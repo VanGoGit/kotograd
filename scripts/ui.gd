@@ -205,6 +205,18 @@ func _make_theme() -> Theme:
 	return t
 
 
+## Крестик «закрыть», нарисованный пикселями (символ ✕ есть не во всех шрифтах).
+func _cross_tex() -> Texture2D:
+	var img := Image.create_empty(9, 9, false, Image.FORMAT_RGBA8)
+	for k in 9:
+		img.set_pixel(k, k, INK)
+		img.set_pixel(8 - k, k, INK)
+		if k < 8:
+			img.set_pixel(k + 1, k, INK)
+			img.set_pixel(7 - k, k, INK)
+	return ImageTexture.create_from_image(img)
+
+
 func _icon(tex: Texture2D, target := 24) -> TextureRect:
 	var r := TextureRect.new()
 	var k := maxi(1, target / maxi(tex.get_width(), tex.get_height()))
@@ -348,7 +360,7 @@ func _build_bottom() -> void:
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	toolbar_panel = panel
 	bottom.add_child(panel)
-	show_build_btn = _btn("Постройки ▴", func(): set_build_hidden(false), "Показать панель построек (V)")
+	show_build_btn = _btn("Постройки", func(): set_build_hidden(false), "Показать панель построек (V)")
 	show_build_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	show_build_btn.visible = false
 	bottom.add_child(show_build_btn)
@@ -369,7 +381,7 @@ func _build_bottom() -> void:
 		b.add_theme_constant_override("icon_max_width", 18)
 		tabs.add_child(b)
 		tab_buttons.append(b)
-	tabs.add_child(_btn("Скрыть ▾", func(): set_build_hidden(true), "Спрятать панель построек и любоваться городом (V)"))
+	tabs.add_child(_btn("Скрыть", func(): set_build_hidden(true), "Спрятать панель построек и любоваться городом (V)"))
 
 	# постройки — в одну строку с прокруткой вправо (колесо мыши тоже листает)
 	tools_scroll = ScrollContainer.new()
@@ -448,7 +460,7 @@ func _tooltip(t: String) -> String:
 	s += "\n" + tr(d.desc)
 	var extra := []
 	if d.get("wonder", false):
-		extra.append(tr("Чудо света — можно построить только одно"))
+		extra.append(tr("Достопримечательность — можно построить только одну"))
 		extra.append(tr("Туристы: +%s мон./с") % str(d.tourism))
 	if d.get("size", 1) == 2:
 		extra.append(tr("Размер: 2×2"))
@@ -615,7 +627,8 @@ func _build_info() -> void:
 	info_sub.add_theme_color_override("font_color", Color(INK, 0.7))
 	info_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	names.add_child(info_sub)
-	var close := _btn("✕", func(): world.info_target = null)
+	var close := _btn("", func(): world.info_target = null)
+	close.icon = _cross_tex()
 	close.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	head.add_child(close)
 	info_body = Label.new()
@@ -694,7 +707,7 @@ func _render_info() -> void:
 		info_name.text = tr(d.name)
 		var lvl := int(o.get("lvl", 1))
 		var maxl: int = D.ups(o.t).size() + 1
-		info_sub.text = tr("Строится… %d%%") % int((1.0 - o.build / d.build) * 100.0) if o.build > 0.0 else (tr("Чудо света") if d.get("wonder", false) else (tr("Уровень %d из %d") % [lvl, maxl] if maxl > 1 else ""))
+		info_sub.text = tr("Строится… %d%%") % int((1.0 - o.build / d.build) * 100.0) if o.build > 0.0 else (tr("Достопримечательность") if d.get("wonder", false) else (tr("Уровень %d из %d") % [lvl, maxl] if maxl > 1 else ""))
 		if d.get("wonder", false) and o.build <= 0.0:
 			lines.append(tr("Туристы приносят +%s мон./с") % str(d.tourism))
 		lines.append(tr(d.desc))
@@ -793,9 +806,9 @@ func _chain_lines(o: Dictionary) -> Array:
 			var v: float = world.stock_of(o, g)
 			if v > 0.0:
 				have += 1
-				parts.append("%s ✓ %d" % [tr(D.GOODS[g].name), ceili(v)])
+				parts.append("%s %d" % [tr(D.GOODS[g].name), ceili(v)])
 			else:
-				parts.append("%s —" % tr(D.GOODS[g].name))
+				parts.append(tr("%s нет") % tr(D.GOODS[g].name))
 				missing.append(g)
 		out.append(tr("Товары: %s") % "  ·  ".join(parts))
 		if have > 0:
@@ -935,7 +948,7 @@ func _build_help() -> void:
 		"• Лимиты — монеты и еда копятся до предела хранилищ: банки, склады и супермаркеты поднимают его.",
 		"• Парковки — котики оставляют на них машины. Если парковки рядом нет, машину бросают прямо на дороге, и начинаются пробки!",
 		"• Еда — рыбные причалы и пекарни. Отдых и природа — пляжи, пальмы, зонтики, фонтаны и знак KOTOWOOD.",
-		"• Чудеса — достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждое строится один раз и привлекает туристов.",
+		"• Достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждая строится один раз и привлекает туристов.",
 		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.",
 		"• Цели — слева сверху текущее задание, за каждое дают монетки. Все задания и достижения — кнопка «Цели».",
 		"• События — иногда в городе праздник: фестиваль на пляже, ярмарка, премьера, салют. Гости приходят сами, а котики становятся счастливее.",
@@ -1328,7 +1341,7 @@ func _fmt(n: float) -> String:
 
 
 func _update_hud() -> void:
-	lbl_coins.text = "∞" if world.unlimited else "%s/%s" % [_fmt(world.coins), _fmt(world.stats.coin_cap)]
+	lbl_coins.text = tr("без лимита") if world.unlimited else "%s/%s" % [_fmt(world.coins), _fmt(world.stats.coin_cap)]
 	lbl_coins.add_theme_color_override("font_color", Color("c08a1a") if world.coins >= world.stats.coin_cap - 0.5 else INK)
 	lbl_coin_rate.text = tr("+%.1f/с") % world.income
 	lbl_food.text = "%s/%s" % [_fmt(world.food), _fmt(world.stats.food_cap)]
@@ -1586,10 +1599,11 @@ func _goal_row(g: Dictionary, m: Dictionary, current: bool) -> Control:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 10)
 	p.add_child(hb)
-	var mark := Label.new()
-	mark.text = "✓" if done else ("→" if current else "·")
-	mark.custom_minimum_size = Vector2(18, 0)
-	mark.add_theme_font_size_override("font_size", 18)
+	# значок слева: звёздочка — готово, лапка — текущая цель, бледное сердечко — впереди
+	var mark := _icon(spr.small.star if done else (spr.icons.paw if current else spr.icons.heart), 15)
+	mark.custom_minimum_size = Vector2(20, 0)
+	if not done and not current:
+		mark.modulate = Color(1, 1, 1, 0.35)
 	hb.add_child(mark)
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 0)
@@ -1657,7 +1671,7 @@ func _build_celebrate() -> void:
 		r.texture = Spr.scaled(spr.cat_set(pair[0], pair[1]).stand[0], 4)
 		cats.add_child(r)
 	vb.add_child(cats)
-	var txt := _label("Все чудеса света построены, и о вашем городе знает всё побережье. Котики устраивают в вашу честь большой салют!\n\nВсе задания выполнены, но город можно строить и дальше: ищите новые достижения и праздники.")
+	var txt := _label("Все достопримечательности построены, и о вашем городе знает всё побережье. Котики устраивают в вашу честь большой салют!\n\nВсе задания выполнены, но город можно строить и дальше: ищите новые достижения и праздники.")
 	txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(txt)
 	var ok := _btn("Ура!", func(): close_modals())

@@ -317,7 +317,7 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 	var key := kind + "|" + col_hex
 	if _veh_cache.has(key):
 		return _veh_cache[key]
-	var van := not (kind == "car" or kind == "police" or kind == "taxi")
+	var van := not (kind in ["car", "police", "taxi", "convertible", "sport"])
 	var col := Color(col_hex)
 	var sh := col.darkened(0.18)
 	var glass := Color("bfe6f7")
@@ -380,7 +380,27 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 				else:
 					p.R(1, 8, 10, 1, dark)
 	var side_fn := func(p: Painter) -> void:
-		if not van:
+		if kind == "convertible":
+			# кабриолет: без крыши, наклонное стекло, видно сиденья
+			p.R(1, 5, 14, 3, col); p.R(2, 4, 12, 1, col)
+			p.R(10, 2, 1, 2, glass); p.P(11, 3, glass)
+			p.R(4, 3, 2, 1, "6a4a3a"); p.R(7, 3, 2, 1, "6a4a3a")
+			p.R(2, 5, 12, 1, col.lightened(0.25))
+			p.R(1, 7, 14, 1, sh)
+			p.P(14, 5, "fff6c2"); p.P(1, 5, "ff6b6b")
+			p.C(4.5, 8.5, 1.7, wheel); p.C(11.5, 8.5, 1.7, wheel)
+			p.P(4, 8, "aaaaaa"); p.P(11, 8, "aaaaaa")
+		elif kind == "sport":
+			# спорткар: низкий и длинный, с антикрылом
+			p.R(1, 6, 15, 2, col); p.R(3, 5, 12, 1, col)
+			p.R(6, 3, 5, 2, col); p.R(7, 3, 3, 1, glass); p.R(10, 4, 2, 1, glass)
+			p.R(0, 3, 3, 1, sh); p.R(1, 4, 1, 2, sh)
+			p.R(4, 6, 9, 1, col.lightened(0.3))
+			p.R(1, 7, 15, 1, sh)
+			p.P(15, 6, "fff6c2"); p.P(1, 6, "ff6b6b")
+			p.C(4.5, 8.5, 1.7, wheel); p.C(12.5, 8.5, 1.7, wheel)
+			p.P(4, 8, "dddddd"); p.P(12, 8, "dddddd")
+		elif not van:
 			p.R(1, 5, 14, 3, col)
 			p.R(2, 4, 13, 1, col)
 			p.R(4, 1, 8, 3, col)
@@ -412,7 +432,23 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 			p.P(4, 9, "aaaaaa")
 			p.P(11, 9, "aaaaaa")
 	var fb_fn := func(p: Painter, back: bool) -> void:
-		if not van:
+		if kind == "convertible" or kind == "sport":
+			var low := 1 if kind == "sport" else 0
+			p.R(1, 5 + low, 10, 4 - low, col)
+			if kind == "convertible":
+				p.R(3, 3, 6, 1, glass); p.R(2, 4, 1, 1, glass); p.R(9, 4, 1, 1, glass)
+			else:
+				p.R(3, 3 + low, 6, 2, col); p.R(4, 3 + low, 4, 1, glass)
+			p.R(1, 8, 10, 1, sh)
+			if back:
+				p.R(2, 6 + low, 2, 1, "ff6b6b"); p.R(8, 6 + low, 2, 1, "ff6b6b")
+				if kind == "sport":
+					p.R(0, 3, 12, 1, sh)
+			else:
+				p.P(2, 6 + low, "fff6c2"); p.P(9, 6 + low, "fff6c2")
+				p.R(4, 7, 4, 1, dark)
+			p.R(1, 9, 2, 2, wheel); p.R(9, 9, 2, 2, wheel)
+		elif not van:
 			p.R(1, 5, 10, 4, col)
 			p.R(2, 2, 8, 3, col)
 			p.R(3, 2, 6, 2, glass)
@@ -454,7 +490,7 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 		lights = {"side": [[3, 1], [11, 1]], "fb": [[3, 0], [7, 0]]}
 	var res := {
 		"side": [side, flipped(side)], "front": front, "back": back,
-		"driver": {"side": Vector2i(12, 3), "front": Vector2i(5, 2)} if van else {"side": Vector2i(8, 2), "front": Vector2i(5, 2)},
+		"driver": {"side": Vector2i(12, 3), "front": Vector2i(5, 2)} if van else ({"side": Vector2i(6, 2), "front": Vector2i(5, 3)} if kind == "convertible" else ({"side": Vector2i(8, 3), "front": Vector2i(5, 3)} if kind == "sport" else {"side": Vector2i(8, 2), "front": Vector2i(5, 2)})),
 		"lights": lights,
 	}
 	_veh_cache[key] = res
@@ -836,6 +872,14 @@ func _make_fun() -> void:
 		p.R(4, 9, 8, 3, "ffc8d8"); p.R(5, 10, 6, 1, "ffdbe6")
 		p.P(2, 8, "e07a9c"); p.P(13, 8, "e07a9c"); p.P(2, 12, "e07a9c"); p.P(13, 12, "e07a9c")
 	, true, Rect2i(2, 14, 12, 1))
+	obj["pawtile"] = drawn(16, 16, func(p: Painter) -> void:
+		# бетонная плитка с двумя отпечатками лап и автографом
+		p.R(1, 2, 14, 13, "c9bfb0"); p.R(2, 3, 12, 11, "e8e1d6"); p.R(2, 3, 12, 1, "f4efe8")
+		for pw in [Vector2i(4, 5), Vector2i(9, 8)]:
+			p.R(pw.x, pw.y + 2, 3, 2, "a8998a")
+			p.P(pw.x - 1, pw.y + 1, "a8998a"); p.P(pw.x, pw.y, "a8998a"); p.P(pw.x + 2, pw.y, "a8998a"); p.P(pw.x + 3, pw.y + 1, "a8998a")
+		p.R(3, 12, 2, 1, "8a7a90"); p.R(5, 11, 2, 1, "8a7a90"); p.R(7, 12, 3, 1, "8a7a90"); p.P(11, 11, "f59ab2")
+	, true, Rect2i(1, 15, 14, 1))
 	obj["bench"] = drawn(16, 16, func(p: Painter) -> void:
 		p.R(2, 5, 12, 2, "c08f5f"); p.R(2, 5, 12, 1, "d8a874")
 		p.R(2, 9, 12, 2, "c08f5f"); p.R(2, 9, 12, 1, "d8a874")
@@ -1354,9 +1398,14 @@ func _make_icons() -> void:
 		p.R(0, 2, 16, 12, "7a7888"); p.R(0, 2, 16, 1, "b8b6c4"); p.R(0, 13, 16, 1, "b8b6c4")
 		p.R(1, 7, 4, 1, "f4ecd0"); p.R(9, 7, 4, 1, "f4ecd0")
 	, false)
-	icons["oneway"] = drawn(16, 16, func(p: Painter) -> void:
-		p.R(0, 2, 16, 12, "7a7888"); p.R(0, 2, 16, 1, "b8b6c4"); p.R(0, 13, 16, 1, "b8b6c4")
-		p.R(2, 7, 8, 2, "ffffff"); p.R(10, 5, 1, 6, "ffffff"); p.R(11, 6, 1, 4, "ffffff"); p.R(12, 7, 1, 2, "ffffff")
+	icons["blvd"] = drawn(16, 16, func(p: Painter) -> void:
+		p.R(0, 2, 16, 12, "5a4c5e"); p.R(0, 2, 16, 1, "c9b8a0"); p.R(0, 13, 16, 1, "c9b8a0")
+		var star := ["...x...", "..xxx..", "xxxxxxx", ".xxxxx.", "..xxx..", ".xx.xx.", "x.....x"]
+		for r in 7:
+			for c in 7:
+				if star[r][c] == "x":
+					p.P(4 + c, 4 + r, "f59ab2")
+		p.P(7, 7, "e8c870")
 	, false)
 	icons["t_grass"] = drawn(16, 16, func(p: Painter) -> void:
 		p.R(0, 0, 16, 16, "6cc1e0"); p.C(8, 8, 6.5, "9bd67f"); p.P(6, 6, "b0e294"); p.P(10, 9, "8bc871"); p.P(7, 11, "8bc871")
@@ -1540,6 +1589,6 @@ func tool_texture(t: String) -> Texture2D:
 			return icons["road"]
 		"flowers":
 			return flowers[0]
-		"t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow", "highway", "rail", "oneway":
+		"t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow", "highway", "rail", "blvd":
 			return icons[t]
 	return obj.get(t)

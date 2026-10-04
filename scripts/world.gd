@@ -71,7 +71,7 @@ var pairs := {}              # объединённые соседние зда�
 var ramps: Array = []
 var _light_clock := 0.0
 const LIGHT_CYCLE := 9.0
-const FLAT := ["boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
+const FLAT := ["pawtile", "boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
 
 # --- производное / временное ---
 var stats := {}
@@ -113,7 +113,6 @@ var _pan_start := Vector2.ZERO
 var _pan_cam := Vector2.ZERO
 var _painting := false
 var _last_paint := -1
-var _ow_prev := -1               # прошлая клетка, по которой провели «односторонним движением»
 var _cong := {}                  # клетка -> сколько машин там стоит (для объезда пробок)
 var _last_reason_ms := 0
 var mouse_tile := Vector2i(-1, -1)
@@ -195,7 +194,7 @@ func serialize() -> String:
 	for i in W * H:
 		var o = objs[i]
 		if o != null and o.i == i:
-			var m := [i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), int(o.get("ow", -1))]
+			var m := [i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), -1]
 			if o.has("stock") or o.has("out"):
 				var st := {}
 				for g in o.get("stock", {}):
@@ -310,8 +309,6 @@ func deserialize(text: String) -> bool:
 		var o := place_obj(int(m[0]), str(m[1]), int(m[2]), float(m[3]))
 		if m.size() > 4:
 			o["lvl"] = int(m[4])
-		if m.size() > 5 and int(m[5]) >= 0:
-			o["ow"] = int(m[5])
 		if m.size() > 6 and typeof(m[6]) == TYPE_DICTIONARY:
 			var st := {}
 			for g in m[6].get("s", {}):
@@ -741,7 +738,9 @@ func recalc() -> void:
 			v += 6.0
 		if _next_to(h, "road"):
 			v += 5.0
-		if _next_to(h, "path"):
+		if _next_to(h, "blvd"):
+			v += 8.0
+		elif _next_to(h, "path"):
 			v += 5.0
 		st.house_happy[h] = minf(100.0, v)
 	stats = st
@@ -1509,7 +1508,7 @@ func _leisure_trip(c: Dictionary):
 func _tile_cost(i: int) -> float:
 	var o = objs[i]
 	if o != null:
-		if o.t == "path":
+		if o.t == "path" or o.t == "blvd":
 			return 1.0
 		if o.t == "road":
 			# по проезжей части котики не гуляют — только переходят её, лучше по зебре
@@ -1624,14 +1623,6 @@ func goals_around(b: int) -> Dictionary:
 	return g
 
 
-## Направление односторонней дороги (индекс в DIRS) или -1. На перекрёстках движение всегда двустороннее.
-func ow_at(i: int) -> int:
-	var o = objs[i]
-	if o == null or o.t != "road" or junctions.has(i):
-		return -1
-	return int(o.get("ow", -1))
-
-
 ## Сколько «стоит» въехать на клетку: магистраль быстрее, светофоры и пробки — дольше.
 func _step_cost(n: int) -> int:
 	var o = objs[n]
@@ -1641,7 +1632,7 @@ func _step_cost(n: int) -> int:
 	return c + mini(3, _cong.get(n, 0)) * 5
 
 
-## Путь по дорогам: самый быстрый с учётом магистралей, светофоров, пробок и одностороннего движения.
+## Путь по дорогам: самый быстрый с учётом магистралей, светофоров и пробок.
 func road_route(starts: Array, goals: Dictionary, avoid: Dictionary = {}):
 	if starts.is_empty() or goals.is_empty():
 		return null
@@ -1675,7 +1666,6 @@ func road_route(starts: Array, goals: Dictionary, avoid: Dictionary = {}):
 				return out
 			var ux := u % W
 			var uy := u / W
-			var ow_u := ow_at(u)
 			for di in 4:
 				var dv: Vector2i = DIRS[di]
 				var nx: int = ux + dv.x
@@ -1683,7 +1673,7 @@ func road_route(starts: Array, goals: Dictionary, avoid: Dictionary = {}):
 				if not is_drivable(nx, ny):
 					continue
 				var n := ny * W + nx
-				if avoid.has(n) or ow_u == (di ^ 1) or ow_at(n) == (di ^ 1):
+				if avoid.has(n):
 					continue
 				var nd := c + _step_cost(n)
 				if nd < dist[n]:
@@ -1844,7 +1834,7 @@ func _try_drive(c: Dictionary, d: Dictionary) -> bool:
 	c.state = "drive"
 	c.at = -1
 	c.dest = d
-	var car := _make_car("car", c.car, route, c, d.b, -1)
+	var car := _make_car(car_model(c), c.car, route, c, d.b, -1)
 	car["mode"] = "home" if d.kind == "home" else ("lot" if lot >= 0 else "street")
 	car["lot"] = lot
 	cars.append(car)
@@ -1954,7 +1944,7 @@ func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
 	for o in opts:
 		var w := 1.0
 		var ob = obj_at(o.x, o.y)
-		if ob != null and ob.t == "path":
+		if ob != null and (ob.t == "path" or ob.t == "blvd"):
 			w *= 4.0
 		if ob != null and ob.t == "road":
 			w *= 0.6
@@ -2086,7 +2076,7 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 			var dy: float = tgt.y - c.y
 			var dist := sqrt(dx * dx + dy * dy)
 			var o = obj_at(tgt.x, tgt.y)
-			var sp := dt * (1.7 if o != null and o.t == "path" else (1.4 if o != null and o.t == "road" else 1.1))
+			var sp := dt * (1.7 if o != null and (o.t == "path" or o.t == "blvd") else (1.4 if o != null and o.t == "road" else 1.1))
 			if absf(dx) > 0.01:
 				c.dir = 1 if dx > 0 else -1
 			if dist <= sp:
@@ -2177,7 +2167,7 @@ func _traffic(car: Dictionary) -> int:
 	var side_v := Vector2(fwd_v.y, fwd_v.x)
 	var me := Vector2(car.bx, car.by)
 	var hw: bool = car.get("hw", false)
-	var multi: bool = hw or car.get("ow", false)
+	var multi: bool = hw
 	var my_p := Vector2(car.px, car.py)
 	var my_t := _tile_of(car)
 	var in_box := junctions.has(my_t)
@@ -2195,7 +2185,7 @@ func _traffic(car: Dictionary) -> int:
 				return 2
 			continue
 		# на многополосной дороге мешает только машина в своей полосе
-		if multi and (o.get("hw", false) or o.get("ow", false)) and o.get("lane", 0) != car.get("lane", 0):
+		if multi and o.get("hw", false) and o.get("lane", 0) != car.get("lane", 0):
 			continue
 		if fwd > 0.5 and fwd < 11.0 and side < 3.5:
 			if odot < 0.5 and in_box and _tile_of(o) == my_t:
@@ -2212,7 +2202,7 @@ func _traffic(car: Dictionary) -> int:
 		var side := absf(rel.dot(side_v))
 		if fwd > -8.0 and fwd < 14.0 and side < 4.0:
 			# прежде чем выехать на встречку, пропускаем встречных (кто уже объезжает — едет дальше)
-			if not car.get("passing", false) and not car.get("ow", false) and _oncoming(car, 18.0) != null:
+			if not car.get("passing", false) and _oncoming(car, 18.0) != null:
 				car["blk"] = _oncoming(car, 18.0)
 				return 2
 			return 1
@@ -2244,9 +2234,14 @@ func _lane_free(car: Dictionary, lane: int) -> bool:
 	return true
 
 
+## Калифорния: у многих котиков кабриолет или спортивная машина (у каждого своя, навсегда).
+func car_model(c: Dictionary) -> String:
+	return ["car", "convertible", "sport", "car", "convertible"][int(c.get("id", 0)) % 5]
+
+
 func _make_car(kind: String, color: String, route: Array, cat, target: int, return_to: int) -> Dictionary:
 	var car := {"kind": kind, "color": color, "route": route, "k": 0, "prog": 0.0, "cat": cat, "target": target,
-		"return_to": return_to, "px": 0.0, "py": 0.0, "bx": 0.0, "by": 0.0, "dir": "r", "speed": 3.0 if kind == "car" else 2.6,
+		"return_to": return_to, "px": 0.0, "py": 0.0, "bx": 0.0, "by": 0.0, "dir": "r", "speed": 3.0 if kind in ["car", "convertible", "sport"] else 2.6,
 		"base": -1, "wait": 0.0, "passing": false, "mode": "home", "lot": -1, "lane": randi() % 2, "hw": false}
 	_car_pos(car)
 	return car
@@ -2267,15 +2262,10 @@ func _car_pos(car: Dictionary) -> void:
 		car.dir = "u"
 	var off: Vector2 = LANE[car.dir]
 	var hw := is_highway(a.x, a.y) or is_highway(b.x, b.y)
-	var ow := ow_at(a.y * W + a.x) >= 0 and (ow_at(b.y * W + b.x) >= 0 or junctions.has(b.y * W + b.x) or a == b)
 	car["hw"] = hw
-	car["ow"] = ow and not hw
 	if hw:
 		# магистраль: ближняя полоса — 2 px от разделительной, дальняя — 5 px
 		off = off / 3.0 * (2.0 if car.get("lane", 0) == 0 else 5.0)
-	elif ow:
-		# одностороннее движение: обе полосы попутные
-		off = off if car.get("lane", 0) == 0 else -off
 	elif car.get("passing", false):
 		off = -off
 	car["bx"] = (a.x + dx * car.prog) * T + 8.0
@@ -2513,9 +2503,17 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 		var o = objs[i]
 		if terrain[i] == d.terra:
 			return {"ok": false}
-		if o != null and o.t != "road" and o.t != "path":
+		if o != null and o.t != "road" and o.t != "path" and o.t != "blvd":
 			return {"ok": false, "reason": tr("Сначала уберите постройку")}
 		return {"ok": true, "cost": 0}
+	if d.get("need_blvd", false):
+		var near := false
+		for dv in DIRS:
+			var nb = obj_at(x + dv.x, y + dv.y)
+			if nb != null and nb.t == "blvd":
+				near = true
+		if not near:
+			return {"ok": false, "reason": tr("Ставится только рядом с Голливудским бульваром")}
 	if d.get("need_rail", false):
 		var near_rail := false
 		var sz := D.size_of(t)
@@ -2528,7 +2526,7 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 		if not near_rail:
 			return {"ok": false, "reason": tr("Ставьте вплотную к рельсам")}
 	if d.get("wonder", false) and wonder_built(t):
-		return {"ok": false, "reason": tr("Это чудо уже есть в городе")}
+		return {"ok": false, "reason": tr("Эта достопримечательность уже есть в городе")}
 	var w := D.size_of(t)
 	var water := 0
 	var cost: int = d.cost
@@ -2551,14 +2549,14 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 				high += 1
 	if d.get("need_high", false) and high < w * w:
 		return {"ok": false, "reason": tr("Строится только на холмах и в горах")}
-	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false)):
+	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "blvd", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false)):
 		return {"ok": false, "reason": tr("Слишком круто: в горах — только жильё и дороги")}
 	if water > 0:
 		if t == "road":
 			cost = 8
 		elif t == "highway":
 			cost = 14
-		elif t == "path":
+		elif t == "path" or t == "blvd":
 			cost = 6
 		elif t == "rail":
 			cost = 12
@@ -2603,9 +2601,6 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if tool == "bulldoze":
 		_bulldoze(x, y, first)
 		return
-	if tool == "oneway":
-		_oneway_tool(x, y, first)
-		return
 	var here = objs[y * W + x]
 	if here != null and ((tool == "rail" and here.t == "road") or (tool == "road" and here.t == "rail")):
 		_make_crossing(x, y)
@@ -2629,42 +2624,6 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if r.cost > 0:
 		float_text(Vector2(x * T + 8 * w, y * T), "-%d" % r.cost, Color("8a5a3b"))
 	recalc()
-
-
-## «Одностороннее движение»: ведём по дороге — стрелки ложатся по ходу; нажатие — смена направления по кругу.
-func _oneway_tool(x: int, y: int, first: bool) -> void:
-	var i := y * W + x
-	var o = objs[i]
-	if o == null or o.t != "road":
-		if first and Time.get_ticks_msec() - _last_reason_ms > 400:
-			_last_reason_ms = Time.get_ticks_msec()
-			float_text(Vector2(x * T + 8, y * T), tr("Проведите по обычной дороге"), Color("c24a5a"))
-		_ow_prev = -1
-		return
-	if first or _ow_prev < 0:
-		const ORDER := [-1, 0, 2, 1, 3]
-		var cur := int(o.get("ow", -1))
-		_set_ow(i, ORDER[(ORDER.find(cur) + 1) % ORDER.size()])
-		_ow_prev = i
-	else:
-		var dv := Vector2i(x - _ow_prev % W, y - _ow_prev / W)
-		var di := DIRS.find(dv)
-		if di >= 0:
-			if objs[_ow_prev] != null and objs[_ow_prev].t == "road":
-				_set_ow(_ow_prev, di)
-			_set_ow(i, di)
-		_ow_prev = i
-	sound.play("pop", 1.2)
-	recalc()
-
-
-func _set_ow(i: int, di: int) -> void:
-	var o = objs[i]
-	if di < 0:
-		o.erase("ow")
-	else:
-		o["ow"] = di
-	mark_dirty(i % W, i / W, 1)
 
 
 ## Рельсы через дорогу (или дорога через рельсы) — переезд со шлагбаумом.
@@ -2698,7 +2657,7 @@ func _bulldoze(x: int, y: int, first: bool) -> void:
 		coins -= 2.0
 	else:
 		var on_water: bool = terrain[o.i] == WATER
-		var refund: int = 3 if (o.t == "road" or o.t == "path") and on_water else int(d.cost / 2)
+		var refund: int = 3 if (o.t == "road" or o.t == "path" or o.t == "blvd") and on_water else int(d.cost / 2)
 		coins += refund
 		if refund > 0:
 			float_text(Vector2(x * T + 8, y * T), "+%d" % refund, Color("c08a1a"))
@@ -2760,7 +2719,7 @@ func _update_construction(dt: float) -> void:
 			float_text(cp + Vector2(0, -10), tr("%s — готово!") % tr(D.def(o.t).name), Color("4f8a4f"))
 			sound.play("pop")
 			if D.def(o.t).get("wonder", false):
-				ui.toast(tr("Чудо света построено: %s! Туристы уже едут.") % tr(D.def(o.t).name), true, true)
+				ui.toast(tr("Достопримечательность построена: %s! Туристы уже едут.") % tr(D.def(o.t).name), true, true)
 				sound.play("chime")
 				for k in 30:
 					add_p({"type": "sparkle", "x": cp.x + randf_range(-20, 20), "y": cp.y + randf_range(-30, 6), "vx": randf_range(-30, 30), "vy": randf_range(-45, -10), "life": randf_range(1.0, 2.0)})
@@ -3185,7 +3144,7 @@ func _update_cursor() -> void:
 	if tool == "hand":
 		shape = Input.CURSOR_DRAG if _pan_moved else Input.CURSOR_ARROW
 		var o = obj_at(mouse_tile.x, mouse_tile.y)
-		if cat_at(get_global_mouse_position()) != null or (o != null and o.t != "path" and o.t != "road"):
+		if cat_at(get_global_mouse_position()) != null or (o != null and o.t != "path" and o.t != "blvd" and o.t != "road"):
 			shape = Input.CURSOR_POINTING_HAND
 	Input.set_default_cursor_shape(shape)
 
@@ -3197,7 +3156,7 @@ func _click(wp: Vector2) -> void:
 		info_target = {"cat": c}
 		return
 	var o = obj_at(mouse_tile.x, mouse_tile.y)
-	if o != null and o.t != "path" and o.t != "road":
+	if o != null and o.t != "path" and o.t != "blvd" and o.t != "road":
 		info_target = {"tile": o.i}
 	else:
 		info_target = null
@@ -3353,6 +3312,11 @@ func _draw_tile(x: int, y: int) -> void:
 		_draw_highway(px, py, x, y, t == WATER)
 	elif o.t == "path":
 		_draw_path(px, py, x, y, t == WATER, hs)
+	elif o.t == "blvd":
+		if t == WATER:
+			_draw_path(px, py, x, y, true, hs)
+		else:
+			_draw_blvd(px, py, x, y)
 	elif o.t == "rail":
 		_draw_rail(px, py, x, y, t == WATER, false)
 	elif o.t == "crossing":
@@ -3449,10 +3413,6 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if not lf: _r(px, py, 1, 1, 1, 14, curb)
 		if not rt: _r(px, py, 14, 1, 1, 14, curb)
 	var n := int(up) + int(dn) + int(lf) + int(rt)
-	var ow := ow_at(y * W + x)
-	if ow >= 0 and n <= 2 and not is_crosswalk(x, y):
-		_draw_oneway_arrow(px, py, ow)
-		return
 	if not water and is_crosswalk(x, y):
 		# «зебра» поперёк дороги
 		if (lf or rt) and not (up or dn):
@@ -3478,20 +3438,6 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if dn: _r(px, py, 7, 11, 1, 4, line)
 		if lf: _r(px, py, 1, 7, 4, 1, line)
 		if rt: _r(px, py, 11, 7, 4, 1, line)
-
-
-## Белая стрелка односторонней дороги и пунктир между двумя попутными полосами.
-func _draw_oneway_arrow(px: int, py: int, di: int) -> void:
-	var w := "f4f4f8"
-	match di:
-		0:
-			_r(px, py, 3, 7, 7, 2, w); _r(px, py, 10, 5, 1, 6, w); _r(px, py, 11, 6, 1, 4, w); _r(px, py, 12, 7, 1, 2, w)
-		1:
-			_r(px, py, 6, 7, 7, 2, w); _r(px, py, 5, 5, 1, 6, w); _r(px, py, 4, 6, 1, 4, w); _r(px, py, 3, 7, 1, 2, w)
-		2:
-			_r(px, py, 7, 3, 2, 7, w); _r(px, py, 5, 10, 6, 1, w); _r(px, py, 6, 11, 4, 1, w); _r(px, py, 7, 12, 2, 1, w)
-		3:
-			_r(px, py, 7, 6, 2, 7, w); _r(px, py, 5, 5, 6, 1, w); _r(px, py, 6, 4, 4, 1, w); _r(px, py, 7, 3, 2, 1, w)
 
 
 func _draw_rail(px: int, py: int, x: int, y: int, water: bool, on_road: bool) -> void:
@@ -3566,7 +3512,7 @@ func _path_conn(x: int, y: int) -> bool:
 	var n = obj_at(x, y)
 	if n == null:
 		return false
-	if n.t == "path" or n.t == "road":
+	if n.t == "path" or n.t == "blvd" or n.t == "road":
 		return true
 	var d := D.def(n.t)
 	return not d.get("natural", false) and not d.get("walk", false)
@@ -3601,6 +3547,38 @@ func _draw_path(px: int, py: int, x: int, y: int, water: bool, hs: Callable) -> 
 	for k in 3:
 		_r(px, py, 1 + int(hs.call(k + 60) * 14), 1 + int(hs.call(k + 70) * 14), 2, 1, "f4ebe0")
 	var curb := "b8a48e"
+	if not up: _r(px, py, 0, 0, 16, 1, curb)
+	if not dn: _r(px, py, 0, 15, 16, 1, curb)
+	if not lf: _r(px, py, 0, 0, 1, 16, curb)
+	if not rt: _r(px, py, 15, 0, 1, 16, curb)
+
+
+## Голливудский бульвар: тёмная плитка аллеи славы с розовой звездой в каждой клетке.
+func _draw_blvd(px: int, py: int, x: int, y: int) -> void:
+	var up := _path_conn(x, y - 1)
+	var dn := _path_conn(x, y + 1)
+	var lf := _path_conn(x - 1, y)
+	var rt := _path_conn(x + 1, y)
+	_r(px, py, 0, 0, 16, 16, "5a4c5e")
+	_r(px, py, 0, 0, 16, 1, "4a3e4e"); _r(px, py, 0, 0, 1, 16, "4a3e4e")
+	for k in 6:
+		_r(px, py, (k * 7 + x * 3) % 15 + 1, (k * 5 + y * 7) % 15 + 1, 1, 1, "6e5e72")
+	# звёзды через клетку, как на настоящей аллее славы
+	var curb := "c9b8a0"
+	if (x + y) % 2 == 1:
+		_r(px, py, 3, 3, 10, 10, "625468"); _r(px, py, 7, 7, 2, 2, "e8c870")
+		if not up: _r(px, py, 0, 0, 16, 1, curb)
+		if not dn: _r(px, py, 0, 15, 16, 1, curb)
+		if not lf: _r(px, py, 0, 0, 1, 16, curb)
+		if not rt: _r(px, py, 15, 0, 1, 16, curb)
+		return
+	var star := ["...x...", "..xxx..", "xxxxxxx", ".xxxxx.", "..xxx..", ".xx.xx.", "x.....x"]
+	for r in 7:
+		for c in 7:
+			if star[r][c] == "x":
+				_r(px, py, 4 + c, 2 + r, 1, 1, "f59ab2")
+	_r(px, py, 7, 5, 1, 1, "e8c870")
+	_r(px, py, 5, 11, 6, 1, "e8c870"); _r(px, py, 6, 12, 4, 1, "c8a850")
 	if not up: _r(px, py, 0, 0, 16, 1, curb)
 	if not dn: _r(px, py, 0, 15, 16, 1, curb)
 	if not lf: _r(px, py, 0, 0, 1, 16, curb)
@@ -3650,7 +3628,7 @@ func _draw() -> void:
 		for x in range(v[0], v[2] + 1):
 			var i := y * W + x
 			var o = objs[i]
-			if o != null and o.i == i and o.t != "path" and o.t != "road" and pairs.get(i, "") != "R":
+			if o != null and o.i == i and o.t != "path" and o.t != "blvd" and o.t != "road" and pairs.get(i, "") != "R":
 				# плоские постройки (парковки, корты) — часть земли: котики и машины поверх них
 				list.append([(y * T - 8.0) if FLAT.has(o.t) else float((y + o.w) * T), 0, o, x, y])
 				if SCENES.has(o.t) and _scene_on(o, h):
@@ -3673,7 +3651,7 @@ func _draw() -> void:
 		if tx < v[0] or tx > v[2] or ty < v[1] or ty > v[3]:
 			continue
 		var off: Vector2 = LANE.get(c.car_dir, Vector2.ZERO)
-		var pc := {"kind": "car", "color": c.car, "px": tx * T + 8.0 + off.x, "py": ty * T + 8.0 + off.y, "dir": c.car_dir, "cat": null, "parked": true}
+		var pc := {"kind": car_model(c), "color": c.car, "px": tx * T + 8.0 + off.x, "py": ty * T + 8.0 + off.y, "dir": c.car_dir, "cat": null, "parked": true}
 		list.append([pc.py + 4.0, 2, pc])
 	list.sort_custom(func(a, b): return a[0] < b[0])
 	_draw_driveways(v)
@@ -4203,7 +4181,7 @@ func _draw_ghost() -> void:
 				if in_map(x, y) and Vector2(x - cx, y - cy).length() <= rad:
 					draw_rect(Rect2(x * T, y * T, T, T), col)
 	draw_rect(Rect2(tx * T, ty * T, w * T, w * T), Color(0.5, 1, 0.63, 0.35) if r.ok else Color(1, 0.35, 0.43, 0.35))
-	if tool != "path" and tool != "road" and not d.has("terra"):
+	if tool != "path" and tool != "blvd" and tool != "road" and not d.has("terra"):
 		var img: Texture2D = spr.tool_texture(tool)
 		draw_texture(img, Vector2(tx * T + (w * T - img.get_width()) / 2, (ty + w) * T - img.get_height()), Color(1, 1, 1, 0.7))
 

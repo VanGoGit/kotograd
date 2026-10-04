@@ -18,7 +18,7 @@ const KINDS := {
 		"outfits": ["actor", "actor", "blogger", "usher", "tourist"]},
 	"game": {"name": "Матч «Котоджерс»", "desc": "Бейсбол, хот-доги и волна на трибунах!", "h": [12.0, 16.0], "dur": 2.5, "n": 14, "happy": 6.0, "income": 0.2,
 		"outfits": ["fan"]},
-	"tourists": {"name": "Автобус туристов", "desc": "Туристы приехали посмотреть на чудо света и привезли монетки.", "h": [9.0, 16.0], "dur": 2.5, "n": 10, "happy": 3.0, "income": 0.0, "coins": 150,
+	"tourists": {"name": "Автобус туристов", "desc": "Туристы приехали посмотреть на достопримечательности и привезли монетки.", "h": [9.0, 16.0], "dur": 2.5, "n": 10, "happy": 3.0, "income": 0.0, "coins": 150,
 		"outfits": ["tourist"]},
 }
 const FW_COLORS := ["ff6b8b", "ffd75e", "7fc4e8", "c8a8ff", "9ed8c8", "ffffff", "ffb07a"]

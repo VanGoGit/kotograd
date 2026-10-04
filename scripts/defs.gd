@@ -18,14 +18,15 @@ const DEFS := {
 	"t_water": {"name": "Вода", "cost": 0, "unlock": 0, "terra": 1, "paint": true, "desc": "Убрать сушу: здесь снова будет вода. Бесплатно. Под дорогой получится мост."},
 	"road": {"name": "Дорога (2 полосы)", "cost": 3, "unlock": 0, "walk": true, "paint": true, "desc": "По дорогам котики ездят на машинах на работу и домой. На воде получается мост (8 мон.)."},
 	"parking": {"name": "Парковка", "cost": 10, "unlock": 0, "parking": 4, "walk": true, "up": [10, 20], "desc": "Стоянка на 4 машины у дороги. Котики оставляют здесь машины и идут пешком. Без парковок машины стоят прямо на дорогах — бывают пробки!"},
-	"garage": {"name": "Паркинг", "cost": 90, "unlock": 8, "size": 2, "parking": 20, "build": 8.0, "up": [70, 140], "desc": "Многоэтажный паркинг на 20 машин. Ставьте рядом с офисами и чудесами."},
+	"garage": {"name": "Паркинг", "cost": 90, "unlock": 8, "size": 2, "parking": 20, "build": 8.0, "up": [70, 140], "desc": "Многоэтажный паркинг на 20 машин. Ставьте рядом с офисами и достопримечательностями."},
 	"highway": {"name": "Магистраль", "cost": 6, "unlock": 5, "walk": false, "paint": true, "desc": "Широкое шоссе: по 2 полосы в каждую сторону, машины едут быстрее и обгоняют. Пешеходам сюда нельзя. Дома к магистрали не подключаются — нужна обычная дорога."},
-	"oneway": {"name": "Одностороннее движение", "cost": 0, "free": true, "unlock": 0, "paint": true, "desc": "Проведите по дороге — она станет односторонней в эту сторону, и машины поедут по ней в две полосы. Нажатие на дорогу меняет направление по кругу, ещё раз — снова двустороннее. Бесплатно."},
 	"rail": {"name": "Железная дорога", "cost": 6, "unlock": 6, "walk": true, "paint": true, "desc": "Рельсы для поездов. Поезд сам ходит между вокзалами и платформами одной линии, а котики ездят на нём в другие районы. Через дорогу получится переезд со шлагбаумом, через воду — мост."},
 	"crossing": {"name": "Железнодорожный переезд", "cost": 6, "unlock": 99999, "walk": true, "desc": "Когда идёт поезд, шлагбаум закрывается и машины ждут."},
 	"platform": {"name": "Платформа", "cost": 50, "unlock": 6, "jobs": 1, "job": "conductor", "hub": "rail", "need_rail": true, "build": 4.0, "look": {"wall": "efe6d6", "roof": "shed", "rc": "2f8a4f", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "2f8a4f", "fg": "ffffff", "h": 16}, "desc": "Маленькая остановка поезда. Ставьте вплотную к рельсам."},
 	"station": {"name": "Вокзал «Юнион»", "cost": 160, "unlock": 10, "size": 2, "jobs": 4, "job": "conductor", "hub": "rail", "need_rail": true, "nopad": true, "shop": 0.6, "service": 5, "sradius": 8, "build": 10.0, "up": [120, 240], "look": {"wall": "f2dcc0", "roof": "gable", "rc": "c8553d", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "c8553d", "fg": "ffffff", "h": 30, "extra": ["tower"]}, "desc": "Большой вокзал с часовой башней. Ставьте вплотную к рельсам — поезд будет останавливаться здесь."},
 	"airport": {"name": "Аэропорт", "cost": 450, "unlock": 25, "size": 3, "jobs": 8, "job": "pilot", "hub": "air", "shop": 1.2, "tourism": 1.5, "build": 20.0, "look": {"wall": "e8eef4", "roof": "flat", "rc": "9aa6b8", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 64, "extra": ["runway"]}, "desc": "Самолёты летают в другие аэропорты вашего города. Нужно хотя бы два аэропорта — иначе лететь некуда. Отлично связывает дальние острова!"},
+	"blvd": {"name": "Голливудский бульвар", "cost": 8, "unlock": 10, "walk": true, "paint": true, "desc": "Аллея славы: тёмная плитка с розовыми звёздами. Котики гуляют по ней быстрее, дома рядом уютнее, а вдоль бульвара можно выложить плитку с отпечатками лапок."},
+	"pawtile": {"name": "Плитка с отпечатками лапок", "cost": 20, "unlock": 10, "walk": true, "stroll": true, "happy": 5, "radius": 3, "need_blvd": true, "desc": "Отпечатки лапок знаменитых котиков в цементе. Котики приходят их рассмотреть. Ставится только рядом с Голливудским бульваром."},
 	"path": {"name": "Тротуар", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Пешеходная дорожка: по ней котики ходят быстрее."},
 
 	"house": {"name": "Домик", "cost": 30, "unlock": 0, "cap": 3, "build": 4.0, "up": [25, 50], "desc": "Домик с ушками на крыше. Живут 3 котика."},
@@ -174,7 +175,7 @@ const DEFS := {
 
 const TABS := [
 	{"name": "Рельеф", "icon": "t_grass", "tools": ["t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow"]},
-	{"name": "Транспорт", "icon": "road", "tools": ["road", "oneway", "highway", "path", "parking", "garage", "rail", "platform", "station", "airport"]},
+	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "blvd", "pawtile", "parking", "garage", "rail", "platform", "station", "airport"]},
 	{"name": "Жильё", "icon": "house", "tools": ["trailer", "house", "bungalow", "townhouse", "cottage", "villa", "mansion", "apartments", "condo"]},
 	{"name": "Магазины", "icon": "shop", "tools": ["shop", "techstore", "boutique", "bookstore", "toystore", "petshop", "florist", "pharmacy", "supermarket", "mall"]},
 	{"name": "Еда", "icon": "sushi", "tools": ["pier", "farm", "bakery", "cafe", "sushi", "pizzeria", "icecream", "burger", "tacotruck", "donut", "boba", "juicebar", "restaurant", "market"]},
@@ -185,7 +186,7 @@ const TABS := [
 	{"name": "Город", "icon": "townhall", "tools": ["townhall", "lifeguard", "post", "school", "police", "hospital", "fire", "library", "courthouse", "kindergarten", "university", "lab", "metro", "busstation", "taxidepot", "helipad"]},
 	{"name": "Отдых", "icon": "umbrella", "tools": ["umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "playground", "surf", "boatdock", "marina", "skatepark", "tennis", "volleyball", "arcade", "bowling", "nightclub", "aquarium", "zoo", "museum", "gallery"]},
 	{"name": "Природа", "icon": "palm", "tools": ["flowers", "palm", "jacaranda", "statue", "billboard", "watertower"]},
-	{"name": "Чудеса", "icon": "observatory", "tools": ["sign", "urban_light", "pier_wheel", "bowl", "observatory", "chinese", "concert", "capitol", "stadium", "getty", "tower"]},
+	{"name": "Достопримечательности", "icon": "observatory", "tools": ["sign", "urban_light", "pier_wheel", "bowl", "observatory", "chinese", "concert", "capitol", "stadium", "getty", "tower"]},
 ]
 
 const TOOL_INFO := {
@@ -413,7 +414,7 @@ const USES := {
 
 
 ## Улучшения есть у всех построек, кроме дорог, природы, мелкого декора и чудес.
-const NO_UPGRADE := ["road", "oneway", "boatdock", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
+const NO_UPGRADE := ["road", "boatdock", "blvd", "pawtile", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
 	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
 
 
