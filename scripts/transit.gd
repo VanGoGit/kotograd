@@ -307,20 +307,25 @@ func _update_train(tr: Dictionary, dt: float) -> void:
 		tr.dwell -= dt
 		if tr.dwell > 0.0:
 			return
-		# следующая станция
+		# поезд стоит, пока в него не сядет котик (или пока котик не ждёт на другой станции)
+		var here: int = tr.stops[tr.si]
+		_board_waiting(tr, here)
+		var target := _next_target(tr, here)
+		if target < 0:
+			tr.dwell = 0.5
+			return
 		var cur: Vector2i = tr.route[tr.route.size() - 1]
-		for attempt in tr.stops.size():
-			tr.si = (tr.si + 1) % tr.stops.size()
-			var r = rail_route(cur.y * W + cur.x, hubs[tr.stops[tr.si]].stop)
-			if r != null and r.size() >= 2:
-				tr.route = r
-				tr.k = 0
-				tr.prog = 0.0
-				tr.mode = "move"
-				tr.arrived = false
-				if world.on_screen(Vector2(tr.hx, tr.hy)):
-					world.sound.play("horn", 1.0, -10.0)
-				return
+		var r = rail_route(cur.y * W + cur.x, hubs[target].stop)
+		if r != null and r.size() >= 2:
+			tr.si = tr.stops.find(target)
+			tr.route = r
+			tr.k = 0
+			tr.prog = 0.0
+			tr.mode = "move"
+			tr.arrived = false
+			if world.on_screen(Vector2(tr.hx, tr.hy)):
+				world.sound.play("horn", 1.0, -10.0)
+			return
 		tr.dwell = 2.0
 		return
 	var route: Array = tr.route
@@ -363,6 +368,28 @@ func _arrive(tr: Dictionary) -> void:
 		if tr.stops.has(c.trip.to) and c.trip.to != b and tr.passengers.size() < 24:
 			_board(c)
 			tr.passengers.append(c)
+
+
+func _board_waiting(tr: Dictionary, b: int) -> void:
+	for c in _waiting_at(b):
+		if tr.stops.has(c.trip.to) and c.trip.to != b and tr.passengers.size() < 24:
+			_board(c)
+			tr.passengers.append(c)
+
+
+## Куда ехать: туда, куда нужно первому пассажиру, или за котиком на другую станцию.
+func _next_target(tr: Dictionary, here: int) -> int:
+	for c in tr.passengers:
+		var trip = c.get("trip")
+		if trip != null and tr.stops.has(trip.to) and trip.to != here:
+			return trip.to
+	for b in tr.stops:
+		if b == here:
+			continue
+		for c in _waiting_at(b):
+			if tr.stops.has(c.trip.to) and c.trip.to != b:
+				return b
+	return -1
 
 
 func _dispatch_planes() -> void:

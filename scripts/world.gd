@@ -1247,6 +1247,41 @@ func roads_around(b: int) -> Array:
 	return out
 
 
+## Дорога, до которой от здания можно дойти: вплотную или в паре шагов по тротуару и траве.
+func access_roads(b: int) -> Array:
+	var near := roads_around(b)
+	if not near.is_empty():
+		return near
+	var seen := {}
+	var front: Array = []
+	for p in around(b):
+		var i: int = p.y * W + p.x
+		if foot_ok(i):
+			seen[i] = true
+			front.append(i)
+	var out: Array = []
+	for depth in 3:
+		var nxt: Array = []
+		for i in front:
+			for dv in DIRS:
+				var nx: int = i % W + dv.x
+				var ny: int = i / W + dv.y
+				if not in_map(nx, ny):
+					continue
+				var n := ny * W + nx
+				if seen.has(n):
+					continue
+				seen[n] = true
+				if is_road(nx, ny):
+					out.append(n)
+				elif foot_ok(n):
+					nxt.append(n)
+		if not out.is_empty():
+			return out
+		front = nxt
+	return out
+
+
 func _door_of(b: int):
 	for p in around(b):
 		if foot_ok(p.y * W + p.x):
@@ -1325,16 +1360,25 @@ func _try_drive(c: Dictionary, d: Dictionary) -> bool:
 			return _walk_to_car(c, d, goals_around(c.car_lot))
 	elif c.state == "in" and c.at == c.home and is_ready(c.home):
 		starts = roads_around(c.home)
+		if starts.is_empty():
+			# дом не у самой дороги — сначала дойти до неё по тротуару
+			var acc := access_roads(c.home)
+			if acc.is_empty():
+				return false
+			return _walk_to_car(c, d, _to_set(acc))
+	elif c.near_car and _car_at_home(c) and c.home >= 0:
+		var here := roundi(c.y) * W + roundi(c.x)
+		starts = [here] if is_road(roundi(c.x), roundi(c.y)) else access_roads(c.home)
 	if starts.is_empty():
 		return false
 	var lot := -1
 	if d.kind != "home":
 		lot = _find_lot(d.b)
-	var goal := _to_set(roads_around(lot if lot >= 0 else d.b))
+	var goal := _to_set(access_roads(lot if lot >= 0 else d.b))
 	var route = road_route(starts, goal)
 	if route == null and lot >= 0:
 		lot = -1
-		route = road_route(starts, _to_set(roads_around(d.b)))
+		route = road_route(starts, _to_set(access_roads(d.b)))
 	if route == null or route.size() < 2:
 		return false
 	c.car_tile = -1
@@ -1376,7 +1420,7 @@ func _go_to(c: Dictionary, d: Dictionary, allow_car := true) -> void:
 		c.timer = 0.0
 	if kind == "wander" or kind == "rest":
 		return
-	if can_car and not _car_at_home(c) and _try_drive(c, d):
+	if can_car and (not _car_at_home(c) or c.near_car) and _try_drive(c, d):
 		return
 	var sx := roundi(c.x)
 	var sy := roundi(c.y)
@@ -1783,7 +1827,11 @@ func _finish_car(car: Dictionary, broken: bool) -> void:
 	match car.get("mode", "home"):
 		"home":
 			if is_ready(car.target):
-				_enter(c, car.target)
+				if roads_around(car.target).has(end.y * W + end.x):
+					_enter(c, car.target)
+				else:
+					# машина уехала в гараж, а котик идёт от дороги до двери
+					_go_to(c, d, false)
 		"lot":
 			if is_ready(car.lot):
 				c.car_lot = car.lot
@@ -2958,6 +3006,7 @@ func _draw() -> void:
 		var pc := {"kind": "car", "color": c.car, "px": tx * T + 8.0 + off.x, "py": ty * T + 8.0 + off.y, "dir": c.car_dir, "cat": null, "parked": true}
 		list.append([pc.py + 4.0, 2, pc])
 	list.sort_custom(func(a, b): return a[0] < b[0])
+	_draw_driveways(v)
 
 	for it in list:
 		match it[1]:
@@ -3161,6 +3210,55 @@ func _draw_ramp_signs(v: Array) -> void:
 		# галочка-шеврон «туда»
 		for q in [ac + f, ac + side, ac - side, ac - f + side * 2, ac - f - side * 2]:
 			draw_rect(Rect2(q, Vector2.ONE), Color("f4f4f8"))
+
+
+## Въезды на парковки: опущенный бордюр, светлая полоса, стоп-линия и стрелка внутрь.
+func _draw_driveways(v: Array) -> void:
+	var apron := Color("a9a6b8")
+	var edge := Color("d8d4e4")
+	var arrow := Color("ffd23f")
+	for l in stats.lots:
+		var o = objs[l]
+		if o == null:
+			continue
+		var lx: int = l % W
+		var ly: int = l / W
+		if lx + o.w < v[0] or lx > v[2] or ly + o.w < v[1] or ly > v[3]:
+			continue
+		var made := 0
+		for p in around(l):
+			if made >= (2 if o.w > 1 else 1) or not is_road(p.x, p.y):
+				continue
+			# направление от парковки к дороге
+			var d := Vector2i(0, 0)
+			if p.y >= ly + o.w:
+				d = Vector2i(0, 1)
+			elif p.y < ly:
+				d = Vector2i(0, -1)
+			elif p.x < lx:
+				d = Vector2i(-1, 0)
+			else:
+				d = Vector2i(1, 0)
+			made += 1
+			# c — точка на границе парковки и дороги; съезд в основном лежит на дороге
+			var c := Vector2(p.x * T + 8, p.y * T + 8) - Vector2(d) * 8.0
+			var fd := Vector2(d)
+			var side := Vector2(absf(d.y), absf(d.x))
+			var a0 := c - fd * 2.0 - side * 6.0
+			var a1 := c + fd * 6.0 + side * 6.0
+			var r := Rect2(a0, a1 - a0).abs()
+			draw_rect(r, apron)
+			# бортики по краям съезда
+			draw_rect(Rect2(c - fd * 2.0 - side * 7.0, fd * 8.0 + side).abs(), edge)
+			draw_rect(Rect2(c - fd * 2.0 + side * 6.0, fd * 8.0 + side).abs(), edge)
+			# пунктирная стоп-линия на выезде
+			var sl := c + fd * 5.0
+			for k in range(-5, 6, 2):
+				draw_rect(Rect2(sl + side * k, Vector2.ONE), Color(1, 1, 1, 0.9))
+			# стрелка внутрь парковки
+			var tip := c - fd * 1.0
+			for q in [tip, tip + fd + side, tip + fd - side, tip + fd * 2.0 + side * 2.0, tip + fd * 2.0 - side * 2.0, tip + fd * 2.0, tip + fd * 3.0]:
+				draw_rect(Rect2(q, Vector2.ONE), arrow)
 
 
 func on_screen(wp: Vector2) -> bool:
