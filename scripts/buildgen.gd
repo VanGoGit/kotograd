@@ -106,6 +106,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 				top = maxi(top, 14)
 			"silo":
 				top = maxi(top, 6)
+			"runway":
+				top = maxi(top, 30)
 			"windmill":
 				top = maxi(top, 12)
 	var min_body := 12 if sz == 1 else 16
@@ -118,6 +120,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 	var rc: String = look.get("rc", "8a8fb0")
 	var wc: String = look.get("wc", "9fd3e6")
 	var cx := w / 2
+	if ex.has("runway"):
+		_runway(p, w, by0)
 
 	if not full:
 		# крыша
@@ -217,6 +221,41 @@ static func build(look: Dictionary, sz: int, make: Callable):
 	for e in ex:
 		_extra(p, e, w, h, by0, body_h, sz, look)
 	return p
+
+
+## Взлётная полоса и стоянка самолётов позади здания аэропорта.
+static func _runway(p, w: int, by0: int) -> void:
+	p.R(0, 1, w, by0 - 1, "a8d08a")
+	# полоса
+	p.R(0, 3, w, 9, "5d5b6a"); p.R(0, 3, w, 1, "e6e6ee"); p.R(0, 11, w, 1, "e6e6ee")
+	for x in range(2, w - 2, 6):
+		p.R(x, 7, 3, 1, "ffffff")
+	p.R(1, 4, 1, 7, "ffffff"); p.R(3, 4, 1, 7, "ffffff"); p.R(w - 2, 4, 1, 7, "ffffff"); p.R(w - 4, 4, 1, 7, "ffffff")
+	# перрон
+	p.R(0, 13, w, by0 - 13, "c9c4d6")
+	for x in range(4, w, 16):
+		p.R(x, 14, 1, by0 - 15, "ffd23f")
+	# самолёт на полосе и два на стоянке
+	_mini_plane(p, 26, 5, "3d5a98")
+	_mini_plane(p, 9, 17, "e45b6b")
+	# площадка для вертолёта справа
+	p.C(w - 6, 21.5, 4, "8a8898"); p.R(w - 8, 20, 1, 4, "ffffff"); p.R(w - 5, 20, 1, 4, "ffffff"); p.R(w - 8, 21, 4, 1, "ffffff")
+	# диспетчерская вышка слева
+	p.R(2, 9, 3, by0 - 9, "dfe5ee"); p.R(1, 6, 5, 3, "3d5a98"); p.R(2, 7, 3, 1, "9fd3e6"); p.P(3, 5, "ff6b6b")
+	# огни полосы
+	for x in range(1, w, 8):
+		p.P(x, 2, "ffd23f")
+		p.P(x + 4, 12, "5fd3c8")
+
+
+static func _mini_plane(p, x: int, y: int, stripe: String) -> void:
+	# нос вправо: фюзеляж, крыло, хвост
+	p.R(x, y + 2, 14, 3, "3b2a3a"); p.R(x + 1, y + 2, 12, 2, "f4f7fb"); p.P(x + 14, y + 3, "3b2a3a")
+	p.R(x + 1, y + 3, 12, 1, stripe)
+	p.R(x + 12, y + 2, 1, 1, "9fd3e6")
+	p.R(x + 5, y + 4, 4, 3, "dfe5ee"); p.R(x + 5, y + 6, 4, 1, "3b2a3a")
+	p.R(x + 6, y, 2, 2, "dfe5ee")
+	p.R(x, y, 2, 2, stripe); p.R(x - 1, y, 1, 3, "3b2a3a")
 
 
 static func _extra(p, e: String, w: int, h: int, by0: int, body_h: int, sz: int, look: Dictionary) -> void:

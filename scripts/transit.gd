@@ -14,6 +14,8 @@ const PLANE_SPEED := 70.0
 var world
 var trains: Array = []
 var planes: Array = []
+var helis: Array = []           # вертолёты: по одному у каждой площадки и аэропорта
+var _heli_sync := 0.0
 var hubs := {}               # здание -> {"kind": "rail"/"air", "net": номер сети, "stop": клетка рельсов}
 var rail_net := {}           # клетка рельсов -> номер сети
 var closed := {}             # закрытые переезды
@@ -225,6 +227,7 @@ func update(dt: float) -> void:
 		_dispatch_planes()
 	for tr in trains:
 		_update_train(tr, dt)
+	_update_helis(dt)
 	for b in _air_cool:
 		_air_cool[b] -= dt
 	var k := planes.size() - 1
@@ -442,6 +445,129 @@ func plane_alt(pl: Dictionary) -> float:
 	return clampf(minf(k, 1.0 - k) * 5.0, 0.0, 1.0)
 
 
+# ---------- вертолёты ----------
+
+const HELI_SPEED := 42.0
+const HELI_COLORS := ["e45b6b", "ffd23f", "3d5a98", "5fae73", "ff9f43"]
+
+
+## Вертолётные площадки и аэропорты, где вертолёт может сесть.
+func heli_spots() -> Array:
+	var out: Array = []
+	for b in world.stats.get("hubs", []):
+		if world.is_ready(b) and world.objs[b].t == "airport":
+			out.append(b)
+	for b in world.stats.get("tourists", []):
+		if world.is_ready(b) and world.objs[b].t == "helipad":
+			out.append(b)
+	return out
+
+
+## Точка посадки: центр площадки или перрон позади аэропорта.
+func heli_pad(b: int, slot: int) -> Vector2:
+	var o = world.objs[b]
+	if o != null and o.t == "airport":
+		return Vector2(b % W * T + 42 - slot * 11, (b / W + 3) * T - 64 + 22 + slot * 3)
+	return Vector2(b % W * T + 8, b / W * T + 8) + Vector2(slot * 6, 0)
+
+
+func _update_helis(dt: float) -> void:
+	_heli_sync -= dt
+	if _heli_sync <= 0.0:
+		_heli_sync = 2.0
+		var spots := heli_spots()
+		var keep: Array = []
+		var owned := {}
+		for hl in helis:
+			if spots.has(hl.home) and not owned.has(hl.home):
+				owned[hl.home] = true
+				if not spots.has(hl.at) and hl.state == "park":
+					hl.at = hl.home
+				keep.append(hl)
+		helis = keep
+		for b in spots:
+			if not owned.has(b):
+				helis.append({"home": b, "at": b, "state": "park", "timer": randf_range(5.0, 25.0), "t": 0.0, "dur": 1.0,
+					"a": Vector2.ZERO, "b": Vector2.ZERO, "to": b, "tour": false, "ang": 0.0,
+					"col": HELI_COLORS[b % HELI_COLORS.size()]})
+	var h: float = world.hour()
+	var day := h >= 7.0 and h < 20.0
+	for hl in helis:
+		match hl.state:
+			"park":
+				hl.timer -= dt
+				if hl.timer <= 0.0:
+					hl.timer = randf_range(25.0, 60.0)
+					if day or hl.at != hl.home:
+						_heli_depart(hl)
+			"fly":
+				hl.t += dt
+				if hl.t >= hl.dur:
+					if hl.tour:
+						# облетели побережье — домой
+						hl.tour = false
+						_heli_fly(hl, hl.b, heli_pad(hl.home, 0), hl.home)
+						hl["ret"] = true
+					else:
+						hl.state = "park"
+						hl.at = hl.to
+						hl.timer = randf_range(8.0, 20.0) if hl.at != hl.home else randf_range(30.0, 70.0)
+
+
+func _heli_depart(hl: Dictionary) -> void:
+	var from: Vector2 = heli_pad(hl.at, _slot(hl))
+	if hl.at != hl.home and world.is_ready(hl.home):
+		_heli_fly(hl, from, heli_pad(hl.home, 0), hl.home)
+		return
+	var others: Array = heli_spots().filter(func(b): return b != hl.at)
+	if not others.is_empty() and randf() < 0.75:
+		var to: int = others.pick_random()
+		_heli_fly(hl, from, heli_pad(to, 1), to)
+	else:
+		# экскурсия над городом и обратно
+		var ang := randf() * TAU
+		var p := from + Vector2(cos(ang), sin(ang)) * randf_range(120.0, 220.0)
+		p = p.clamp(Vector2(16, 16), Vector2(W * T - 16, H * T - 16))
+		_heli_fly(hl, from, p, hl.home)
+		hl.tour = true
+
+
+func _heli_fly(hl: Dictionary, a: Vector2, b: Vector2, to: int) -> void:
+	hl.state = "fly"
+	hl["ret"] = false
+	hl.a = a
+	hl.b = b
+	hl.to = to
+	hl.t = 0.0
+	hl.dur = a.distance_to(b) / HELI_SPEED + 3.0
+	hl.ang = (b - a).angle()
+	if world.on_screen(a):
+		world.sound.play("whoosh", 1.4, -14.0)
+
+
+func _slot(hl: Dictionary) -> int:
+	return 0 if hl.at == hl.home else 1
+
+
+func heli_pos(hl: Dictionary) -> Vector2:
+	if hl.state == "park":
+		return heli_pad(hl.at, _slot(hl))
+	# взлёт и посадка — на месте, полёт между ними
+	var k: float = clampf((hl.t - 1.5) / maxf(0.1, hl.dur - 3.0), 0.0, 1.0)
+	return (hl.a as Vector2).lerp(hl.b, k * k * (3.0 - 2.0 * k))
+
+
+func heli_alt(hl: Dictionary) -> float:
+	if hl.state == "park":
+		return 0.0
+	# над точкой экскурсии не садимся, а зависаем
+	if hl.tour:
+		return clampf(hl.t / 1.5, 0.0, 1.0)
+	if hl.get("ret", false):
+		return clampf((hl.dur - hl.t) / 1.5, 0.0, 1.0)
+	return clampf(minf(hl.t, hl.dur - hl.t) / 1.5, 0.0, 1.0)
+
+
 # ---------- переезды ----------
 
 func train_segments(tr: Dictionary) -> Array:
@@ -521,6 +647,14 @@ const INK := Color("3b2a3a")
 
 
 func draw_items(list: Array) -> void:
+	for hl in helis:
+		if hl.state == "park":
+			# на перроне аэропорта вертолёт рисуется поверх здания
+			var o = world.objs[hl.at]
+			var key: float = heli_pos(hl).y + 3.0
+			if o != null and o.t == "airport":
+				key = float((hl.at / W + 3) * T) + 1.0
+			list.append([key, 7, hl])
 	for tr in trains:
 		for sg in train_segments(tr):
 			list.append([sg[0].y + 5.0, 4, [sg, tr]])
@@ -557,8 +691,47 @@ func draw_segment(item: Array) -> void:
 		w.lights.append(Vector3(pos.x, pos.y - 2, 12))
 
 
+func draw_heli(hl: Dictionary) -> void:
+	var w = world
+	var p := heli_pos(hl).round()
+	var alt := heli_alt(hl)
+	var ang: float = hl.ang
+	# тень на земле
+	w.draw_set_transform(p + Vector2(alt * 6.0, 2.0), ang, Vector2(0.9, 0.9))
+	_heli_shape(Color(0.157, 0.118, 0.196, 0.22), Color(0, 0, 0, 0), Color(0, 0, 0, 0))
+	var lift := p - Vector2(0, alt * 26.0)
+	w.draw_set_transform(lift, ang, Vector2.ONE)
+	_heli_shape(Color(hl.col), Color("f4f7fb"), Color("9fd3e6"))
+	w.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# несущий винт: в полёте крутится, на земле стоит
+	var spin: float = w.anim_time * 22.0 if hl.state == "fly" else 0.6
+	var rc := Color(0.23, 0.2, 0.27, 0.55 if hl.state == "fly" else 0.95)
+	for k in 2:
+		var v := Vector2(cos(spin + k * PI / 2.0), sin(spin + k * PI / 2.0) * 0.8) * 10.0
+		w.draw_line(lift - v, lift + v, rc, 1.0)
+	if w.dark > 0.1 and int(w.anim_time * 2.0) % 2 == 0:
+		w.lights.append(Vector3(lift.x, lift.y, 7))
+
+
+func _heli_shape(body: Color, trim: Color, glass: Color) -> void:
+	var w = world
+	# вид сверху, нос вправо: кабина, хвостовая балка, хвостовой винт, полозья
+	if trim.a > 0.0:
+		w.draw_rect(Rect2(-4, -5, 9, 1), Color("6a6478"))
+		w.draw_rect(Rect2(-4, 4, 9, 1), Color("6a6478"))
+	w.draw_rect(Rect2(-14, -1, 10, 2), body)
+	w.draw_rect(Rect2(-15, -3, 2, 6), body)
+	w.draw_colored_polygon(PackedVector2Array([Vector2(-5, -3), Vector2(3, -4), Vector2(7, -1), Vector2(7, 1), Vector2(3, 4), Vector2(-5, 3)]), body)
+	if glass.a > 0.0:
+		w.draw_colored_polygon(PackedVector2Array([Vector2(3, -3), Vector2(6, -1), Vector2(6, 1), Vector2(3, 3)]), glass)
+		w.draw_rect(Rect2(-4, -1, 6, 1), trim)
+
+
 func draw_planes() -> void:
 	var w = world
+	for hl in helis:
+		if hl.state == "fly":
+			draw_heli(hl)
 	for pl in planes:
 		var p := plane_pos(pl)
 		var alt := plane_alt(pl)

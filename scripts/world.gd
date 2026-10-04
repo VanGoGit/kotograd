@@ -170,6 +170,7 @@ func new_game() -> void:
 	events.cool = 4.0
 	transit.trains = []
 	transit.planes = []
+	transit.helis = []
 	transit.rides = 0
 	_gen_map(map_seed)
 	zoom = 3
@@ -333,6 +334,7 @@ func deserialize(text: String) -> bool:
 	transit.rides = int(d.get("rides", 0))
 	transit.trains = []
 	transit.planes = []
+	transit.helis = []
 	_had_goals = d.has("goals")
 	goals.done = {}
 	for g in d.get("goals", []):
@@ -3687,6 +3689,8 @@ func _draw() -> void:
 				_draw_scene(it[2])
 			6:
 				boats.draw_boat(it[2])
+			7:
+				transit.draw_heli(it[2])
 
 	_draw_bunting()
 	_draw_traffic_lights(v)

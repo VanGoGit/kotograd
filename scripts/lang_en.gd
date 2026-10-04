@@ -860,4 +860,5 @@ const EN := {
 	"Продайте 100 товаров через грузовой порт": "Sell 100 goods through the cargo port",
 	"Полный цикл": "Full cycle",
 	"Запустите все 5 перерабатывающих производств": "Run all 5 processing plants",
+	"Вертолётные экскурсии над побережьем. Вертолёт летает к другим площадкам и аэропортам, а если лететь некуда — облетает город.": "Helicopter tours over the coast. The helicopter flies to other helipads and airports, and if there is nowhere to go, it circles the city.",
 }
