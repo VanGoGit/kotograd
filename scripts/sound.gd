@@ -59,24 +59,24 @@ const MOODS := {
 			[[38, "maj7"], [47, "m7"], [43, "maj7"], [45, "7"]],
 			[[43, "6"], [45, "7"], [42, "m7"], [47, "m7"]],
 		],
-		"swing": 0.0, "drums": "surf", "bass": "walk", "keys": "stab", "pad": false, "bpm": 118.0, "tr": 2,
-		"lead": "surf", "arp": false, "dense": 0.9, "lp": 12000.0, "crackle": false,
+		"swing": 0.1, "drums": "light", "bass": "simple", "keys": "pulse", "pad": false, "bpm": 86.0, "tr": 2,
+		"lead": "surf", "arp": false, "dense": 0.55, "lp": 9000.0, "crackle": false,
 	},
 	"boulevard": {
 		"progs": [
 			[[47, "m9"], [43, "maj7"], [38, "maj7"], [45, "sus"]],
 			[[47, "m7"], [40, "m7"], [43, "maj9"], [45, "6"]],
 		],
-		"swing": 0.0, "drums": "synth", "bass": "eighths", "keys": "none", "pad": true, "bpm": 104.0, "tr": -2,
-		"lead": "square", "arp": true, "arp16": true, "dense": 0.75, "lp": 8000.0, "crackle": false,
+		"swing": 0.12, "drums": "lofi", "bass": "slow", "keys": "long", "pad": true, "bpm": 84.0, "tr": -2,
+		"lead": "tri", "arp": true, "dense": 0.5, "lp": 5500.0, "crackle": false,
 	},
 	"lazy": {
 		"progs": [
 			[[40, "m9"], [45, "13"], [38, "maj9"], [38, "maj9"]],
 			[[43, "maj9"], [42, "m7"], [40, "m9"], [45, "13"]],
 		],
-		"swing": 0.24, "drums": "lofi", "bass": "walk", "keys": "long", "pad": false, "bpm": 76.0, "tr": 3,
-		"lead": "tri", "arp": false, "dense": 0.45, "lp": 3800.0, "crackle": true,
+		"swing": 0.22, "drums": "lofi", "bass": "slow", "keys": "long", "pad": false, "bpm": 74.0, "tr": 3,
+		"lead": "tri", "arp": false, "dense": 0.4, "lp": 3800.0, "crackle": true,
 	},
 	"dawn": {
 		"progs": [
@@ -756,11 +756,11 @@ func _s_surf(m: int, dur: float) -> PackedFloat32Array:
 		ph += f * (1.0 + 0.012 * sin(TAU * 6.5 * t) * minf(1.0, t * 3.0)) / SR
 		var x := 1.0 if fposmod(ph, 1.0) < 0.4 else -1.0
 		lp += (x - lp) * 0.3
-		var trem := 0.65 + 0.35 * sin(TAU * 14.0 * t)
+		var trem := 0.85 + 0.15 * sin(TAU * 7.0 * t)
 		var env := minf(1.0, t / 0.003) * (0.55 + 0.45 * exp(-t * 7.0)) * trem
 		if t > dur:
 			env *= maxf(0.0, 1.0 - (t - dur) / 0.08)
-		out[i] = lp * env * 0.15
+		out[i] = lp * env * 0.11
 	return out
 
 

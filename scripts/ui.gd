@@ -163,6 +163,25 @@ func _make_theme() -> Theme:
 	fill.bg_color = Color("ff8fab")
 	fill.set_corner_radius_all(2)
 	t.set_stylebox("background", "ProgressBar", bg)
+	# полоса прокрутки в стиле игры: светлая дорожка, розовый бегунок
+	var track := StyleBoxFlat.new()
+	track.bg_color = PAPER2
+	track.set_corner_radius_all(4)
+	track.content_margin_top = 3
+	track.content_margin_bottom = 3
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color("ff8fab")
+	grab.set_corner_radius_all(4)
+	grab.border_color = Color(INK, 0.6)
+	grab.set_border_width_all(1)
+	var grab_h := grab.duplicate()
+	grab_h.bg_color = Color("ffb3c6")
+	for sb_name in ["HScrollBar", "VScrollBar"]:
+		t.set_stylebox("scroll", sb_name, track)
+		t.set_stylebox("scroll_focus", sb_name, track)
+		t.set_stylebox("grabber", sb_name, grab)
+		t.set_stylebox("grabber_highlight", sb_name, grab_h)
+		t.set_stylebox("grabber_pressed", sb_name, grab_h)
 	t.set_stylebox("fill", "ProgressBar", fill)
 	_styles["tool"] = _sb(PAPER2, Color(0, 0, 0, 0), 3, 8, 4.0)
 	_styles["tool"].shadow_size = 0
@@ -408,8 +427,8 @@ func _tooltip(t: String) -> String:
 		extra.append("Служебная машина (нужна дорога)")
 	if d.has("build"):
 		extra.append("Стройка: %d с" % int(d.build))
-	if d.has("up"):
-		extra.append("Можно улучшить до уровня %d" % (d.up.size() + 1))
+	if not D.ups(t).is_empty():
+		extra.append("Можно улучшить до уровня %d" % (D.ups(t).size() + 1))
 	if d.get("need_high", false):
 		extra.append("Только на холмах и в горах")
 	if d.has("store_coins"):
@@ -625,7 +644,7 @@ func _render_info() -> void:
 		info_img.texture = Spr.scaled(tex, k)
 		info_name.text = d.name
 		var lvl := int(o.get("lvl", 1))
-		var maxl: int = d.get("up", []).size() + 1
+		var maxl: int = D.ups(o.t).size() + 1
 		info_sub.text = "Строится… %d%%" % int((1.0 - o.build / d.build) * 100.0) if o.build > 0.0 else ("Чудо света" if d.get("wonder", false) else ("Уровень %d из %d" % [lvl, maxl] if maxl > 1 else ""))
 		if d.get("wonder", false) and o.build <= 0.0:
 			lines.append("Туристы приносят +%s мон./с" % str(d.tourism))
@@ -1167,7 +1186,17 @@ func _update_hud() -> void:
 	hint.text = _hint_text()
 	lbl_brand.text = world.city_name
 	_update_goal_panel()
-	left_col.position.y = top_bar.position.y + top_bar.size.y + 8.0
+	# верхняя строка может переноситься на два ряда — ставим панель цели под её реальным низом
+	var bottom_y := 0.0
+	for ch in top_bar.get_children():
+		var cc := ch as Control
+		if cc != null and cc.visible:
+			bottom_y = maxf(bottom_y, cc.position.y + cc.size.y)
+	left_col.position.y = top_bar.position.y + bottom_y + 8.0
+	# если между верхней строкой и панелью построек нет места — панель цели прячется сама
+	if not zen and not title_open():
+		var room: float = (bottom_box.position.y if bottom_box.visible else root.size.y) - left_col.position.y
+		left_col.visible = left_col.get_combined_minimum_size().y + 8.0 < room
 	refresh_tools()
 
 

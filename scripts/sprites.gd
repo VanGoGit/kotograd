@@ -1187,6 +1187,29 @@ func _make_parking() -> void:
 			GARAGE_SLOTS.append(Vector2i(x, y))
 
 
+## Широкие версии маленьких зданий, нарисованных вручную (для пар).
+const PAIR_LOOKS := {
+	"house": {"wall": "ffe9d6", "roof": "gable", "rc": "f28fa6", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 26, "extra": ["ears"]},
+	"pier": {"wall": "c8a070", "roof": "shed", "rc": "5b8de4", "win": "none", "door": "8a5a3b", "sign": "fish", "sc": "5b8de4", "fg": "ffffff", "h": 20},
+	"shop": {"wall": "fff4e0", "roof": "awning", "rc": "ff8fab", "win": "shop", "wc": "9fd3e6", "door": "8a5a3b", "sign": "cart", "sc": "ff8fab", "fg": "ffffff", "h": 22},
+	"icecream": {"wall": "fff0f5", "roof": "awning", "rc": "ff9fc0", "win": "shop", "wc": "ffe0ec", "door": "c8706a", "sign": "cup", "sc": "ff9fc0", "fg": "ffffff", "h": 20},
+	"bakery": {"wall": "f7e3c4", "roof": "awning", "rc": "c8955a", "win": "shop", "wc": "ffe9a8", "door": "8a5a3b", "sign": "cup", "sc": "c8955a", "fg": "ffffff", "h": 22},
+	"sushi": {"wall": "f4efe6", "roof": "flat", "rc": "2b2b3a", "win": "shop", "wc": "9fd3e6", "door": "8a3a3a", "sign": "fish", "sc": "e45b6b", "fg": "ffffff", "h": 22},
+	"pizzeria": {"wall": "fff1d6", "roof": "awning", "rc": "5fae73", "win": "shop", "wc": "ffe9a8", "door": "8a5a3b", "sign": "cup", "sc": "e45b6b", "fg": "ffffff", "h": 22},
+	"groomer": {"wall": "ffe1ec", "roof": "awning", "rc": "ff9fc0", "win": "shop", "wc": "9fd3e6", "door": "c8706a", "sign": "scissors", "sc": "ff9fc0", "fg": "ffffff", "h": 22},
+	"cafe": {"wall": "9ed8c8", "roof": "flat", "rc": "fff4e0", "win": "shop", "wc": "fff4e0", "door": "8a5a3b", "sign": "paw", "sc": "fff4e0", "fg": "3b2a3a", "h": 24, "extra": ["ears"]},
+	"gym": {"wall": "d8e4f0", "roof": "flat", "rc": "5fd38f", "win": "glass", "wc": "9fd3e6", "door": "3b3b4a", "sign": "bolt", "sc": "5fd38f", "fg": "ffffff", "h": 24},
+	"cinema": {"wall": "b02e3a", "roof": "flat", "rc": "ffd75e", "win": "none", "door": "2b2b3a", "sign": "camera", "sc": "ffd75e", "fg": "3b2a3a", "h": 26, "extra": ["neon"]},
+	"blogstudio": {"wall": "f0e0ff", "roof": "flat", "rc": "c8a8ff", "win": "glass", "wc": "9fd3e6", "door": "5a4a6a", "sign": "camera", "sc": "ff6fae", "fg": "ffffff", "h": 24, "extra": ["antenna"]},
+	"lifeguard": {"wall": "ffffff", "roof": "shed", "rc": "e0483a", "win": "grid", "wc": "9fd3e6", "door": "e0483a", "sign": "cross", "sc": "e0483a", "fg": "ffffff", "h": 22},
+	"post": {"wall": "5b8de4", "roof": "flat", "rc": "ffd75e", "win": "grid", "wc": "cfe0ff", "door": "3d5a98", "sign": "box", "sc": "ffd75e", "fg": "3b2a3a", "h": 24},
+	"police": {"wall": "d8e0f0", "roof": "flat", "rc": "3d5a98", "win": "grid", "wc": "9fd3e6", "door": "3d5a98", "sign": "star", "sc": "3d5a98", "fg": "ffffff", "h": 26},
+	"fire": {"wall": "e0483a", "roof": "flat", "rc": "8a2a2a", "win": "grid", "wc": "ffe9a8", "door": "3b3b4a", "sign": "fuel", "sc": "ffffff", "fg": "e0483a", "h": 26, "extra": ["garage_door"]},
+	"library": {"wall": "e8d8b8", "roof": "gable", "rc": "8a5a3b", "win": "grid", "wc": "9fd3e6", "door": "6a4a3a", "sign": "book", "sc": "8a5a3b", "fg": "ffffff", "h": 28, "extra": ["columns"]},
+	"surf": {"wall": "5fd3c8", "roof": "shed", "rc": "ffd75e", "win": "shop", "wc": "e8fbf8", "door": "8a5a3b", "sign": "sun", "sc": "ffd75e", "fg": "e45b6b", "h": 20},
+}
+
+
 func _make_generated() -> void:
 	var make := func(w: int, h: int): return Painter.new(w, h)
 	for key in D.DEFS:
@@ -1198,6 +1221,19 @@ func _make_generated() -> void:
 		add_shadow(p.img, Rect2i(1, p.h - 1, p.w - 2, 1))
 		obj[key] = tex(p.img)
 		windows[key] = p.wins
+	# широкие «парные» версии маленьких домов, магазинов и служб
+	for key in D.DEFS:
+		var d: Dictionary = D.DEFS[key]
+		if int(d.get("size", 1)) != 1 or not (d.has("cap") or d.has("jobs")):
+			continue
+		var look: Dictionary = PAIR_LOOKS.get(key, d.get("look", {}))
+		if look.is_empty() or look.get("extra", []).has("trailer"):
+			continue
+		var p = BG.build(look, 2, make)
+		outline(p.img)
+		add_shadow(p.img, Rect2i(1, p.h - 1, p.w - 2, 1))
+		obj["pair_" + key] = tex(p.img)
+		windows["pair_" + key] = p.wins
 
 
 func _make_icons() -> void:
@@ -1303,69 +1339,18 @@ var _lvl_cache := {}
 var _pair_cache := {}
 
 
-## Два одинаковых маленьких здания рядом — одно широкое здание-близнец:
-## правая половина зеркальная, а стена между ними убрана.
+## Два одинаковых маленьких здания рядом — одно широкое здание с одной дверью.
+## Для улучшенных — тот же широкий дом с этажами и украшениями уровня.
+func has_pair(t: String) -> bool:
+	return obj.has("pair_" + t)
+
+
 func pair_variant(o: Dictionary) -> Array:
-	var key: String = o.t + "|" + str(int(o.get("lvl", 1)))
-	if _pair_cache.has(key):
-		return _pair_cache[key]
-	var base: Texture2D = obj_texture(o)
-	var img: Image = base.get_image()
-	img.convert(Image.FORMAT_RGBA8)
-	var wins: Array = windows_for(o)
-	var w := img.get_width()
-	var h := img.get_height()
-	var r := 0
-	for x in w:
-		for y in h - 1:
-			if img.get_pixel(x, y).a > 0.5:
-				r = maxi(r, x)
-	var flip := img.duplicate()
-	flip.flip_x()
-	var off := maxi(0, 2 * r + 2 - w)
-	var c := Image.create_empty(off + w, h, false, Image.FORMAT_RGBA8)
-	c.blend_rect(img, Rect2i(0, 0, w, h), Vector2i.ZERO)
-	c.blend_rect(flip, Rect2i(0, 0, w, h), Vector2i(off, 0))
-	# стык: заполняем щель между стенами цветом стены — получается одно здание с двумя крышами
-	var cw := off + w
-	var mid := r + 1
-	var filled: Array = []
-	for y in h - 1:
-		var a := -1
-		for x in range(mid - 1, maxi(-1, mid - 8), -1):
-			if c.get_pixel(x, y).a > 0.63:
-				a = x
-				break
-		var b := -1
-		for x in range(mid, mini(cw, mid + 7)):
-			if c.get_pixel(x, y).a > 0.63:
-				b = x
-				break
-		if a < 2 or b < 0:
-			continue
-		var fill := Color(0, 0, 0, 0)
-		for k in range(1, 5):
-			var cand := c.get_pixel(a - k, y)
-			var glassy := cand.b > cand.r + 0.12 and cand.b > cand.g
-			if cand.a > 0.63 and cand.get_luminance() >= 0.25 and not glassy:
-				fill = cand
-				break
-		if fill.a == 0.0:
-			continue
-		for x in range(a, b + 1):
-			c.set_pixel(x, y, fill)
-			filled.append(Vector2i(x, y))
-	for p in filled:
-		for dv in [Vector2i(0, -1), Vector2i(0, 1)]:
-			var n: Vector2i = p + dv
-			if n.y >= 0 and n.y < h - 1 and c.get_pixel(n.x, n.y).a < 0.1:
-				c.set_pixel(n.x, n.y, INK)
-	var wins2: Array = wins.duplicate()
-	for wr in wins:
-		wins2.append(Rect2i(off + w - wr.position.x - wr.size.x, wr.position.y, wr.size.x, wr.size.y))
-	var out := [ImageTexture.create_from_image(c), wins2]
-	_pair_cache[key] = out
-	return out
+	var key: String = "pair_" + o.t
+	var lvl := int(o.get("lvl", 1))
+	if lvl > 1:
+		return level_variant(key, lvl)
+	return [obj[key], windows.get(key, [])]
 
 
 ## Улучшенное здание: на каждый уровень — ещё один этаж (копия ряда окон),

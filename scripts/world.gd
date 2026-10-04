@@ -454,7 +454,7 @@ func upgrade_cost(b: int) -> int:
 	var o = objs[b]
 	if o == null:
 		return -1
-	var ups: Array = D.def(o.t).get("up", [])
+	var ups: Array = D.ups(o.t)
 	var lvl := int(o.get("lvl", 1))
 	if lvl - 1 >= ups.size():
 		return -1
@@ -629,7 +629,7 @@ func _pairable(o) -> bool:
 	if o == null or o.w != 1 or o.build > 0.0:
 		return false
 	var d := D.def(o.t)
-	return d.has("cap") or d.has("jobs")
+	return (d.has("cap") or d.has("jobs")) and spr.has_pair(o.t)
 
 
 ## Два одинаковых маленьких здания одного уровня рядом по горизонтали рисуются как одно.

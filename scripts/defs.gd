@@ -375,5 +375,20 @@ static func def(t: String) -> Dictionary:
 	return DEFS.get(t, {})
 
 
+## Улучшения есть у всех построек, кроме дорог, природы, мелкого декора и чудес.
+const NO_UPGRADE := ["road", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
+	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
+
+
+static func ups(t: String) -> Array:
+	var d: Dictionary = DEFS.get(t, {})
+	if d.has("up"):
+		return d.up
+	if d.is_empty() or d.has("terra") or d.get("wonder", false) or NO_UPGRADE.has(t):
+		return []
+	var c := int(d.get("cost", 20))
+	return [maxi(10, roundi(c * 0.6 / 5.0) * 5), maxi(20, roundi(c * 1.2 / 5.0) * 5)]
+
+
 static func size_of(t: String) -> int:
 	return int(DEFS.get(t, {}).get("size", 1))

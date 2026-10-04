@@ -96,6 +96,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 				top = maxi(top, 8)
 			"dish":
 				top = maxi(top, 5)
+			"ears":
+				top = maxi(top, 4)
 			"tower":
 				top = maxi(top, 14)
 	var min_body := 12 if sz == 1 else 16
@@ -212,6 +214,19 @@ static func build(look: Dictionary, sz: int, make: Callable):
 static func _extra(p, e: String, w: int, h: int, by0: int, body_h: int, sz: int, look: Dictionary) -> void:
 	var cx := w / 2
 	match e:
+		"ears":
+			# кошачьи ушки на крыше — как у маленького домика
+			var rc2: String = look.get("rc", "f28fa6")
+			for ex0 in [cx - 10, cx + 6]:
+				var ty := by0
+				for yy in h:
+					if p.img.get_pixel(ex0 + 2, yy).a > 0.5:
+						ty = yy
+						break
+				p.R(ex0, ty - 2, 5, 3, rc2)
+				p.R(ex0 + 1, ty - 4, 3, 2, rc2)
+				p.P(ex0 + 2, ty - 5, rc2)
+				p.R(ex0 + 2, ty - 3, 1, 2, "ffc8d4")
 		"trailer":
 			p.R(1, 7, 14, 7, "d8dce4"); p.R(2, 6, 12, 1, "e8ecf2"); p.R(1, 12, 14, 1, "b8bcc4")
 			p.win(3, 8, 3, 2); p.win(10, 8, 3, 2)
