@@ -1299,15 +1299,11 @@ func _quit_game() -> void:
 	get_tree().quit()
 
 
+## «Новый город» из меню — тот же экран, что на старте: название и выбор острова.
+## Там же предупреждение, что нынешний город заменится, и кнопка «Назад».
 func _on_new_game() -> void:
-	if not _confirm_new:
-		_confirm_new = true
-		new_game_btn.text = "Точно? Нажмите ещё раз"
-		return
-	world.new_game()
-	close_modals()
-	refresh_tools()
-	toast(tr("Новый остров ждёт котиков!"))
+	show_title(true)
+	title._on_new()
 
 
 func _setting_row(grid: GridContainer, title: String, ctrl: Control) -> void:
