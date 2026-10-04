@@ -138,14 +138,8 @@ const DEFS := {
 	"clothing": {"name": "Фабрика одежды", "cost": 160, "unlock": 12, "size": 2, "jobs": 6, "job": "seamstress", "shop": 1.4, "smoke": true, "build": 10.0, "up": [120, 240], "look": {"wall": "f2d0e0", "roof": "saw", "rc": "8a8fb0", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "shirt", "sc": "ff6fae", "fg": "ffffff", "h": 36, "extra": ["chimney"]}, "desc": "Шьют пиджаки, худи и комбинезоны для всего города."},
 	"warehouse": {"name": "Склад", "cost": 90, "unlock": 6, "size": 2, "jobs": 3, "job": "courier", "depot": true, "store_food": 800, "build": 6.0, "up": [70, 140], "look": {"wall": "c9a77a", "roof": "saw", "rc": "8a6a48", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "box", "sc": "c9a77a", "fg": "5a3c30", "h": 30, "extra": ["garage_door"]}, "desc": "Коробки, коробки, коробки! Сильно поднимает лимит еды. Принимает лишние товары и сам развозит их своими грузовиками туда, где они нужны."},
 	"cargoport": {"name": "Грузовой порт", "cost": 240, "unlock": 18, "size": 2, "jobs": 6, "job": "docker", "export": true, "shop": 2.0, "need_water": true, "store_food": 300, "build": 14.0, "look": {"wall": "d8d4cc", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 40, "extra": ["containers", "crane"]}, "desc": "Краны и контейнеры. Ставится у воды. Покупает лишние товары на экспорт — грузовики везут сюда всё, что не нужно городу."},
-	"dairy": {"name": "Молочная ферма", "cost": 90, "unlock": 5, "size": 2, "jobs": 3, "job": "milkmaid", "nopad": true, "build": 6.0, "up": [70, 140], "look": {"wall": "f2e6cc", "roof": "gable", "rc": "c8553d", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "milk", "sc": "ffffff", "fg": "5b8de4", "h": 34, "extra": ["silo", "cows"]}, "desc": "Коровы, сено и самое вкусное молоко. Молоко ждут кафе, мороженое, бабл-ти, пекарни и пончиковые."},
-	"sheepfarm": {"name": "Овечья ферма", "cost": 80, "unlock": 8, "size": 2, "jobs": 2, "job": "shepherd", "nopad": true, "walk": false, "build": 5.0, "up": [60, 120], "look": {"wall": "9bd67f", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 24, "extra": ["sheep"]}, "desc": "Пушистые овечки дают шерсть. Из неё на Фабрике клубков делают клубки."},
-	"cottonfield": {"name": "Хлопковое поле", "cost": 60, "unlock": 10, "size": 2, "jobs": 2, "job": "farmer", "nopad": true, "build": 4.0, "up": [45, 90], "look": {"wall": "8bc34a", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 20, "extra": ["cotton"]}, "desc": "Белые коробочки хлопка. Хлопок нужен Фабрике одежды."},
-	"sawmill": {"name": "Лесопилка", "cost": 100, "unlock": 9, "size": 2, "jobs": 3, "job": "lumberjack", "build": 6.0, "up": [70, 140], "look": {"wall": "c9a77a", "roof": "shed", "rc": "7a5a3b", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "log", "sc": "7a5a3b", "fg": "f1dfa6", "h": 30, "extra": ["logs"]}, "desc": "Пилит доски. Доски нужны Мебельной фабрике, Стройконторе и архитекторам."},
-	"quarry": {"name": "Рудник", "cost": 140, "unlock": 14, "size": 2, "jobs": 4, "job": "miner", "need_high": true, "mine": true, "nopad": true, "build": 8.0, "up": [100, 200], "look": {"wall": "a89a84", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 28, "extra": ["mine"]}, "desc": "Добывает металл в горах. Строится на холмах и в горах. Металл нужен Заводу электроники и автомастерам."},
-	"mill": {"name": "Мукомольня", "cost": 75, "unlock": 6, "jobs": 2, "job": "miller", "build": 5.0, "up": [55, 110], "look": {"wall": "f2e6cc", "roof": "gable", "rc": "a0704a", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 30, "extra": ["windmill"]}, "desc": "Мелет урожай с фермы в муку. Мука нужна пекарням, пиццериям, пончиковым и бургерным."},
-	"furniture": {"name": "Мебельная фабрика", "cost": 170, "unlock": 13, "size": 2, "jobs": 5, "job": "carpenter", "shop": 1.2, "build": 10.0, "up": [130, 260], "look": {"wall": "e8d6bc", "roof": "saw", "rc": "a0704a", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "sofa", "sc": "a0704a", "fg": "ffffff", "h": 34, "extra": ["chimney"]}, "desc": "Делает диваны и кресла из досок. Мебель ждут торговые центры, отели, мотели и офисы."},
-	"electronics": {"name": "Завод электроники", "cost": 240, "unlock": 17, "size": 2, "jobs": 6, "job": "assembler", "shop": 1.8, "build": 12.0, "up": [180, 360], "look": {"wall": "dfe6f2", "roof": "flat", "rc": "6a7f9a", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "sign": "chip", "sc": "4d6cff", "fg": "ffffff", "h": 38, "extra": ["antenna"]}, "desc": "Собирает телефоны и приставки из металла. Электроника нужна магазинам техники, айти-компаниям, игровым студиям и вычислительным центрам."},
+	"cottonfield": {"name": "Хлопковое поле", "cost": 60, "unlock": 10, "size": 2, "jobs": 2, "job": "farmer", "nopad": true, "build": 4.0, "up": [45, 90], "look": {"wall": "8bc34a", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 20, "extra": ["cotton"]}, "desc": "Белые коробочки хлопка. Хлопок везут на Фабрику одежды и Фабрику клубков."},
+	"wheat": {"name": "Пшеничное поле", "cost": 70, "unlock": 5, "size": 2, "jobs": 2, "job": "farmer", "nopad": true, "build": 5.0, "up": [55, 110], "look": {"wall": "ecc860", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 34, "extra": ["wheat"]}, "desc": "Золотая пшеница и маленькая мельница: здесь сразу мелют муку. Мука нужна пекарням, пиццериям, пончиковым, бургерным и котокафе."},
 	"boatdock": {"name": "Лодочная пристань", "cost": 30, "unlock": 3, "need_water": true, "boats": 1, "boat": "boat", "happy": 3, "radius": 3, "walk": true, "stroll": true, "build": 2.0, "look": {"wall": "c9a77a", "roof": "none", "rc": "8a8fb0", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "h": 12, "extra": ["deck"]}, "desc": "Деревянные мостки и моторная лодка. Днём котики катаются по заливу. Ставится у воды."},
 	"marina": {"name": "Яхт-клуб", "cost": 160, "unlock": 12, "size": 2, "jobs": 2, "job": "captain", "need_water": true, "boats": 3, "boat": "yacht", "shop": 0.8, "happy": 6, "radius": 4, "tourism": 0.5, "leisure": true, "build": 8.0, "up": [120, 240], "look": {"wall": "f4f6fb", "roof": "flat", "rc": "3d5a98", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "sign": "anchor", "sc": "3d5a98", "fg": "ffffff", "h": 32, "extra": ["flag"]}, "desc": "Белые яхты под парусами. Днём они выходят в залив с котиками на борту, а туристы приезжают на них посмотреть. Ставится у воды."},
 	"powerplant": {"name": "Электростанция", "cost": 200, "unlock": 14, "size": 2, "jobs": 4, "job": "electrician", "shop": 1.2, "service": 6, "sradius": 12, "smoke": true, "build": 12.0, "look": {"wall": "c9c4d6", "roof": "flat", "rc": "6a6478", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "bolt", "sc": "ffd23f", "fg": "3b3b4a", "h": 44, "extra": ["towers"]}, "desc": "Даёт свет всему острову."},
@@ -187,7 +181,7 @@ const TABS := [
 	{"name": "Услуги", "icon": "groomer", "tools": ["groomer", "gym", "barber", "spa", "yoga", "tattoo", "dentist", "vet", "laundry", "gasstation", "carwash", "autorepair", "cardealer", "motel", "hotel"]},
 	{"name": "Бизнес", "icon": "blogstudio", "tools": ["blogstudio", "construction", "itoffice", "office", "exchange", "coworking", "bank", "insurance", "lawfirm", "adagency", "design", "architect", "gamestudio", "datacenter"]},
 	{"name": "Медиа", "icon": "cinema", "tools": ["cinema", "studio", "recording", "radio", "tvcenter", "newspaper", "theater"]},
-	{"name": "Промышленность", "icon": "factory", "tools": ["dairy", "sheepfarm", "cottonfield", "sawmill", "quarry", "mill", "factory", "clothing", "furniture", "electronics", "warehouse", "cargoport", "powerplant", "solar", "waterplant", "recycling"]},
+	{"name": "Промышленность", "icon": "factory", "tools": ["wheat", "cottonfield", "factory", "clothing", "warehouse", "cargoport", "powerplant", "solar", "waterplant", "recycling"]},
 	{"name": "Город", "icon": "townhall", "tools": ["townhall", "lifeguard", "post", "school", "police", "hospital", "fire", "library", "courthouse", "kindergarten", "university", "lab", "metro", "busstation", "taxidepot", "helipad"]},
 	{"name": "Отдых", "icon": "umbrella", "tools": ["umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "playground", "surf", "boatdock", "marina", "skatepark", "tennis", "volleyball", "arcade", "bowling", "nightclub", "aquarium", "zoo", "museum", "gallery"]},
 	{"name": "Природа", "icon": "palm", "tools": ["flowers", "palm", "jacaranda", "statue", "billboard", "watertower"]},
@@ -261,8 +255,7 @@ const PROFESSIONS := {
 	"scientist": "Учёный",
 	"metroman": "Машинист метро",
 	"conductor": "Кондуктор",
-	"milkmaid": "Доярка", "shepherd": "Пастух", "lumberjack": "Лесоруб", "miner": "Шахтёр", "miller": "Мельник",
-	"carpenter": "Столяр", "captain": "Капитан яхты", "assembler": "Сборщик электроники",
+	"captain": "Капитан яхты",
 	"busdriver": "Водитель автобуса",
 	"taxi": "Таксист",
 	"pilot": "Пилот",
@@ -281,13 +274,6 @@ const PROFESSIONS := {
 ## Одежда новых профессий (старые описаны в sprites.gd).
 const JOB_OUTFITS := {
 	"captain": {"s": "ffffff", "t": "3d5a98", "w": "ffffff", "l": "ffffff", "hat": "cap", "hc": "ffffff", "badge": true},
-	"milkmaid": {"s": "ffffff", "t": "5b8de4", "w": "ffffff", "l": "5b8de4", "hat": "band", "hc": "ff8fab"},
-	"shepherd": {"s": "a0704a", "t": "f1dfa6", "w": "a0704a", "l": "5b6b8a", "hat": "straw", "hc": "e8c870"},
-	"lumberjack": {"s": "e45b6b", "t": "2b2b3a", "w": "e45b6b", "l": "3e6aa8", "hat": "beanie", "hc": "e45b6b"},
-	"miner": {"s": "6a6478", "t": "ff9f43", "w": "6a6478", "l": "3b3b4a", "hat": "hard", "hc": "ffd23f"},
-	"miller": {"s": "f4f0e6", "t": "c9a77a", "w": "f4f0e6", "l": "8a6a48", "hat": "beret", "hc": "f4f0e6"},
-	"carpenter": {"s": "c9a77a", "t": "ffffff", "w": "c9a77a", "l": "5b6b8a", "hat": "cap", "hc": "a0704a"},
-	"assembler": {"s": "dfe6f2", "t": "4d6cff", "w": "dfe6f2", "l": "4d6cff", "hat": "cap", "hc": "4d6cff", "glasses": true},
 	"conductor": {"s": "2f3a5a", "t": "ffffff", "w": "2f3a5a", "l": "2f3a5a", "hat": "cap", "hc": "2f3a5a", "badge": true},
 	"fan": {"s": "2f5fb0", "t": "ffffff", "w": "2f5fb0", "l": "3b3b4a", "hat": "cap", "hc": "2f5fb0"},
 	"tourist": {"s": "ffb07a", "t": "7fc4e8", "w": "ffb07a", "l": "c8b896", "hat": "straw", "hc": "e8c870", "shades": true},
@@ -408,35 +394,21 @@ static func def(t: String) -> Dictionary:
 const GOODS := {
 	"fish": {"name": "Рыба", "col": "5fa8d3", "raw": true},
 	"crop": {"name": "Урожай", "col": "8bc34a", "raw": true},
-	"milk": {"name": "Молоко", "col": "e8eef8", "raw": true},
-	"wool": {"name": "Шерсть", "col": "d9c8ec", "raw": true},
+	"flour": {"name": "Мука", "col": "f1dfa6", "raw": true},
 	"cotton": {"name": "Хлопок", "col": "f6f2e2", "raw": true},
-	"wood": {"name": "Доски", "col": "c08a5a", "raw": true},
-	"ore": {"name": "Металл", "col": "9aa3b5", "raw": true},
-	"flour": {"name": "Мука", "col": "f1dfa6"},
-	"yarn": {"name": "Клубки", "col": "ff8fb1"},
-	"clothes": {"name": "Одежда", "col": "b48ce0"},
-	"furniture": {"name": "Мебель", "col": "a0704a"},
-	"tech": {"name": "Электроника", "col": "4d6cff"},
 }
 
-## Кто что производит: [товар, из чего]. Без сырья переработчик просто ждёт, остальное работает как раньше.
+## Кто что производит: [товар, из чего]. Цепочки короткие: поле или причал — склад — магазин.
 const MAKES := {
-	"pier": ["fish", []], "farm": ["crop", []], "dairy": ["milk", []], "sheepfarm": ["wool", []],
-	"cottonfield": ["cotton", []], "sawmill": ["wood", []], "quarry": ["ore", []],
-	"mill": ["flour", ["crop"]], "factory": ["yarn", ["wool"]], "clothing": ["clothes", ["cotton"]],
-	"furniture": ["furniture", ["wood"]], "electronics": ["tech", ["ore"]],
+	"pier": ["fish", []], "farm": ["crop", []], "wheat": ["flour", []], "cottonfield": ["cotton", []],
 }
 
 ## Кому что привозить: с завезёнными товарами заведение зарабатывает больше (и готовит больше еды).
 const USES := {
-	"sushi": ["fish"], "restaurant": ["fish", "crop"], "market": ["fish", "crop"], "supermarket": ["fish", "crop", "milk"],
-	"juicebar": ["crop"], "tacotruck": ["crop"], "burger": ["flour", "crop"], "bakery": ["flour", "milk"],
-	"pizzeria": ["flour"], "donut": ["flour", "milk"], "icecream": ["milk"], "cafe": ["milk"], "boba": ["milk"],
-	"shop": ["yarn"], "toystore": ["yarn"], "petshop": ["yarn"], "boutique": ["clothes"],
-	"mall": ["clothes", "furniture", "tech"], "techstore": ["tech"], "gamestudio": ["tech"], "datacenter": ["tech"],
-	"itoffice": ["tech"], "hotel": ["furniture"], "motel": ["furniture"], "office": ["furniture"], "coworking": ["furniture"],
-	"construction": ["wood"], "architect": ["wood"], "cardealer": ["ore"], "autorepair": ["ore"],
+	"sushi": ["fish"], "restaurant": ["fish", "crop"], "market": ["fish", "crop"], "supermarket": ["fish", "crop", "flour"],
+	"juicebar": ["crop"], "tacotruck": ["crop"], "icecream": ["crop"], "boba": ["crop"], "burger": ["flour", "crop"],
+	"bakery": ["flour"], "pizzeria": ["flour"], "donut": ["flour"], "cafe": ["flour"],
+	"factory": ["cotton"], "clothing": ["cotton"],
 }
 
 

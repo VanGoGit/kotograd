@@ -45,10 +45,7 @@ const GLYPHS := {
 	"box": ["xxxxx", "x.x.x", "xxxxx", "x...x", "xxxxx"],
 	"house": ["..x..", ".xxx.", "xxxxx", ".x.x.", ".xxx."],
 	"bowling": ["..x..", ".xxx.", "..x..", ".xxx.", ".xxx."],
-	"milk": [".xxx.", "..x..", ".xxx.", "x.x.x", "xxxxx"],
-	"log": [".xxx.", "x...x", "x.x.x", "x...x", ".xxx."],
 	"anchor": ["..x..", ".xxx.", "..x..", "x.x.x", ".xxx."],
-	"sofa": [".....", "x...x", "xxxxx", "xxxxx", "x...x"],
 }
 
 
@@ -104,12 +101,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 				top = maxi(top, 4)
 			"tower":
 				top = maxi(top, 14)
-			"silo":
-				top = maxi(top, 6)
 			"runway":
 				top = maxi(top, 30)
-			"windmill":
-				top = maxi(top, 12)
 	var min_body := 12 if sz == 1 else 16
 	var h: int = maxi(int(look.get("h", 24 if sz == 1 else 40)), top + roof_h + min_body + 1)
 	var p = make.call(w, h)
@@ -389,31 +382,26 @@ static func _extra(p, e: String, w: int, h: int, by0: int, body_h: int, sz: int,
 			p.R(0, h - 2, w, 1, "8a6a48")
 			p.R(1, h - 12, 2, 3, "6a6478"); p.R(w - 3, h - 12, 2, 3, "6a6478")
 			p.R(2, h - 11, w - 4, 1, "e8d6bc")
-		"silo":
-			# силос у правого края
-			var sx := w - 8
-			p.R(sx, 3, 6, h - 4, "dfe3ea"); p.R(sx, 3, 1, h - 4, "c3c8d2"); p.R(sx + 5, 3, 1, h - 4, "eef1f6")
-			p.C(sx + 3, 3.5, 3, "c8553d")
-			for y in range(8, h - 2, 4):
-				p.R(sx, y, 6, 1, "c3c8d2")
-		"cows":
-			p.R(1, h - 6, w - 12, 1, "c08f5f"); p.R(1, h - 9, w - 12, 1, "c08f5f")
-			for k in [3, 12]:
-				p.R(k, h - 8, 7, 4, "ffffff"); p.R(k + 1, h - 7, 2, 2, "2b2b3a"); p.R(k + 5, h - 8, 1, 2, "2b2b3a")
-				p.R(k + 7, h - 9, 3, 3, "ffffff"); p.P(k + 9, h - 8, "2b2b3a"); p.R(k + 8, h - 7, 2, 1, "ffb3c1")
-				p.P(k, h - 4, "3b3b4a"); p.P(k + 5, h - 4, "3b3b4a")
-		"sheep":
-			# пастбище с загородкой и пушистыми овечками
-			for x in range(0, w, 4):
-				p.R(x, h - 4, 1, 3, "c08f5f")
-			p.R(0, h - 3, w, 1, "c08f5f"); p.R(0, 4, w, 1, "c08f5f")
-			for x in range(0, w, 4):
-				p.R(x, 3, 1, 3, "c08f5f")
-			for k in [[3, 8], [15, 6], [8, 14], [21, 13]]:
-				p.C(k[0] + 3, k[1] + 2, 2.6, "ffffff"); p.C(k[0] + 5, k[1] + 1.5, 2.2, "f4f0ec")
-				p.R(k[0] + 6, k[1] + 1, 3, 3, "4a4050"); p.P(k[0] + 7, k[1] + 2, "ffffff")
-				p.P(k[0] + 2, k[1] + 5, "4a4050"); p.P(k[0] + 5, k[1] + 5, "4a4050")
-			p.R(w - 7, 7, 5, 4, "a0704a"); p.R(w - 8, 6, 7, 1, "c8553d")
+		"wheat":
+			# золотое поле: ряды колосьев, а справа мельница с крыльями
+			p.R(0, 6, w, h - 7, "ecc860")
+			for r in range(8, h - 2, 4):
+				p.R(1, r, w - 2, 1, "d1a540")
+				for x in range(1, w - 1, 3):
+					p.P(x + (r / 4) % 2, r - 1, "fbe7a0")
+			var mx := w - 9
+			var by := h - 2
+			p.R(mx - 4, by - 13, 9, 13, "f4ecdc"); p.R(mx - 4, by - 13, 1, 13, "d8ccb4")
+			p.R(mx - 5, by - 14, 11, 1, "b8553d"); p.R(mx - 4, by - 15, 9, 1, "c8553d"); p.R(mx - 3, by - 16, 7, 1, "c8553d"); p.R(mx - 1, by - 17, 3, 1, "c8553d")
+			p.R(mx - 1, by - 5, 3, 5, "8a5a3b"); p.R(mx - 2, by - 10, 2, 2, "9fd3e6")
+			var hub := Vector2i(mx, by - 17)
+			for k in range(1, 9):
+				p.P(hub.x - k, hub.y - k, "7a5a3b"); p.P(hub.x + k, hub.y + k, "7a5a3b")
+				p.P(hub.x + k, hub.y - k, "7a5a3b"); p.P(hub.x - k, hub.y + k, "7a5a3b")
+				if k >= 3:
+					p.P(hub.x - k + 1, hub.y - k, "ffffff"); p.P(hub.x + k - 1, hub.y + k, "ffffff")
+					p.P(hub.x + k, hub.y - k + 1, "ffffff"); p.P(hub.x - k, hub.y + k - 1, "ffffff")
+			p.R(hub.x - 1, hub.y - 1, 3, 3, "5a3c30")
 		"cotton":
 			for r in range(2, h - 2, 4):
 				p.R(1, r, w - 2, 2, "6a9a3a")
@@ -422,29 +410,6 @@ static func _extra(p, e: String, w: int, h: int, by0: int, body_h: int, sz: int,
 					p.P(x + 1, r + 1, "f4f0e6")
 			p.R(w - 10, h - 9, 8, 6, "c9a77a"); p.R(w - 11, h - 10, 10, 1, "a0704a")
 			p.R(w - 9, h - 8, 6, 3, "ffffff")
-		"logs":
-			for k in 3:
-				var y0 := h - 4 - k * 3
-				for j in 3 - k:
-					var x0 := 2 + j * 4 + k * 2
-					p.C(x0 + 1.5, y0 + 1.5, 1.7, "a0704a"); p.P(x0 + 1, y0 + 1, "f1dfa6")
-			p.R(w - 12, h - 6, 10, 3, "e8c89a"); p.R(w - 12, h - 7, 10, 1, "c08a5a")
-		"mine":
-			# вход в гору, рельсы и тележка с рудой
-			p.C(w / 2, h - 8, 12, "9a8a74"); p.C(w / 2, h - 10, 9, "b4a48c")
-			p.R(0, h - 4, w, 3, "9a8a74")
-			p.C(w / 2, h - 5, 5, "3b3340"); p.R(w / 2 - 5, h - 5, 10, 4, "3b3340")
-			p.R(w / 2 - 6, h - 11, 12, 1, "a0704a"); p.R(w / 2 - 6, h - 11, 1, 9, "a0704a"); p.R(w / 2 + 5, h - 11, 1, 9, "a0704a")
-			p.R(2, h - 2, w - 4, 1, "6a6478")
-			p.R(4, h - 6, 7, 3, "6a6478"); p.R(5, h - 7, 5, 1, "c9ccd6"); p.P(6, h - 8, "e8eaf0")
-			p.P(5, h - 3, "2b2b33"); p.P(9, h - 3, "2b2b33")
-		"windmill":
-			var mx := w / 2
-			var my := 5
-			for k in 6:
-				p.R(mx - k - 1, my - k, 2, 1, "f4f0e6"); p.R(mx + k, my + k, 2, 1, "f4f0e6")
-				p.R(mx + k, my - k, 2, 1, "f4f0e6"); p.R(mx - k - 1, my + k, 2, 1, "f4f0e6")
-			p.R(mx - 1, my - 1, 2, 2, "a0704a")
 		"containers":
 			var cols := ["e45b6b", "5b8de4", "5fae73", "ff9f43", "ffd23f", "9b7ad1"]
 			for r in 3:

@@ -861,4 +861,9 @@ const EN := {
 	"Полный цикл": "Full cycle",
 	"Запустите все 5 перерабатывающих производств": "Run all 5 processing plants",
 	"Вертолётные экскурсии над побережьем. Вертолёт летает к другим площадкам и аэропортам, а если лететь некуда — облетает город.": "Helicopter tours over the coast. The helicopter flies to other helipads and airports, and if there is nowhere to go, it circles the city.",
+	"Режим «Дзен»: спрятать цели, подсказки, новости и надписи над городом (Z)": "Zen mode: hide goals, hints, news and labels over the city (Z)",
+	"Только город, музыка и стройка: без целей, подсказок, новостей, гудков и надписей над котиками и машинами. Цели всё равно засчитываются тихо.": "Just the city, music and building: no goals, hints, news, honking or labels over cats and cars. Goals still count quietly.",
+	"Пшеничное поле": "Wheat field",
+	"Золотая пшеница и маленькая мельница: здесь сразу мелют муку. Мука нужна пекарням, пиццериям, пончиковым, бургерным и котокафе.": "Golden wheat and a little windmill that grinds flour right there. Bakeries, pizzerias, donut shops, burger joints and cat cafes need flour.",
+	"Белые коробочки хлопка. Хлопок везут на Фабрику одежды и Фабрику клубков.": "White cotton bolls. Cotton goes to the Clothing factory and the Yarn factory.",
 }

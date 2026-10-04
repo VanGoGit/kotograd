@@ -301,7 +301,7 @@ func _build_top() -> void:
 	top.add_child(btn_music)
 	_update_music_btn()
 	top.add_child(_btn("Цели", _open_goals, "Задания и достижения"))
-	btn_zen = _btn("Дзен", func(): set_zen(not zen), "Режим «Дзен»: спрятать цели, подсказки и новости (Z)")
+	btn_zen = _btn("Дзен", func(): set_zen(not zen), "Режим «Дзен»: спрятать цели, подсказки, новости и надписи над городом (Z)")
 	btn_zen.toggle_mode = true
 	top.add_child(btn_zen)
 	top.add_child(_btn(" ? ", func(): open_modal(help_modal), "Как играть"))
@@ -1081,7 +1081,7 @@ func _build_settings() -> void:
 	chk_zen = CheckButton.new()
 	chk_zen.focus_mode = Control.FOCUS_NONE
 	chk_zen.text = "Режим «Дзен»"
-	chk_zen.tooltip_text = "Только город, музыка и стройка: без целей, подсказок и новостей. Цели всё равно засчитываются тихо."
+	chk_zen.tooltip_text = "Только город, музыка и стройка: без целей, подсказок, новостей, гудков и надписей над котиками и машинами. Цели всё равно засчитываются тихо."
 	chk_zen.button_pressed = zen
 	chk_zen.toggled.connect(set_zen)
 	_setting_row(grid, "", chk_zen)

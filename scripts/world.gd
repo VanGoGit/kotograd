@@ -315,7 +315,9 @@ func deserialize(text: String) -> bool:
 		if m.size() > 6 and typeof(m[6]) == TYPE_DICTIONARY:
 			var st := {}
 			for g in m[6].get("s", {}):
-				st[g] = float(m[6].s[g])
+				# товары, которых больше нет в игре, просто забываем
+				if D.GOODS.has(g):
+					st[g] = float(m[6].s[g])
 			o["stock"] = st
 			o["out"] = float(m[6].get("o", 0.0))
 	coins = float(d.coins)
@@ -2549,7 +2551,7 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 				high += 1
 	if d.get("need_high", false) and high < w * w:
 		return {"ok": false, "reason": tr("Строится только на холмах и в горах")}
-	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false) or d.get("mine", false)):
+	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false)):
 		return {"ok": false, "reason": tr("Слишком круто: в горах — только жильё и дороги")}
 	if water > 0:
 		if t == "road":
@@ -2788,6 +2790,9 @@ func _dust(x: int, y: int) -> void:
 
 
 func float_text(pos: Vector2, text: String, color: Color) -> void:
+	# в режиме «Дзен» — тишина: остаются только красные подсказки о том, почему нельзя строить
+	if ui != null and ui.zen and color != Color("c24a5a"):
+		return
 	floats.append({"pos": pos, "text": text, "color": color, "life": 1.6, "mx": 1.6})
 
 
@@ -4126,7 +4131,7 @@ func _update_ambience() -> void:
 	sound.amb.birds = clampf(green / 10.0, 0.0, 1.0) * day_k * 0.8
 	sound.amb.crickets = (1.0 - day_k) * clampf((tot - water) / tot * 1.6, 0.0, 1.0) * near
 	sound.amb.traffic = clampf(cars_vis / 10.0, 0.0, 1.0) * near
-	if jammed >= 3 and randf() < 0.08:
+	if jammed >= 3 and randf() < 0.08 and not ui.zen:
 		sound.play("honk", randf_range(0.9, 1.15), -16.0)
 
 
