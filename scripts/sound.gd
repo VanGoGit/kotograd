@@ -120,6 +120,28 @@ var _themes := {}
 var _prev_kind := "intro"
 var _mood := "day"
 
+# Браузер: звук там считается в том же потоке, что и игра, и живой поток
+# прерывается при малейшей подтормозке. Поэтому в вебе музыка заранее
+# сводится в готовые фрагменты, а браузер играет их в своём аудиопотоке.
+const CHUNK := 6 * SR        # длина фрагмента
+const OV := 1600             # 50 мс общего хвоста для плавного стыка
+const DLY := 3520            # задержка «эха комнаты» (110 мс)
+var _web := OS.has_feature("web")
+var _chunk := PackedVector2Array()
+var _ov_head := PackedVector2Array()
+var _chunks: Array = []      # готовые к игре AudioStreamWAV
+var _wplayers: Array = []
+var _wp := 0
+var _due := -1.0             # когда (по часам) должен начаться следующий фрагмент
+var _lpa := 1.0
+var _lpl := 0.0
+var _lpr := 0.0
+var _dly_l := PackedFloat32Array()
+var _dly_r := PackedFloat32Array()
+var _dly_i := 0
+var _dml := 0.0
+var _dmr := 0.0
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -152,6 +174,17 @@ func _ready() -> void:
 		add_child(p)
 		_sfx_players.append(p)
 
+	if _web:
+		_dly_l.resize(DLY)
+		_dly_r.resize(DLY)
+		for i in 3:
+			var wp := AudioStreamPlayer.new()
+			wp.bus = "Music"
+			wp.volume_db = -3.0
+			add_child(wp)
+			_wplayers.append(wp)
+		_gen_section()
+		return
 	var gen := AudioStreamGenerator.new()
 	gen.mix_rate = SR
 	gen.buffer_length = 0.4
@@ -170,6 +203,9 @@ func _process(_delta: float) -> void:
 	var target: float = MOODS[_mood_for(hour)].lp
 	_lp_cut = lerpf(_lp_cut, target, 0.01)
 	_lp.cutoff_hz = _lp_cut
+	if _web:
+		_process_web()
+		return
 	if not music_on:
 		if _player.playing:
 			_player.stop()
@@ -186,6 +222,62 @@ func _process(_delta: float) -> void:
 	var n := _pb.get_frames_available()
 	if n > 0:
 		_pb.push_buffer(render(n))
+
+
+func _process_web() -> void:
+	if not music_on:
+		for p in _wplayers:
+			p.stop()
+		_due = -1.0
+		return
+	_lpa = 1.0 - exp(-TAU * _lp_cut / SR)
+	_render_chunks(4000)
+	var now := Time.get_ticks_usec() / 1000000.0
+	if _chunks.is_empty() or (_due >= 0.0 and now < _due):
+		return
+	# опоздали сильнее хвоста (вкладка была скрыта) — начинаем заново с этого момента
+	if _due < 0.0 or now - _due > float(OV) / SR:
+		_due = now
+	var p: AudioStreamPlayer = _wplayers[_wp]
+	_wp = (_wp + 1) % _wplayers.size()
+	p.stream = _chunks.pop_front()
+	# пропускаем ровно столько, на сколько опоздал кадр, — стык остаётся точным
+	p.play(now - _due)
+	_due += float(CHUNK) / SR
+
+
+## Сводит музыку фрагментами в фоне, понемногу за кадр.
+func _render_chunks(budget_usec: int) -> void:
+	var t0 := Time.get_ticks_usec()
+	while _chunks.size() < 2 and Time.get_ticks_usec() - t0 < budget_usec:
+		if _chunk.is_empty():
+			_chunk = _ov_head.duplicate()
+		var n := mini(2048, CHUNK + OV - _chunk.size())
+		_chunk.append_array(render(n))
+		if _chunk.size() < CHUNK + OV:
+			continue
+		# хвост этого фрагмента — начало следующего; на стыке они плавно перетекают
+		_ov_head = _chunk.slice(CHUNK)
+		for k in OV:
+			var a := float(k) / OV
+			_chunk[k] *= a
+			_chunk[CHUNK + k] *= 1.0 - a
+		_chunks.append(_to_wav(_chunk))
+		_chunk = PackedVector2Array()
+
+
+func _to_wav(buf: PackedVector2Array) -> AudioStreamWAV:
+	var ints := PackedInt32Array()
+	ints.resize(buf.size())
+	for k in buf.size():
+		var v := buf[k]
+		ints[k] = (int(v.x * 32000.0) & 0xFFFF) | (int(v.y * 32000.0) << 16)
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = SR
+	w.stereo = true
+	w.data = ints.to_byte_array()
+	return w
 
 
 # ---------- микшер ----------
@@ -217,8 +309,35 @@ func render(n: int) -> PackedVector2Array:
 	_voices = keep
 	var out := PackedVector2Array()
 	out.resize(n)
-	for k in n:
-		out[k] = Vector2(tanh(L[k] * MASTER), tanh(R[k] * MASTER))
+	if not _web:
+		for k in n:
+			out[k] = Vector2(tanh(L[k] * MASTER), tanh(R[k] * MASTER))
+	else:
+		# в браузере эффекты шины не действуют на готовые фрагменты — эхо и фильтр прямо здесь
+		var lpa := _lpa
+		var lpl := _lpl
+		var lpr := _lpr
+		var dml := _dml
+		var dmr := _dmr
+		var di := _dly_i
+		for k in n:
+			dml += (_dly_l[di] - dml) * 0.4
+			dmr += (_dly_r[di] - dmr) * 0.4
+			var l := L[k] + dml * 0.16
+			var r := R[k] + dmr * 0.16
+			_dly_l[di] = L[k] + dmr * 0.32
+			_dly_r[di] = R[k] + dml * 0.32
+			di += 1
+			if di == DLY:
+				di = 0
+			lpl += (l - lpl) * lpa
+			lpr += (r - lpr) * lpa
+			out[k] = Vector2(tanh(lpl * MASTER), tanh(lpr * MASTER))
+		_lpl = lpl
+		_lpr = lpr
+		_dml = dml
+		_dmr = dmr
+		_dly_i = di
 	_t += n
 	return out
 
