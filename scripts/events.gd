@@ -287,7 +287,7 @@ func _event_fx(dt: float) -> void:
 			_fx_t = 0.25
 			world.add_p({"type": "confetti", "x": p.x + randf_range(-24, 24), "y": p.y - 30, "vx": randf_range(-10, 10), "vy": randf_range(-20, -5), "g": 30.0, "life": 2.5, "col": FW_COLORS.pick_random(), "ph": randf() * 6.0})
 			if randf() < 0.04:
-				world.float_text(p + Vector2(0, -20), ["Ура!", "Хоум-ран!", "Мяу-у!"].pick_random(), Color("e45b6b"))
+				world.float_text(p + Vector2(0, -20), [tr("Ура!"), tr("Хоум-ран!"), tr("Мяу-у!")].pick_random(), Color("e45b6b"))
 				world.sound.play("cheer", randf_range(0.9, 1.1), -14.0)
 		"fireworks":
 			_fx_t = randf_range(0.4, 1.0)

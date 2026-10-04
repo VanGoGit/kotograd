@@ -176,7 +176,7 @@ func _big(text: String, cb: Callable, primary := false) -> Button:
 func open(has_city: bool) -> void:
 	visible = true
 	_btn_continue.visible = has_city
-	_btn_continue.text = "Продолжить: %s" % world.city_name
+	_btn_continue.text = tr("Продолжить: %s") % tr(world.city_name)
 	_show_menu()
 
 
@@ -186,9 +186,9 @@ func _show_menu() -> void:
 
 
 func _random_name() -> String:
-	var n: String = NAMES.pick_random()
+	var n: String = tr(NAMES.pick_random())
 	while n == _name_edit.text and NAMES.size() > 1:
-		n = NAMES.pick_random()
+		n = tr(NAMES.pick_random())
 	return n
 
 
@@ -200,7 +200,7 @@ func _on_new() -> void:
 	_menu_box.visible = false
 	_name_box.visible = true
 	_name_edit.text = _random_name()
-	_warn.text = ("Город «%s» будет заменён новым островом." % world.city_name) if _btn_continue.visible else ""
+	_warn.text = (tr("Город «%s» будет заменён новым островом.") % tr(world.city_name)) if _btn_continue.visible else ""
 	_warn.visible = _btn_continue.visible
 	_name_edit.grab_focus()
 
@@ -214,7 +214,7 @@ func _on_found() -> void:
 	world.save_game()
 	ui.refresh_tools()
 	ui.hide_title()
-	ui.toast("Добро пожаловать в %s!" % n, true)
+	ui.toast(tr("Добро пожаловать в %s!") % tr(n), true)
 	ui.open_modal(ui.help_modal)
 
 

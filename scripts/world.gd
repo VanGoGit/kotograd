@@ -5,6 +5,7 @@ const D = preload("res://scripts/defs.gd")
 const Goals = preload("res://scripts/goals.gd")
 const Events = preload("res://scripts/events.gd")
 const Transit = preload("res://scripts/transit.gd")
+const I18n = preload("res://scripts/i18n.gd")
 const W := D.W
 const H := D.H
 const T := D.T
@@ -475,7 +476,7 @@ func upgrade(b: int) -> bool:
 	var cp := center_of(b) * T + Vector2(8, 0)
 	for k in 16:
 		add_p({"type": "sparkle", "x": cp.x + randf_range(-12, 12), "y": cp.y + randf_range(-16, 8), "vx": randf_range(-25, 25), "vy": randf_range(-40, -10), "life": randf_range(0.7, 1.4)})
-	float_text(cp + Vector2(0, -14), "%s — уровень %d!" % [D.def(o.t).name, o.lvl], Color("c08a1a"))
+	float_text(cp + Vector2(0, -14), tr("%s — уровень %d!") % [tr(D.def(o.t).name), o.lvl], Color("c08a1a"))
 	sound.play("chime")
 	recalc()
 	return true
@@ -498,7 +499,7 @@ func foot_ok(i: int) -> bool:
 
 func bname(b: int) -> String:
 	if b >= 0 and b < W * H and objs[b] != null:
-		return D.def(objs[b].t).get("name", "—")
+		return tr(D.def(objs[b].t).get("name", "—"))
 	return "—"
 
 
@@ -779,7 +780,7 @@ func _assign_homes() -> void:
 		c.home = fh[0]
 		rebuild_maps()
 		hearts_at(cat_pos(c) + Vector2(0, -12), 3)
-		ui.toast("%s нашёл новый дом!" % c.name, false, true)
+		ui.toast(tr("%s нашёл новый дом!") % I18n.cat(c.name), false, true)
 
 
 func employed_count() -> int:
@@ -847,7 +848,7 @@ func _assign_jobs() -> void:
 				workers[best] = []
 			workers[best].append(c)
 			var p := cat_pos(c)
-			float_text(p + Vector2(0, -18), "%s: %s!" % [c.name, D.PROFESSIONS[D.def(objs[best].t).job].to_lower()], Color("5b6bb0"))
+			float_text(p + Vector2(0, -18), "%s: %s!" % [I18n.cat(c.name), tr(D.PROFESSIONS[D.def(objs[best].t).job]).to_lower()], Color("5b6bb0"))
 
 
 # =====================================================================
@@ -922,15 +923,15 @@ func spawn_cat() -> void:
 	var hc := center_of(h) * T + Vector2(8, 8)
 	for k in 8:
 		add_p({"type": "sparkle", "x": hc.x + randf_range(-8, 8), "y": hc.y + randf_range(-8, 4), "vx": randf_range(-6, 6), "vy": randf_range(-20, -8), "life": randf_range(0.6, 1.2)})
-	ui.toast("%s переезжает в %s!" % [c.name, city_name], false, true)
+	ui.toast(tr("%s переезжает в %s!") % [I18n.cat(c.name), tr(city_name)], false, true)
 	sound.play("mew", randf_range(0.9, 1.25))
 	var opened := []
 	for t in D.DEFS:
 		var u := int(D.DEFS[t].get("unlock", 0))
 		if u > prev and u <= max_cats:
-			opened.append(D.DEFS[t].name)
+			opened.append(tr(D.DEFS[t].name))
 	if opened.size() > 0:
-		ui.toast("Открыто: %s!" % ", ".join(opened), true, true)
+		ui.toast(tr("Открыто: %s!") % ", ".join(opened), true, true)
 		sound.play("chime")
 	ui.refresh_tools()
 
@@ -967,8 +968,8 @@ func _city_style() -> String:
 
 func profession(c: Dictionary) -> String:
 	if c.job >= 0 and objs[c.job] != null:
-		return D.PROFESSIONS.get(D.def(objs[c.job].t).get("job", ""), "")
-	return "Ищет работу"
+		return tr(D.PROFESSIONS.get(D.def(objs[c.job].t).get("job", ""), ""))
+	return tr("Ищет работу")
 
 
 func _near(list: Array, c: Dictionary, dist: float) -> Array:
@@ -1572,7 +1573,7 @@ func pet_cat(c: Dictionary) -> void:
 	c.pet = 1.4
 	var p := cat_pos(c)
 	hearts_at(p + Vector2(0, -12), 5)
-	float_text(p + Vector2(0, -16), "мрр... zZ" if c.state == "sleep" else ["Мурр!", "Мяу!", "Мрр~"].pick_random(), Color("ff6b8b"))
+	float_text(p + Vector2(0, -16), tr("мрр... zZ") if c.state == "sleep" else [tr("Мурр!"), tr("Мяу!"), tr("Мрр~")].pick_random(), Color("ff6b8b"))
 	sound.play("mew", randf_range(0.95, 1.3))
 	pet_bonus = minf(10.0, pet_bonus + 1.5)
 	pets_total += 1
@@ -1601,30 +1602,30 @@ func activity_text(c: Dictionary) -> String:
 			return ""
 		match dd.kind:
 			"home":
-				return "домой"
+				return tr("домой")
 			"work":
-				return "на работу"
+				return tr("на работу")
 			"visit":
-				return "в «%s»" % bname(dd.b)
-		return "гулять"
+				return tr("в «%s»") % bname(dd.b)
+		return tr("гулять")
 	match c.state:
 		"ride":
-			return "летит на самолёте" if transit.vehicle_kind(c) == "air" else "едет на поезде"
+			return tr("летит на самолёте") if transit.vehicle_kind(c) == "air" else tr("едет на поезде")
 		"drive":
-			return "едет %s на машине" % where.call(d)
+			return tr("едет %s на машине") % where.call(d)
 		"walk":
-			return "идёт %s" % where.call(d) if d != null and d.kind != "wander" else "гуляет"
+			return tr("идёт %s") % where.call(d) if d != null and d.kind != "wander" else tr("гуляет")
 		"in":
 			if c.get("trip") != null:
-				return "ждёт %s в «%s»" % ["самолёт" if transit.hubs.get(c.at, {}).get("kind", "") == "air" else "поезд", bname(c.at)]
+				return tr("ждёт %s в «%s»") % [tr("самолёт") if transit.hubs.get(c.at, {}).get("kind", "") == "air" else tr("поезд"), bname(c.at)]
 			if c.at == c.home:
-				return "спит дома" if is_night() else "отдыхает дома"
+				return tr("спит дома") if is_night() else tr("отдыхает дома")
 			if c.at == c.job:
-				return "работает"
-			return "в «%s»" % bname(c.at)
+				return tr("работает")
+			return tr("в «%s»") % bname(c.at)
 		"sleep":
-			return "дремлет под открытым небом" if c.home < 0 else "дремлет"
-	return "ждёт новый дом" if c.home < 0 else "отдыхает на улице"
+			return tr("дремлет под открытым небом") if c.home < 0 else tr("дремлет")
+	return tr("ждёт новый дом") if c.home < 0 else tr("отдыхает на улице")
 
 
 # =====================================================================
@@ -1738,7 +1739,7 @@ func _update_cars(dt: float) -> void:
 		if tr == 2 and car.get("wait", 0.0) < 6.0:
 			car["wait"] = car.get("wait", 0.0) + dt
 			if car.wait > 4.0 and randf() < dt * 0.25:
-				float_text(Vector2(car.px, car.py - 10), "Би-бип!", Color("6a6478"))
+				float_text(Vector2(car.px, car.py - 10), tr("Би-бип!"), Color("6a6478"))
 			_car_pos(car)
 			continue
 		car["wait"] = 0.0
@@ -1854,14 +1855,14 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 	if d.is_empty() or not in_map(x, y):
 		return {"ok": false}
 	if not unlimited and max_cats < d.get("unlock", 0):
-		return {"ok": false, "reason": "Пока закрыто"}
+		return {"ok": false, "reason": tr("Пока закрыто")}
 	if d.has("terra"):
 		var i := y * W + x
 		var o = objs[i]
 		if terrain[i] == d.terra:
 			return {"ok": false}
 		if o != null and o.t != "road" and o.t != "path":
-			return {"ok": false, "reason": "Сначала уберите постройку"}
+			return {"ok": false, "reason": tr("Сначала уберите постройку")}
 		return {"ok": true, "cost": 0}
 	if d.get("need_rail", false):
 		var near_rail := false
@@ -1873,19 +1874,19 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 				if not inside and not corner and is_rail(xx, yy):
 					near_rail = true
 		if not near_rail:
-			return {"ok": false, "reason": "Ставьте вплотную к рельсам"}
+			return {"ok": false, "reason": tr("Ставьте вплотную к рельсам")}
 	if d.get("wonder", false) and wonder_built(t):
-		return {"ok": false, "reason": "Это чудо уже есть в городе"}
+		return {"ok": false, "reason": tr("Это чудо уже есть в городе")}
 	var w := D.size_of(t)
 	var water := 0
 	var cost: int = d.cost
 	for yy in range(y, y + w):
 		for xx in range(x, x + w):
 			if not in_map(xx, yy):
-				return {"ok": false, "reason": "Не помещается"}
+				return {"ok": false, "reason": tr("Не помещается")}
 			var i := yy * W + xx
 			if objs[i] != null:
-				return {"ok": false, "reason": "Здесь занято"}
+				return {"ok": false, "reason": tr("Здесь занято")}
 			if terrain[i] == WATER:
 				water += 1
 	var high := 0
@@ -1897,9 +1898,9 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 			if is_high(yy * W + xx):
 				high += 1
 	if d.get("need_high", false) and high < w * w:
-		return {"ok": false, "reason": "Строится только на холмах и в горах"}
+		return {"ok": false, "reason": tr("Строится только на холмах и в горах")}
 	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false)):
-		return {"ok": false, "reason": "Слишком круто: в горах — только жильё и дороги"}
+		return {"ok": false, "reason": tr("Слишком круто: в горах — только жильё и дороги")}
 	if water > 0:
 		if t == "road":
 			cost = 8
@@ -1910,18 +1911,18 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 		elif t == "rail":
 			cost = 12
 		else:
-			return {"ok": false, "reason": "Нельзя на воде"}
+			return {"ok": false, "reason": tr("Нельзя на воде")}
 	if d.get("need_water", false):
 		var near := false
 		for dv in DIRS:
 			if in_map(x + dv.x, y + dv.y) and terrain[(y + dv.y) * W + x + dv.x] == WATER:
 				near = true
 		if not near:
-			return {"ok": false, "reason": "Нужна вода рядом"}
+			return {"ok": false, "reason": tr("Нужна вода рядом")}
 	if unlimited:
 		cost = 0
 	if coins < cost:
-		return {"ok": false, "reason": "Не хватает монеток", "cost": cost}
+		return {"ok": false, "reason": tr("Не хватает монеток"), "cost": cost}
 	return {"ok": true, "cost": cost}
 
 
@@ -1979,7 +1980,7 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 func _make_crossing(x: int, y: int) -> void:
 	var cost := 0 if unlimited else 6
 	if coins < cost:
-		float_text(Vector2(x * T + 8, y * T), "Не хватает монеток", Color("c24a5a"))
+		float_text(Vector2(x * T + 8, y * T), tr("Не хватает монеток"), Color("c24a5a"))
 		return
 	if not unlimited and max_cats < 6:
 		return
@@ -2001,7 +2002,7 @@ func _bulldoze(x: int, y: int, first: bool) -> void:
 	elif d.get("natural", false):
 		if coins < 2.0:
 			if first:
-				float_text(Vector2(x * T + 8, y * T), "Нужно 2 монетки", Color("c24a5a"))
+				float_text(Vector2(x * T + 8, y * T), tr("Нужно 2 монетки"), Color("c24a5a"))
 			return
 		coins -= 2.0
 	else:
@@ -2044,7 +2045,7 @@ func _release_building(b: int, o: Dictionary) -> void:
 			c["ay"] = float(y0)
 			if c.plan != null and c.plan.kind == "home":
 				c.plan = null
-			ui.toast("%s остался без дома и ждёт новый" % c.name, false, true)
+			ui.toast(tr("%s остался без дома и ждёт новый") % I18n.cat(c.name), false, true)
 	rebuild_maps()
 
 
@@ -2065,10 +2066,10 @@ func _update_construction(dt: float) -> void:
 			var cp := Vector2(b % W * T + o.w * 8, b / W * T + o.w * 8)
 			for k in 14:
 				add_p({"type": "sparkle", "x": cp.x + randf_range(-10, 10), "y": cp.y + randf_range(-10, 6), "vx": randf_range(-25, 25), "vy": randf_range(-35, -10), "life": randf_range(0.7, 1.3)})
-			float_text(cp + Vector2(0, -10), "%s — готово!" % D.def(o.t).name, Color("4f8a4f"))
+			float_text(cp + Vector2(0, -10), tr("%s — готово!") % tr(D.def(o.t).name), Color("4f8a4f"))
 			sound.play("pop")
 			if D.def(o.t).get("wonder", false):
-				ui.toast("Чудо света построено: %s! Туристы уже едут." % D.def(o.t).name, true, true)
+				ui.toast(tr("Чудо света построено: %s! Туристы уже едут.") % tr(D.def(o.t).name), true, true)
 				sound.play("chime")
 				for k in 30:
 					add_p({"type": "sparkle", "x": cp.x + randf_range(-20, 20), "y": cp.y + randf_range(-30, 6), "vx": randf_range(-30, 30), "vy": randf_range(-45, -10), "life": randf_range(1.0, 2.0)})
@@ -2222,7 +2223,7 @@ func _step(gdt: float) -> void:
 	if time >= 1.0:
 		time -= 1.0
 		day += 1
-		ui.toast("Доброе утро! Начинается день %d" % day, false, true)
+		ui.toast(tr("Доброе утро! Начинается день %d") % day, false, true)
 	if was_night != is_night():
 		sound.night = is_night()
 	rebuild_maps()
@@ -2509,7 +2510,7 @@ func _click(wp: Vector2) -> void:
 func select_tool(t: String) -> void:
 	var d := D.def(t)
 	if not d.is_empty() and not unlimited and max_cats < d.get("unlock", 0):
-		ui.toast("«%s» откроется, когда в городе будет %d котиков" % [d.name, d.unlock])
+		ui.toast(tr("«%s» откроется, когда в городе будет %d котиков") % [tr(d.name), d.unlock])
 		return
 	tool = t
 	ui.refresh_tools()

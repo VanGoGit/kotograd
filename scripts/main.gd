@@ -6,6 +6,7 @@ const Sound = preload("res://scripts/sound.gd")
 const World = preload("res://scripts/world.gd")
 const UI = preload("res://scripts/ui.gd")
 const Fx = preload("res://scripts/fx.gd")
+const I18n = preload("res://scripts/i18n.gd")
 const NIGHT_SHADER = preload("res://scripts/night.gdshader")
 const MAX_LIGHTS := 128
 
@@ -17,6 +18,13 @@ var night_mat: ShaderMaterial
 
 func _ready() -> void:
 	randomize()
+	# язык — до того, как появятся надписи (по умолчанию русский)
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	var lang := str(cfg.get_value("game", "lang", "ru"))
+	if OS.has_environment("KOTO_LANG"):  # для тестов
+		lang = OS.get_environment("KOTO_LANG")
+	I18n.set_lang(lang)
 	var spr = Sprites.new()
 
 	sound = Sound.new()

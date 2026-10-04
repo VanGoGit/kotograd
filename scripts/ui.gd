@@ -5,6 +5,7 @@ const D = preload("res://scripts/defs.gd")
 const Spr = preload("res://scripts/sprites.gd")
 const Goals = preload("res://scripts/goals.gd")
 const Title = preload("res://scripts/title.gd")
+const I18n = preload("res://scripts/i18n.gd")
 
 const INK := Color("3b2a3a")
 const PAPER := Color("fff6ea")
@@ -301,11 +302,11 @@ func _toggle_music() -> void:
 
 
 func _update_music_btn() -> void:
-	btn_music.text = "Звук" if sound.music_on else "Тихо"
+	btn_music.text = tr("Звук") if sound.music_on else tr("Тихо")
 
 
 func refresh_speed() -> void:
-	btn_speed.text = ["Пауза", "x1", "x2", "x3"][world.speed]
+	btn_speed.text = [tr("Пауза"), "x1", "x2", "x3"][world.speed]
 
 
 # ---------- нижняя панель: вкладки и постройки ----------
@@ -399,46 +400,46 @@ func _tool_button(t: String, key: String) -> Button:
 
 func _tooltip(t: String) -> String:
 	var d: Dictionary = D.DEFS.get(t, D.TOOL_INFO.get(t, {}))
-	var s: String = d.name
+	var s: String = tr(d.name)
 	if d.has("terra"):
-		s += "  ·  бесплатно"
+		s += tr("  ·  бесплатно")
 	elif d.has("cost"):
-		s += "  ·  %d мон." % d.cost
-	s += "\n" + d.desc
+		s += tr("  ·  %d мон.") % d.cost
+	s += "\n" + tr(d.desc)
 	var extra := []
 	if d.get("wonder", false):
-		extra.append("Чудо света — можно построить только одно")
-		extra.append("Туристы: +%s мон./с" % str(d.tourism))
+		extra.append(tr("Чудо света — можно построить только одно"))
+		extra.append(tr("Туристы: +%s мон./с") % str(d.tourism))
 	if d.get("size", 1) == 2:
-		extra.append("Размер: 2×2")
+		extra.append(tr("Размер: 2×2"))
 	if d.has("cap"):
-		extra.append("Жильцов: %d" % d.cap)
+		extra.append(tr("Жильцов: %d") % d.cap)
 	if d.has("jobs"):
-		extra.append("Рабочих мест: %d (%s)" % [d.jobs, D.PROFESSIONS[d.job].to_lower()])
+		extra.append(tr("Рабочих мест: %d (%s)") % [d.jobs, tr(D.PROFESSIONS[d.job]).to_lower()])
 	if d.has("food"):
-		extra.append("Даёт еду")
+		extra.append(tr("Даёт еду"))
 	if d.has("happy"):
-		extra.append("Радость +%d в радиусе %d" % [d.happy, d.radius])
+		extra.append(tr("Радость +%d в радиусе %d") % [d.happy, d.radius])
 	if d.has("service"):
-		extra.append("Уют района +%d (радиус %d)" % [d.service, d.sradius])
+		extra.append(tr("Уют района +%d (радиус %d)") % [d.service, d.sradius])
 	if d.has("shop"):
-		extra.append("Приносит монетки")
+		extra.append(tr("Приносит монетки"))
 	if d.has("vehicle"):
-		extra.append("Служебная машина (нужна дорога)")
+		extra.append(tr("Служебная машина (нужна дорога)"))
 	if d.has("build"):
-		extra.append("Стройка: %d с" % int(d.build))
+		extra.append(tr("Стройка: %d с") % int(d.build))
 	if not D.ups(t).is_empty():
-		extra.append("Можно улучшить до уровня %d" % (D.ups(t).size() + 1))
+		extra.append(tr("Можно улучшить до уровня %d") % (D.ups(t).size() + 1))
 	if d.get("need_high", false):
-		extra.append("Только на холмах и в горах")
+		extra.append(tr("Только на холмах и в горах"))
 	if d.has("store_coins"):
-		extra.append("Хранилище монет +%d" % d.store_coins)
+		extra.append(tr("Хранилище монет +%d") % d.store_coins)
 	if d.has("store_food"):
-		extra.append("Хранилище еды +%d" % d.store_food)
+		extra.append(tr("Хранилище еды +%d") % d.store_food)
 	if d.has("tourism") and not d.get("wonder", false):
-		extra.append("Туристы: +%s мон./с" % str(d.tourism))
+		extra.append(tr("Туристы: +%s мон./с") % str(d.tourism))
 	if d.get("unlock", 0) > 0:
-		extra.append("Открывается при %d котиках" % d.unlock)
+		extra.append(tr("Открывается при %d котиках") % d.unlock)
 	if extra.size() > 0:
 		s += "\n\n" + "\n".join(extra)
 	return s
@@ -452,14 +453,14 @@ func _update_tool_button(t: String) -> void:
 	var locked: bool = d.has("unlock") and world.max_cats < d.unlock and not world.unlimited
 	var line2 := ""
 	if locked:
-		line2 = "нужно %d кот." % d.unlock
+		line2 = tr("нужно %d кот.") % d.unlock
 	elif d.get("wonder", false) and world.wonder_built(t):
-		line2 = "построено"
+		line2 = tr("построено")
 	elif d.has("terra") or (world.unlimited and d.has("cost")):
-		line2 = "бесплатно"
+		line2 = tr("бесплатно")
 	elif d.has("cost"):
-		line2 = "%d мон." % d.cost
-	b.text = "%s\n%s" % [d.name, line2]
+		line2 = tr("%d мон.") % d.cost
+	b.text = "%s\n%s" % [tr(d.name), line2]
 	b.modulate = Color(1, 1, 1, 0.45) if locked else Color.WHITE
 	var poor: bool = d.has("cost") and world.coins < d.cost and not locked and not world.unlimited
 	b.add_theme_color_override("font_color", Color("c24a5a") if poor else INK)
@@ -591,7 +592,7 @@ func _upgrade_selected() -> void:
 	if it == null or not it.has("tile"):
 		return
 	if not world.upgrade(it.tile):
-		toast("Не хватает монеток для улучшения")
+		toast(tr("Не хватает монеток для улучшения"))
 	_info_t = 1.0
 
 
@@ -609,26 +610,26 @@ func _render_info() -> void:
 			return
 		var fs: Dictionary = spr.cat_set(c.color, world.outfit_key(c))
 		info_img.texture = Spr.scaled(fs.stand[0], 3)
-		info_name.text = c.name
-		info_sub.text = "%s котик · %s" % [D.CAT_COLORS[c.color].name, world.profession(c)]
-		lines.append("Сейчас: " + world.activity_text(c))
-		lines.append("Работа: " + (world.bname(c.job) if c.job >= 0 else "—"))
-		lines.append("Дом: " + (world.bname(c.home) if c.home >= 0 else "пока нет — ждёт новое жильё"))
-		var car_txt := "ходит пешком"
+		info_name.text = I18n.cat(c.name)
+		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.profession(c)]
+		lines.append(tr("Сейчас: ") + world.activity_text(c))
+		lines.append(tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
+		lines.append(tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
+		var car_txt := tr("ходит пешком")
 		if c.car != "":
 			if c.state == "drive":
-				car_txt = "за рулём"
+				car_txt = tr("за рулём")
 			elif c.car_lot >= 0:
-				car_txt = "на парковке «%s»" % world.bname(c.car_lot)
+				car_txt = tr("на парковке «%s»") % world.bname(c.car_lot)
 			elif c.car_tile >= 0:
-				car_txt = "стоит прямо на дороге"
+				car_txt = tr("стоит прямо на дороге")
 			else:
-				car_txt = "в гараже дома"
-		lines.append("Машина: " + car_txt)
+				car_txt = tr("в гараже дома")
+		lines.append(tr("Машина: ") + car_txt)
 		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.hungry else 0.0)
-		lines.append("Настроение: " + _mood(hv))
+		lines.append(tr("Настроение: ") + _mood(hv))
 		if world.hungry:
-			lines.append("Хочет кушать! Нужен рыбный причал или пекарня.")
+			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
 		info_pet.visible = true
 		info_up.visible = false
 	else:
@@ -642,53 +643,53 @@ func _render_info() -> void:
 		var tex: Texture2D = spr.scaffold[o.w] if o.build > 0.0 else spr.obj_texture(o)
 		var k := clampi(56 / maxi(tex.get_width(), tex.get_height()), 1, 3)
 		info_img.texture = Spr.scaled(tex, k)
-		info_name.text = d.name
+		info_name.text = tr(d.name)
 		var lvl := int(o.get("lvl", 1))
 		var maxl: int = D.ups(o.t).size() + 1
-		info_sub.text = "Строится… %d%%" % int((1.0 - o.build / d.build) * 100.0) if o.build > 0.0 else ("Чудо света" if d.get("wonder", false) else ("Уровень %d из %d" % [lvl, maxl] if maxl > 1 else ""))
+		info_sub.text = tr("Строится… %d%%") % int((1.0 - o.build / d.build) * 100.0) if o.build > 0.0 else (tr("Чудо света") if d.get("wonder", false) else (tr("Уровень %d из %d") % [lvl, maxl] if maxl > 1 else ""))
 		if d.get("wonder", false) and o.build <= 0.0:
-			lines.append("Туристы приносят +%s мон./с" % str(d.tourism))
-		lines.append(d.desc)
+			lines.append(tr("Туристы приносят +%s мон./с") % str(d.tourism))
+		lines.append(tr(d.desc))
 		if d.has("cap") and o.build <= 0.0:
 			var res: Array = world.residents.get(i, [])
 			lines.append("")
-			lines.append("Жильцы: %d/%d" % [res.size(), world.stat(o, "cap")])
+			lines.append(tr("Жильцы: %d/%d") % [res.size(), world.stat(o, "cap")])
 			for c in res:
-				lines.append("  • %s — %s" % [c.name, world.profession(c).to_lower()])
+				lines.append("  • %s — %s" % [I18n.cat(c.name), world.profession(c).to_lower()])
 			if res.is_empty():
-				lines.append("  Скоро сюда кто-нибудь переедет…")
+				lines.append(tr("  Скоро сюда кто-нибудь переедет…"))
 			var hh: float = world.stats.house_happy.get(i, 0.0)
-			lines.append("Уют: %d%%" % int(hh))
+			lines.append(tr("Уют: %d%%") % int(hh))
 			if hh < 60.0:
-				lines.append("Совет: дорога, тротуар, клумбы и городские службы рядом делают дом уютнее.")
+				lines.append(tr("Совет: дорога, тротуар, клумбы и городские службы рядом делают дом уютнее."))
 		if d.has("jobs") and o.build <= 0.0:
 			var ws: Array = world.workers.get(i, [])
 			lines.append("")
-			lines.append("Работники: %d/%d (%s)" % [ws.size(), world.stat(o, "jobs"), D.PROFESSIONS[d.job].to_lower()])
+			lines.append(tr("Работники: %d/%d (%s)") % [ws.size(), world.stat(o, "jobs"), tr(D.PROFESSIONS[d.job]).to_lower()])
 			for c in ws:
-				lines.append("  • %s%s" % [c.name, " — на месте" if c.state == "in" and c.at == i else ""])
+				lines.append("  • %s%s" % [I18n.cat(c.name), tr(" — на месте") if c.state == "in" and c.at == i else ""])
 			if ws.is_empty():
-				lines.append("  Ждём сотрудников — нужны новые жители.")
+				lines.append(tr("  Ждём сотрудников — нужны новые жители."))
 			if d.has("vehicle") and world.roads_around(i).is_empty():
-				lines.append("Подведите дорогу, чтобы выезжала служебная машина.")
+				lines.append(tr("Подведите дорогу, чтобы выезжала служебная машина."))
 		if d.has("parking") and o.build <= 0.0:
 			lines.append("")
-			lines.append("Машин: %d/%d" % [world.lot_count.get(i, 0), int(world.stat(o, "parking"))])
+			lines.append(tr("Машин: %d/%d") % [world.lot_count.get(i, 0), int(world.stat(o, "parking"))])
 			if world.roads_around(i).is_empty():
-				lines.append("Подведите дорогу — иначе сюда не заехать.")
+				lines.append(tr("Подведите дорогу — иначе сюда не заехать."))
 		if d.has("happy"):
-			lines.append("Радость: +%d домам в радиусе %d" % [int(world.stat(o, "happy")), d.radius])
+			lines.append(tr("Радость: +%d домам в радиусе %d") % [int(world.stat(o, "happy")), d.radius])
 		if d.has("service"):
-			lines.append("Уют района: +%d в радиусе %d" % [int(world.stat(o, "service")), d.sradius])
+			lines.append(tr("Уют района: +%d в радиусе %d") % [int(world.stat(o, "service")), d.sradius])
 		if d.has("store_coins"):
-			lines.append("Хранилище монет: +%d" % int(world.stat(o, "store_coins")))
+			lines.append(tr("Хранилище монет: +%d") % int(world.stat(o, "store_coins")))
 		if d.has("store_food"):
-			lines.append("Хранилище еды: +%d" % int(world.stat(o, "store_food")))
+			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
 		var uc: int = world.upgrade_cost(i) if o.build <= 0.0 else -1
 		info_up.visible = uc >= 0
 		if uc >= 0:
-			info_up.text = "Улучшить до уровня %d — %s" % [int(o.get("lvl", 1)) + 1, "бесплатно" if world.unlimited else "%d мон." % uc]
+			info_up.text = tr("Улучшить до уровня %d — %s") % [int(o.get("lvl", 1)) + 1, tr("бесплатно") if world.unlimited else tr("%d мон.") % uc]
 			info_up.disabled = world.coins < uc and not world.unlimited
 	info_body.text = "\n".join(lines)
 	info_panel.visible = true
@@ -696,14 +697,14 @@ func _render_info() -> void:
 
 func _mood(v: float) -> String:
 	if v >= 85.0:
-		return "на седьмом небе"
+		return tr("на седьмом небе")
 	if v >= 65.0:
-		return "счастливое"
+		return tr("счастливое")
 	if v >= 45.0:
-		return "спокойное"
+		return tr("спокойное")
 	if v >= 25.0:
-		return "скучает"
-	return "грустное"
+		return tr("скучает")
+	return tr("грустное")
 
 
 # ---------- уведомления ----------
@@ -796,33 +797,44 @@ func _build_help() -> void:
 		cats.add_child(r)
 	vb.add_child(cats)
 	vb.add_child(_label("На солнечном калифорнийском побережье всегда хорошая погода. Постройте настоящий город, где котики живут, работают и отдыхают!"))
-	vb.add_child(_label(
-		"• Рельеф — начинаем на небольшом островке. Насыпайте землю и песок, а инструментом «Вода» убирайте сушу. Это бесплатно!\n" +
-		"• Жильё — домики, коттеджи, виллы и многоэтажки. Сколько мест в домах — столько котиков в городе.\n" +
-		"• Работа и бизнес — котики сами устраиваются на работу и надевают форму: блогеры, разработчики в худи, актёры, серферы, строители в касках…\n" +
-		"• Город — мэрия, школа, больница, полиция, почта. Делают районы уютнее, а их машины разъезжают по улицам.\n" +
-		"• Дороги — двусторонние, по ним котики утром едут на работу, а вечером домой. Дом и работа должны стоять у дороги. Пешком котики ходят по тротуарам и только переходят дорогу.\n" +
-		"• Магистраль — по 2 полосы в каждую сторону: быстро и с обгонами. Здания к ней не подключаются: подведите обычную дорогу вплотную — на стыке появится съезд с зелёным указателем.\n" +
-		"• Перекрёстки — где сходятся 3–4 дороги, сами появляются светофоры и пешеходные зебры: машины ждут зелёного, а котики переходят по зебре.\n" +
-		"• Поезда — проложите рельсы и поставьте вплотную к ним вокзал или платформу (минимум две). Поезд будет ходить сам, а котики — ездить в другие районы. Рельсы через дорогу — переезд со шлагбаумом.\n" +
-		"• Аэропорты — если их хотя бы два, котики летают между ними. Удобно для дальних островов.\n" +
-		"• Холмы и горы — дома с видом уютнее, а особняки строятся только наверху.\n" +
-		"• Улучшения — нажмите на здание: многие можно улучшить до 3 уровня — здание станет выше и наряднее.\n" +
-		"• Лимиты — монеты и еда копятся до предела хранилищ: банки, склады и супермаркеты поднимают его.\n" +
-		"• Парковки — котики оставляют на них машины. Если парковки рядом нет, машину бросают прямо на дороге, и начинаются пробки!\n" +
-		"• Еда — рыбные причалы и пекарни. Отдых и природа — пляжи, пальмы, зонтики, фонтаны и знак KOTOWOOD.\n" +
-		"• Чудеса — достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждое строится один раз и привлекает туристов.\n" +
-		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.\n" +
-		"• Цели — слева сверху текущее задание, за каждое дают монетки. Все задания и достижения — кнопка «Цели».\n" +
-		"• События — иногда в городе праздник: фестиваль на пляже, ярмарка, премьера, салют. Гости приходят сами, а котики становятся счастливее.", 15))
+	# каждая строка — отдельная подпись: так она сама переводится при смене языка
+	var bl := VBoxContainer.new()
+	bl.add_theme_constant_override("separation", 2)
+	for line in [
+		"• Рельеф — начинаем на небольшом островке. Насыпайте землю и песок, а инструментом «Вода» убирайте сушу. Это бесплатно!",
+		"• Жильё — домики, коттеджи, виллы и многоэтажки. Сколько мест в домах — столько котиков в городе.",
+		"• Работа и бизнес — котики сами устраиваются на работу и надевают форму: блогеры, разработчики в худи, актёры, серферы, строители в касках…",
+		"• Город — мэрия, школа, больница, полиция, почта. Делают районы уютнее, а их машины разъезжают по улицам.",
+		"• Дороги — двусторонние, по ним котики утром едут на работу, а вечером домой. Дом и работа должны стоять у дороги. Пешком котики ходят по тротуарам и только переходят дорогу.",
+		"• Магистраль — по 2 полосы в каждую сторону: быстро и с обгонами. Здания к ней не подключаются: подведите обычную дорогу вплотную — на стыке появится съезд с зелёным указателем.",
+		"• Перекрёстки — где сходятся 3–4 дороги, сами появляются светофоры и пешеходные зебры: машины ждут зелёного, а котики переходят по зебре.",
+		"• Поезда — проложите рельсы и поставьте вплотную к ним вокзал или платформу (минимум две). Поезд будет ходить сам, а котики — ездить в другие районы. Рельсы через дорогу — переезд со шлагбаумом.",
+		"• Аэропорты — если их хотя бы два, котики летают между ними. Удобно для дальних островов.",
+		"• Холмы и горы — дома с видом уютнее, а особняки строятся только наверху.",
+		"• Улучшения — нажмите на здание: многие можно улучшить до 3 уровня — здание станет выше и наряднее.",
+		"• Лимиты — монеты и еда копятся до предела хранилищ: банки, склады и супермаркеты поднимают его.",
+		"• Парковки — котики оставляют на них машины. Если парковки рядом нет, машину бросают прямо на дороге, и начинаются пробки!",
+		"• Еда — рыбные причалы и пекарни. Отдых и природа — пляжи, пальмы, зонтики, фонтаны и знак KOTOWOOD.",
+		"• Чудеса — достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждое строится один раз и привлекает туристов.",
+		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.",
+		"• Цели — слева сверху текущее задание, за каждое дают монетки. Все задания и достижения — кнопка «Цели».",
+		"• События — иногда в городе праздник: фестиваль на пляже, ярмарка, премьера, салют. Гости приходят сами, а котики становятся счастливее.",
+	]:
+		bl.add_child(_label(line, 15))
+	vb.add_child(bl)
 	var keys := PanelContainer.new()
 	keys.add_theme_stylebox_override("panel", _sb(PAPER2, Color(0, 0, 0, 0), 0, 6, 10.0))
-	keys.add_child(_label(
-		"ЛКМ — строить (дороги можно вести мышью) · ПКМ / перетаскивание — двигать карту\n" +
-		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка\n" +
-		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой\n" +
-		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · V — спрятать постройки · Esc — отмена\n" +
-		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб", 13))
+	var kl := VBoxContainer.new()
+	kl.add_theme_constant_override("separation", 0)
+	keys.add_child(kl)
+	for line in [
+		"ЛКМ — строить (дороги можно вести мышью) · ПКМ / перетаскивание — двигать карту",
+		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка",
+		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой",
+		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · V — спрятать постройки · Esc — отмена",
+		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб",
+	]:
+		kl.add_child(_label(line, 13))
 	vb.add_child(keys)
 	var start := _btn("Мяу, начинаем!", func(): close_modals())
 	start.add_theme_font_size_override("font_size", 20)
@@ -835,19 +847,36 @@ func _build_help() -> void:
 func _build_menu() -> void:
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 12)
-	vb.add_child(_label("Меню", 24, false))
-	vb.add_child(_label("Город сохраняется автоматически.", 15, false))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	new_game_btn = _btn("Новый город", _on_new_game)
-	row.add_child(new_game_btn)
-	row.add_child(_btn("Настройки", func(): open_modal(settings_modal)))
-	row.add_child(_btn("Продолжить", func(): close_modals()))
-	row.add_child(_btn("Главное меню", func(): show_title(true)))
+	var title_l := _label("Меню", 24, false)
+	title_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(title_l)
+	var sub := _label("Город сохраняется автоматически.", 15, false)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(sub)
+	# кнопки — вертикальным столбиком, как на стартовом экране
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	col.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var cont := _menu_btn("Продолжить", func(): close_modals())
+	cont.add_theme_stylebox_override("normal", _sb(PINK, INK, 3, 8, 12.0))
+	col.add_child(cont)
+	col.add_child(_menu_btn("Настройки", func(): open_modal(settings_modal)))
+	col.add_child(_menu_btn("Главное меню", func(): show_title(true)))
+	new_game_btn = _menu_btn("Новый город", _on_new_game)
+	col.add_child(new_game_btn)
 	if not _web:  # из браузера выходят, просто закрыв вкладку
-		row.add_child(_btn("Выйти из игры", _quit_game, "Город сохранится автоматически"))
-	vb.add_child(row)
+		var q := _menu_btn("Выйти из игры", _quit_game)
+		q.tooltip_text = "Город сохранится автоматически"
+		col.add_child(q)
+	vb.add_child(col)
 	menu_modal = _modal(vb)
+
+
+func _menu_btn(text: String, cb: Callable) -> Button:
+	var b := _btn(text, cb)
+	b.custom_minimum_size = Vector2(300, 0)
+	b.add_theme_font_size_override("font_size", 20)
+	return b
 
 
 func _quit_game() -> void:
@@ -863,7 +892,7 @@ func _on_new_game() -> void:
 	world.new_game()
 	close_modals()
 	refresh_tools()
-	toast("Новый остров ждёт котиков!")
+	toast(tr("Новый остров ждёт котиков!"))
 
 
 func _setting_row(grid: GridContainer, title: String, ctrl: Control) -> void:
@@ -877,6 +906,15 @@ func _build_settings() -> void:
 	vb.add_theme_constant_override("separation", 14)
 	vb.add_child(_label("Настройки", 24, false))
 	var grid := GridContainer.new()
+	var opt_lang := OptionButton.new()
+	opt_lang.focus_mode = Control.FOCUS_NONE
+	opt_lang.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	for lg in I18n.LANGS:
+		opt_lang.add_item(lg[1])
+		if lg[0] == I18n.lang():
+			opt_lang.selected = opt_lang.item_count - 1
+	opt_lang.item_selected.connect(_on_lang)
+	_setting_row(grid, "Язык · Language", opt_lang)
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 20)
 	grid.add_theme_constant_override("v_separation", 10)
@@ -946,7 +984,7 @@ func _file_dialog(mode: int) -> FileDialog:
 	var fd := FileDialog.new()
 	fd.access = FileDialog.ACCESS_FILESYSTEM
 	fd.file_mode = mode
-	fd.filters = PackedStringArray(["*.json ; Сохранение Котограда"])
+	fd.filters = PackedStringArray([tr("*.json ; Сохранение Котограда")])
 	fd.use_native_dialog = true
 	fd.current_dir = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
 	add_child(fd)
@@ -959,7 +997,7 @@ func _on_export() -> void:
 		world.save_game()
 		var name := "kotograd_den%d_%s.json" % [world.day, Time.get_date_string_from_system()]
 		JavaScriptBridge.download_buffer(world.serialize().to_utf8_buffer(), name, "application/json")
-		toast("Город скачан: " + name, true)
+		toast(tr("Город скачан: ") + name, true)
 		return
 	var fd := _file_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	var date := Time.get_date_string_from_system()
@@ -972,11 +1010,11 @@ func _export_to(path: String) -> void:
 	world.save_game()
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		toast("Не получилось сохранить файл")
+		toast(tr("Не получилось сохранить файл"))
 		return
 	f.store_string(world.serialize())
 	f.close()
-	toast("Город сохранён: " + path.get_file(), true)
+	toast(tr("Город сохранён: ") + path.get_file(), true)
 
 
 func _on_import() -> void:
@@ -995,12 +1033,12 @@ func _import_from(path: String) -> void:
 
 func _import_text(text: String, fname: String) -> void:
 	if text == "" or not world.import_save(text):
-		toast("Этот файл не похож на сохранение Котограда")
+		toast(tr("Этот файл не похож на сохранение Котограда"))
 		return
 	close_modals()
 	refresh_tools()
 	refresh_speed()
-	toast("Город загружен: " + fname, true)
+	toast(tr("Город загружен: ") + fname, true)
 
 
 ## В браузере нет системного окна выбора файла — открываем выбор файла средствами страницы.
@@ -1048,7 +1086,7 @@ func _on_unlim(on: bool) -> void:
 	world.unlimited = on
 	_save_settings()
 	refresh_tools()
-	toast("Неограниченные ресурсы: " + ("включены" if on else "выключены"), true)
+	toast(tr("Неограниченные ресурсы: ") + (tr("включены") if on else tr("выключены")), true)
 
 
 func _volume_slider(kind: String, v: float) -> HSlider:
@@ -1169,11 +1207,11 @@ func _fmt(n: float) -> String:
 func _update_hud() -> void:
 	lbl_coins.text = "∞" if world.unlimited else "%s/%s" % [_fmt(world.coins), _fmt(world.stats.coin_cap)]
 	lbl_coins.add_theme_color_override("font_color", Color("c08a1a") if world.coins >= world.stats.coin_cap - 0.5 else INK)
-	lbl_coin_rate.text = "+%.1f/с" % world.income
+	lbl_coin_rate.text = tr("+%.1f/с") % world.income
 	lbl_food.text = "%s/%s" % [_fmt(world.food), _fmt(world.stats.food_cap)]
 	lbl_food.add_theme_color_override("font_color", Color("c08a1a") if world.food >= world.stats.food_cap - 0.5 else INK)
 	var net: float = world.stats.food_prod - world.eat_rate
-	lbl_food_rate.text = "%s%.1f/с" % ["+" if net >= 0.0 else "", net]
+	lbl_food_rate.text = tr("%s%.1f/с") % ["+" if net >= 0.0 else "", net]
 	lbl_food_rate.add_theme_color_override("font_color", Color("c24a5a") if net < 0.0 else Color("4f8a4f"))
 	lbl_cats.text = "%d/%d" % [world.cats.size(), world.stats.cap]
 	lbl_jobs.text = "%d/%d" % [world.employed_count(), world.stats.jobs]
@@ -1182,9 +1220,9 @@ func _update_hud() -> void:
 	var h: float = world.hour()
 	var hh := int(h)
 	var mm := int((h - hh) * 6.0) * 10
-	lbl_clock.text = "День %d · %02d:%02d" % [world.day, hh, mm]
+	lbl_clock.text = tr("День %d · %02d:%02d") % [world.day, hh, mm]
 	hint.text = _hint_text()
-	lbl_brand.text = world.city_name
+	lbl_brand.text = tr(world.city_name)
 	_update_goal_panel()
 	# верхняя строка может переноситься на два ряда — ставим панель цели под её реальным низом
 	var bottom_y := 0.0
@@ -1203,16 +1241,16 @@ func _update_hud() -> void:
 func _hint_text() -> String:
 	var st: Dictionary = world.stats
 	if st.houses.is_empty() and st.constructing.is_empty():
-		return "Начнём! Во вкладке «Жильё» постройте Домик, а во вкладке «Рельеф» можно бесплатно расширять остров."
+		return tr("Начнём! Во вкладке «Жильё» постройте Домик, а во вкладке «Рельеф» можно бесплатно расширять остров.")
 	if world.cats.is_empty():
-		return "Котик уже собирает чемодан и скоро приедет…"
+		return tr("Котик уже собирает чемодан и скоро приедет…")
 	var homeless: int = world.homeless_count()
 	if homeless > 0:
-		return "Котиков без дома: %d. Постройте жильё — они сразу переедут!" % homeless
+		return tr("Котиков без дома: %d. Постройте жильё — они сразу переедут!") % homeless
 	if st.workplaces.is_empty():
-		return "Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Еда»)."
+		return tr("Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Еда»).")
 	if world.hungry:
-		return "Еда закончилась! Нужен ещё один рыбный причал или пекарня."
+		return tr("Еда закончилась! Нужен ещё один рыбный причал или пекарня.")
 	var roads := 0
 	for o in world.objs:
 		if o != null and o.t == "road":
@@ -1220,20 +1258,20 @@ func _hint_text() -> String:
 			if roads >= 3:
 				break
 	if roads < 3:
-		return "Подсказка: проложите Дорогу мимо домов и работы — котики поедут на машинах!"
+		return tr("Подсказка: проложите Дорогу мимо домов и работы — котики поедут на машинах!")
 	if world.cats.size() >= st.cap:
-		return "Все дома заняты — постройте ещё жильё, чтобы приехали новые котики."
+		return tr("Все дома заняты — постройте ещё жильё, чтобы приехали новые котики.")
 	var employed: int = world.employed_count()
 	if employed < world.cats.size() and st.jobs <= employed:
-		return "Не всем хватает работы — постройте магазин, пекарню или городские службы."
+		return tr("Не всем хватает работы — постройте магазин, пекарню или городские службы.")
 	if world.coins >= st.coin_cap - 0.5 and not world.unlimited:
-		return "Хранилище монет заполнено! Потратьте монетки или постройте Банк (вкладка «Бизнес»)."
+		return tr("Хранилище монет заполнено! Потратьте монетки или постройте Банк (вкладка «Бизнес»).")
 	if world.food >= st.food_cap - 0.5 and world.stats.food_prod > world.eat_rate:
-		return "Склады еды полны — постройте Склад или Супермаркет, чтобы запасать больше."
+		return tr("Склады еды полны — постройте Склад или Супермаркет, чтобы запасать больше.")
 	if world.street_parked.size() >= 3:
-		return "Машины стоят прямо на дорогах — бывают пробки! Постройте Парковку рядом с работой и магазинами."
+		return tr("Машины стоят прямо на дорогах — бывают пробки! Постройте Парковку рядом с работой и магазинами.")
 	if world.happy < 45.0:
-		return "Котикам скучновато: украсьте город клумбами и деревьями рядом с домами."
+		return tr("Котикам скучновато: украсьте город клумбами и деревьями рядом с домами.")
 	return ""
 
 
@@ -1344,8 +1382,8 @@ func _update_goal_panel() -> void:
 	else:
 		var m: Dictionary = world.goals.metrics()
 		var p: int = world.goals.progress(q, m)
-		goal_name.text = q.name
-		goal_desc.text = q.desc
+		goal_name.text = tr(q.name)
+		goal_desc.text = tr(q.desc)
 		goal_bar.max_value = float(q.n)
 		goal_bar.value = float(p)
 		goal_count.text = "%d/%d" % [p, q.n]
@@ -1354,7 +1392,7 @@ func _update_goal_panel() -> void:
 	var ev = world.events.active
 	event_panel.visible = ev != null
 	if ev != null:
-		event_lbl.text = "Праздник: %s\nещё %d ч." % [ev.name, maxi(1, ceili(ev.left))]
+		event_lbl.text = tr("Праздник: %s\nещё %d ч.") % [tr(ev.name), maxi(1, ceili(ev.left))]
 
 
 ## Несколько целей сразу (например, после загрузки) — одним сообщением.
@@ -1374,7 +1412,7 @@ func goals_done(list: Array) -> void:
 	if zen:
 		return
 	sound.play("fanfare", 1.0, -6.0)
-	toast("Выполнено целей и достижений: %d!%s" % [list.size(), ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true, true)
+	toast(tr("Выполнено целей и достижений: %d!%s") % [list.size(), (tr("  +%d мон.") % reward) if reward > 0 and not world.unlimited else ""], true, true)
 	_confetti(40)
 
 
@@ -1387,9 +1425,9 @@ func goal_done(g: Dictionary) -> void:
 		return
 	sound.play("fanfare", 1.0, -6.0)
 	if is_quest:
-		toast("Цель выполнена: «%s»%s" % [g.name, ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true, true)
+		toast(tr("Цель выполнена: «%s»%s") % [tr(g.name), (tr("  +%d мон.") % reward) if reward > 0 and not world.unlimited else ""], true, true)
 	else:
-		toast("Достижение: «%s» — %s" % [g.name, g.desc], true, true)
+		toast(tr("Достижение: «%s» — %s") % [tr(g.name), tr(g.desc)], true, true)
 	_confetti(40 if is_quest else 24)
 	if g.id == "legend":
 		open_modal(celebrate_modal)
@@ -1435,11 +1473,11 @@ func _goal_row(g: Dictionary, m: Dictionary, current: bool) -> Control:
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(tv)
 	var n := Label.new()
-	n.text = g.name
+	n.text = tr(g.name)
 	n.add_theme_font_size_override("font_size", 15)
 	tv.add_child(n)
 	var d := Label.new()
-	d.text = g.desc
+	d.text = tr(g.desc)
 	d.add_theme_font_size_override("font_size", 13)
 	d.add_theme_color_override("font_color", Color(INK, 0.75))
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1452,7 +1490,7 @@ func _goal_row(g: Dictionary, m: Dictionary, current: bool) -> Control:
 	else:
 		r.text = "%d/%d" % [world.goals.progress(g, m), g.n]
 	if g.has("r"):
-		r.text += "\n+%d мон." % g.r
+		r.text += tr("\n+%d мон.") % g.r
 	r.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	r.custom_minimum_size = Vector2(80, 0)
 	hb.add_child(r)
@@ -1468,14 +1506,14 @@ func _open_goals() -> void:
 	for q in Goals.QUESTS:
 		if world.goals.done.has(q.id):
 			nq += 1
-	goals_list.add_child(_label("Задания: %d из %d" % [nq, Goals.QUESTS.size()], 18, false))
+	goals_list.add_child(_label(tr("Задания: %d из %d") % [nq, Goals.QUESTS.size()], 18, false))
 	for q in Goals.QUESTS:
 		goals_list.add_child(_goal_row(q, m, not cur.is_empty() and q.id == cur.id))
 	var na := 0
 	for a in Goals.ACHIEVEMENTS:
 		if world.goals.done.has(a.id):
 			na += 1
-	goals_list.add_child(_label("Достижения: %d из %d" % [na, Goals.ACHIEVEMENTS.size()], 18, false))
+	goals_list.add_child(_label(tr("Достижения: %d из %d") % [na, Goals.ACHIEVEMENTS.size()], 18, false))
 	for a in Goals.ACHIEVEMENTS:
 		goals_list.add_child(_goal_row(a, m, false))
 	open_modal(goals_modal)
@@ -1510,11 +1548,11 @@ func _build_celebrate() -> void:
 
 func event_started(ev: Dictionary, desc: String) -> void:
 	_ev_pos = ev.pos
-	toast("%s! %s" % [ev.name, desc], true, true)
+	toast("%s! %s" % [tr(ev.name), tr(desc)], true, true)
 
 
 func event_finished(ev: Dictionary) -> void:
-	toast("%s закончился — котики довольны!" % ev.name if ev.kind == "game" or ev.kind == "fireworks" else "Праздник «%s» закончился — котики довольны!" % ev.name, false, true)
+	toast(tr("%s закончился — котики довольны!") % tr(ev.name) if ev.kind == "game" or ev.kind == "fireworks" else tr("Праздник «%s» закончился — котики довольны!") % tr(ev.name), false, true)
 
 
 # ---------- режим «Дзен» ----------
@@ -1529,12 +1567,12 @@ func set_zen(on: bool, announce := true) -> void:
 	hint.visible = not on
 	if announce:
 		_save_settings()
-		toast("Режим «Дзен»: только город, музыка и стройка" if on else "Режим «Дзен» выключен: цели и подсказки снова на месте", true)
+		toast(tr("Режим «Дзен»: только город, музыка и стройка") if on else tr("Режим «Дзен» выключен: цели и подсказки снова на месте"), true)
 
 
 func _on_track(i: int) -> void:
 	sound.set_track(sound.TRACKS[i].id)
-	toast("Сейчас играет: %s" % sound.TRACKS[i].name, true)
+	toast(tr("Сейчас играет: %s") % tr(sound.TRACKS[i].name), true)
 
 
 # ---------- любоваться городом ----------
@@ -1546,3 +1584,21 @@ func set_build_hidden(on: bool) -> void:
 	if on:
 		world.select_tool("hand")
 		hide_tooltip()
+
+
+# ---------- язык ----------
+
+func _on_lang(i: int) -> void:
+	I18n.set_lang(I18n.LANGS[i][0])
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	cfg.set_value("game", "lang", I18n.LANGS[i][0])
+	cfg.save("user://settings.cfg")
+	# подписи Godot переводит сам, составные тексты пересобираем
+	set_tab(tab)
+	refresh_speed()
+	_update_music_btn()
+	_update_hud()
+	new_game_btn.text = "Новый город"
+	if title_open():
+		title.open(title._btn_continue.visible)
