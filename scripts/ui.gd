@@ -87,6 +87,16 @@ var build_hidden := false     # панель построек спрятана �
 var show_build_btn: Button
 var zen := false             # режим «Дзен»: без целей, подсказок и новостей
 var btn_zen: Button
+var show_locked := false
+var tutorial_done := false     # обучение уже показывали (или его пропустили)
+var tut_step := -1             # текущий шаг обучения, -1 — не идёт
+var tut_panel: PanelContainer
+var tut_label: Label
+var _tut_t := 0.0
+var _tut_pets := 0       # показывать в меню постройки, которые ещё не открылись
+var info_more: Button
+var _info_full := false
+var _info_tile := -1
 var chk_zen: CheckButton
 var _web := OS.has_feature("web")
 var _js_import_cb  # колбэк JavaScript должен жить, пока открыт выбор файла
@@ -110,6 +120,7 @@ func build(w, sprites, snd) -> void:
 	_build_bottom()
 	_build_info()
 	_build_toasts()
+	_build_tutorial()
 	_build_left()
 	title = Title.new()
 	title.setup(self, world, spr)
@@ -196,11 +207,11 @@ func _make_theme() -> Theme:
 		t.set_stylebox("grabber_highlight", sb_name, grab_h)
 		t.set_stylebox("grabber_pressed", sb_name, grab_h)
 	t.set_stylebox("fill", "ProgressBar", fill)
-	_styles["tool"] = _sb(PAPER2, Color(0, 0, 0, 0), 3, 8, 4.0)
+	_styles["tool"] = _sb(PAPER2, Color(INK, 0.12), 2, 10, 4.0)
 	_styles["tool"].shadow_size = 0
-	_styles["tool_hover"] = _sb(Color.WHITE, Color(0, 0, 0, 0), 3, 8, 4.0)
+	_styles["tool_hover"] = _sb(Color.WHITE, Color(INK, 0.25), 2, 10, 4.0)
 	_styles["tool_hover"].shadow_size = 0
-	_styles["tool_sel"] = _sb(PINK, INK, 3, 8, 4.0)
+	_styles["tool_sel"] = _sb(PINK, INK, 3, 10, 4.0)
 	_styles["tool_sel"].shadow_size = 0
 	return t
 
@@ -227,13 +238,20 @@ func _icon(tex: Texture2D, target := 24) -> TextureRect:
 	return r
 
 
-func _btn(text: String, cb: Callable, tip := "") -> Button:
+func _btn(text: String, cb: Callable, tip := "", silent := false) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.tooltip_text = tip
+	if not silent:
+		b.pressed.connect(_click)
 	b.pressed.connect(cb)
 	return b
+
+
+## Мягкий щелчок интерфейса.
+func _click() -> void:
+	sound.play("click", randf_range(0.95, 1.05), -12.0)
 
 
 # ---------- верхняя панель ----------
@@ -375,7 +393,7 @@ func _build_bottom() -> void:
 	vb.add_child(tabs)
 	for k in D.TABS.size():
 		var tb: Dictionary = D.TABS[k]
-		var b := _btn(tb.name, func(): set_tab(k))
+		var b := _btn(tb.name, func(): _tab_clicked(k), "", true)
 		b.icon = Spr.scaled(spr.tool_texture(tb.icon), 1)
 		b.expand_icon = false
 		b.add_theme_constant_override("icon_max_width", 18)
@@ -401,16 +419,55 @@ func _build_bottom() -> void:
 
 func _tool_button(t: String, key: String) -> Button:
 	var d: Dictionary = D.DEFS.get(t, D.TOOL_INFO.get(t, {}))
+	# карточка: картинка в одинаковой рамке, название в две строки, цена внизу
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(86, 104)
-	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.add_theme_font_size_override("font_size", 12)
-	b.clip_text = false
+	b.custom_minimum_size = Vector2(100, 118)
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	col.offset_left = 4
+	col.offset_right = -4
+	col.offset_top = 5
+	col.offset_bottom = -5
+	col.add_theme_constant_override("separation", 2)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(col)
+	var pic := TextureRect.new()
+	pic.custom_minimum_size = Vector2(0, 54)
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tex: Texture2D = spr.tool_texture(t)
-	var k := clampi(48 / maxi(tex.get_width(), tex.get_height()), 1, 3)
-	b.icon = Spr.scaled(tex, k)
+	var mx := maxi(tex.get_width(), tex.get_height())
+	if mx <= 54:
+		# маленькие картинки — целым увеличением, большие — вписываем в рамку
+		pic.texture = Spr.scaled(tex, clampi(54 / mx, 1, 3))
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	else:
+		pic.texture = tex
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	col.add_child(pic)
+	var nm := Label.new()
+	nm.add_theme_font_size_override("font_size", 12)
+	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nm.autowrap_mode = TextServer.AUTOWRAP_WORD
+	nm.max_lines_visible = 2
+	nm.custom_minimum_size = Vector2(0, 34)
+	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(nm)
+	var pr := HBoxContainer.new()
+	pr.alignment = BoxContainer.ALIGNMENT_CENTER
+	pr.add_theme_constant_override("separation", 3)
+	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(pr)
+	var coin := _icon(spr.icons.coin, 10)
+	pr.add_child(coin)
+	var price := Label.new()
+	price.add_theme_font_size_override("font_size", 11)
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pr.add_child(price)
+	b.set_meta("parts", [nm, price, coin])
 	b.add_theme_stylebox_override("normal", _styles.tool)
 	b.add_theme_stylebox_override("hover", _styles.tool_hover)
 	b.add_theme_stylebox_override("pressed", _styles.tool_sel)
@@ -424,11 +481,17 @@ func _tool_button(t: String, key: String) -> Button:
 	return b
 
 
+func _tab_clicked(k: int) -> void:
+	sound.play("tab", 1.0, -9.0)
+	set_tab(k)
+
+
 func _pick_tool(t: String) -> void:
 	# кнопку отпустили после перелистывания — это не выбор постройки
 	if _tdrag_moved:
 		_tdrag_moved = false
 		return
+	_click()
 	world.select_tool(t)
 
 
@@ -512,20 +575,42 @@ func _update_tool_button(t: String) -> void:
 	var d: Dictionary = D.DEFS.get(t, D.TOOL_INFO.get(t, {}))
 	var locked: bool = d.has("unlock") and world.max_cats < d.unlock and not world.unlimited
 	var line2 := ""
+	var show_coin := false
 	if locked:
 		line2 = tr("нужно %d кот.") % d.unlock
 	elif d.get("wonder", false) and world.wonder_built(t):
 		line2 = tr("построено")
-	elif d.has("terra") or d.get("free", false) or (world.unlimited and d.has("cost")):
+	elif world.unlimited:
+		line2 = ""
+	elif d.has("terra") or d.get("free", false):
 		line2 = tr("бесплатно")
 	elif d.has("cost"):
-		line2 = tr("%d мон.") % d.cost
-	b.text = "%s\n%s" % [tr(d.name), line2]
-	b.modulate = Color(1, 1, 1, 0.45) if locked else Color.WHITE
+		line2 = str(d.cost)
+		show_coin = true
+	var parts: Array = b.get_meta("parts", [])
+	if parts.is_empty():
+		return
+	var nm: Label = parts[0]
+	var price: Label = parts[1]
+	if nm.text != tr(d.name):
+		nm.text = tr(d.name)
+		# слова не рвём: длинное слово — чуть мельче шрифт
+		var longest := 0
+		for wd in nm.text.split(" "):
+			longest = maxi(longest, wd.length())
+		nm.add_theme_font_size_override("font_size", 12 if longest <= 11 else (11 if longest <= 13 else 10))
+	price.text = line2
+	(parts[2] as Control).visible = show_coin
 	var poor: bool = d.has("cost") and world.coins < d.cost and not locked and not world.unlimited
-	b.add_theme_color_override("font_color", Color("c24a5a") if poor else INK)
-	b.add_theme_color_override("font_hover_color", Color("c24a5a") if poor else INK)
-	b.add_theme_stylebox_override("normal", _styles.tool_sel if world.tool == t else _styles.tool)
+	var pc := Color("c24a5a") if poor else (Color("4f8a4f") if line2 == tr("бесплатно") else Color(INK, 0.75))
+	if price.get_meta("c", Color.BLACK) != pc:
+		price.set_meta("c", pc)
+		price.add_theme_color_override("font_color", pc)
+	b.modulate = Color(1, 1, 1, 0.45) if locked else Color.WHITE
+	var sel: bool = world.tool == t
+	if not b.has_meta("sel") or b.get_meta("sel") != sel:
+		b.set_meta("sel", sel)
+		b.add_theme_stylebox_override("normal", _styles.tool_sel if sel else _styles.tool)
 
 
 func refresh_tools() -> void:
@@ -542,9 +627,17 @@ func set_tab(k: int) -> void:
 		tool_buttons.erase(_tool_of(c))
 		tools_box.remove_child(c)
 		c.queue_free()
-	var tools: Array = D.TABS[k].tools
+	var tools := _visible_tools(k)
 	for n in tools.size():
 		tools_box.add_child(_tool_button(tools[n], str(n + 1)))
+	if tools.is_empty():
+		var empty := _label("Здесь пока пусто — новые постройки откроются, когда в городе станет больше котиков.", 13, false)
+		empty.add_theme_color_override("font_color", Color(INK, 0.7))
+		empty.custom_minimum_size = Vector2(260, 0)
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		empty.size_flags_vertical = Control.SIZE_FILL
+		tools_box.add_child(empty)
 	for i in tab_buttons.size():
 		tab_buttons[i].add_theme_stylebox_override("normal", _sb(PINK) if i == k else _sb(PAPER))
 	_layout_bottom.call_deferred()
@@ -571,7 +664,7 @@ func _layout_bottom() -> void:
 	tools_scroll.custom_minimum_size = Vector2(pw - 24.0, tools_h + (14.0 if need_bar else 0.0))
 
 
-func _tool_of(b: Button) -> String:
+func _tool_of(b: Control) -> String:
 	for t in tool_buttons:
 		if tool_buttons[t] == b:
 			return t
@@ -582,8 +675,28 @@ func next_tab(dir: int) -> void:
 	set_tab(posmod(tab + dir, D.TABS.size()))
 
 
+## Постройки вкладки, которые видны в меню (закрытые — только если включена настройка).
+func _visible_tools(k: int) -> Array:
+	var all: Array = D.TABS[k].tools
+	if show_locked or world.unlimited:
+		return all
+	return all.filter(func(t): return world.max_cats >= int(D.DEFS.get(t, {}).get("unlock", 0)))
+
+
+func _on_show_locked(on: bool) -> void:
+	show_locked = on
+	_save_settings()
+	set_tab(tab)
+
+
+## В городе открылись новые постройки — обновляем меню.
+func on_unlocked() -> void:
+	if not show_locked:
+		set_tab(tab)
+
+
 func select_tab_tool(n: int) -> void:
-	var tools: Array = D.TABS[tab].tools
+	var tools := _visible_tools(tab)
 	if n < tools.size():
 		if build_hidden:
 			set_build_hidden(false)
@@ -636,11 +749,66 @@ func _build_info() -> void:
 	info_body.custom_minimum_size = Vector2(266, 0)
 	info_body.add_theme_font_size_override("font_size", 14)
 	vb.add_child(info_body)
+	info_more = _btn("Подробнее", _toggle_info_more)
+	info_more.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	info_more.add_theme_font_size_override("font_size", 13)
+	vb.add_child(info_more)
 	info_pet = _btn("Погладить", _pet_selected)
 	vb.add_child(info_pet)
 	info_up = _btn("Улучшить", _upgrade_selected, "Улучшенное здание вмещает больше котиков, даёт больше монет и радости")
 	info_up.add_theme_stylebox_override("normal", _sb(GOLD, INK, 3, 8, 8.0))
 	vb.add_child(info_up)
+
+
+## Короткая карточка здания: 2–4 строки самого главного.
+func _short_lines(o: Dictionary, d: Dictionary) -> Array:
+	var i: int = o.i
+	var out: Array = []
+	if o.build > 0.0:
+		return [tr(d.desc)]
+	if d.get("wonder", false):
+		out.append(tr("Туристы приносят +%s мон./с") % str(d.tourism))
+	var bits: Array = []
+	if d.has("cap"):
+		bits.append(tr("Жильцы: %d/%d") % [world.residents.get(i, []).size(), world.stat(o, "cap")])
+		bits.append(tr("Уют: %d%%") % int(world.stats.house_happy.get(i, 0.0)))
+	if d.has("jobs"):
+		bits.append(tr("Работники: %d/%d") % [world.workers.get(i, []).size(), world.stat(o, "jobs")])
+	if d.has("parking"):
+		bits.append(tr("Машин: %d/%d") % [world.lot_count.get(i, 0), int(world.stat(o, "parking"))])
+	if not bits.is_empty():
+		out.append("  ·  ".join(bits))
+	if D.MAKES.has(o.t):
+		out.append(tr("Производит: %s — готово %d") % [tr(D.GOODS[D.MAKES[o.t][0]].name).to_lower(), int(o.get("out", 0.0))])
+	var uses: Array = D.USES.get(o.t, [])
+	if not uses.is_empty():
+		var parts: Array = []
+		var have := 0
+		for g in uses:
+			var v: float = world.stock_of(o, g)
+			if v > 0.0:
+				have += 1
+				parts.append("%s %d" % [tr(D.GOODS[g].name), ceili(v)])
+			else:
+				parts.append(tr("%s нет") % tr(D.GOODS[g].name))
+		out.append(tr("Товары: %s") % "  ·  ".join(parts) + (tr("  (+%d%%)") % int(60.0 * have / uses.size()) if have > 0 else ""))
+	if d.has("happy") and out.size() < 3:
+		out.append(tr("Радость: +%d домам в радиусе %d") % [int(world.stat(o, "happy")), d.radius])
+	if d.has("service") and out.size() < 3:
+		out.append(tr("Уют района: +%d в радиусе %d") % [int(world.stat(o, "service")), d.sradius])
+	# одна главная подсказка, если что-то мешает
+	if (d.has("jobs") or d.has("parking") or D.MAKES.has(o.t)) and world.access_roads(i).is_empty() and not d.has("need_water"):
+		out.append(tr("Подведите дорогу рядом."))
+	elif d.has("jobs") and world.workers.get(i, []).is_empty():
+		out.append(tr("Ждём сотрудников — нужны новые жители."))
+	if out.is_empty():
+		out.append(tr(d.desc))
+	return out
+
+
+func _toggle_info_more() -> void:
+	_info_full = not _info_full
+	_info_t = 1.0
 
 
 func _pet_selected() -> void:
@@ -693,6 +861,7 @@ func _render_info() -> void:
 			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
 		info_pet.visible = true
 		info_up.visible = false
+		info_more.visible = false
 	else:
 		var i: int = it.tile
 		var o = world.objs[i]
@@ -701,6 +870,9 @@ func _render_info() -> void:
 			info_panel.visible = false
 			return
 		var d := D.def(o.t)
+		if i != _info_tile:
+			_info_tile = i
+			_info_full = false
 		var tex: Texture2D = spr.scaffold[o.w] if o.build > 0.0 else spr.obj_texture(o)
 		var k := clampi(56 / maxi(tex.get_width(), tex.get_height()), 1, 3)
 		info_img.texture = Spr.scaled(tex, k)
@@ -749,10 +921,16 @@ func _render_info() -> void:
 		if d.has("store_food"):
 			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
+		# коротко по умолчанию, всё остальное — по кнопке «Подробнее»
+		var short := _short_lines(o, d)
+		info_more.visible = o.build <= 0.0
+		info_more.text = tr("Свернуть") if _info_full else tr("Подробнее")
+		if not _info_full:
+			lines = short
 		var uc: int = world.upgrade_cost(i) if o.build <= 0.0 else -1
 		info_up.visible = uc >= 0
 		if uc >= 0:
-			info_up.text = tr("Улучшить до уровня %d — %s") % [int(o.get("lvl", 1)) + 1, tr("бесплатно") if world.unlimited else tr("%d мон.") % uc]
+			info_up.text = (tr("Улучшить до уровня %d") % (int(o.get("lvl", 1)) + 1)) if world.unlimited else tr("Улучшить до уровня %d — %s") % [int(o.get("lvl", 1)) + 1, tr("%d мон.") % uc]
 			info_up.disabled = world.coins < uc and not world.unlimited
 	info_body.text = "\n".join(lines)
 	info_panel.visible = true
@@ -841,6 +1019,110 @@ func _mood(v: float) -> String:
 
 
 # ---------- уведомления ----------
+
+# ---------- мягкое обучение: три-четыре облачка в первые минуты нового города ----------
+
+const TUT_TEXT := [
+	"Поставьте первый домик: вкладка «Жильё» внизу, затем «Домик» — и нажмите на зелёную клетку.",
+	"Теперь проведите дорогу рядом с домиком: вкладка «Транспорт» → «Дорога». Зажмите и ведите.",
+	"Готово! Скоро в домик переедет первый котик…",
+	"Котик приехал! Нажмите на него, чтобы погладить.",
+]
+const TUT_TAB := [2, 1, -1, -1]
+
+
+func _build_tutorial() -> void:
+	tut_panel = PanelContainer.new()
+	tut_panel.add_theme_stylebox_override("panel", _sb(PINK, INK, 3, 10, 12.0))
+	tut_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	tut_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	tut_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	tut_panel.visible = false
+	root.add_child(tut_panel)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	tut_panel.add_child(hb)
+	hb.add_child(_icon(spr.icons.paw, 20))
+	tut_label = Label.new()
+	tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tut_label.custom_minimum_size = Vector2(300, 0)
+	tut_label.add_theme_font_size_override("font_size", 15)
+	tut_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(tut_label)
+	var skip := _btn("", finish_tutorial, "Пропустить подсказки")
+	skip.icon = _cross_tex()
+	skip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	hb.add_child(skip)
+
+
+## Новый город: если подсказки ещё не показывали — начинаем.
+func start_tutorial() -> void:
+	if tutorial_done:
+		return
+	tut_step = 0
+	_tut_t = 0.0
+
+
+func finish_tutorial() -> void:
+	tut_step = -1
+	tutorial_done = true
+	world.tut_cat = null
+	tut_panel.visible = false
+	hint.visible = not zen
+	for b in tab_buttons:
+		b.modulate = Color.WHITE
+	_save_settings()
+
+
+func _update_tutorial(delta: float) -> void:
+	if tut_step < 0 or tut_panel == null:
+		return
+	var busy := zen or title_open() or help_modal.visible or menu_modal.visible or (settings_modal != null and settings_modal.visible)
+	tut_panel.visible = not busy
+	# пока идёт обучение, нижняя строка подсказок молчит — чтобы не было двух подсказок сразу
+	hint.visible = busy and not zen
+	if busy:
+		return
+	_tut_t += delta
+	# шаг выполнен?
+	var st: Dictionary = world.stats
+	match tut_step:
+		0:
+			if st.houses.size() + st.constructing.size() > 0:
+				_tut_next()
+		1:
+			var roads := 0
+			for o in world.objs:
+				if o != null and o.t == "road":
+					roads += 1
+					if roads >= 3:
+						break
+			if roads >= 3:
+				_tut_next()
+		2:
+			if not world.cats.is_empty():
+				world.tut_cat = world.cats[0]
+				_tut_pets = world.pets_total
+				_tut_next()
+		3:
+			if world.pets_total > _tut_pets or _tut_t > 20.0:
+				finish_tutorial()
+				return
+	if tut_step < 0:
+		return
+	tut_label.text = tr(TUT_TEXT[tut_step])
+	tut_panel.offset_bottom = -(root.size.y - bottom_box.position.y + 10.0) if bottom_box.visible else -16.0
+	# подсвечиваем нужную вкладку мягким миганием
+	var pulse := 0.75 + 0.25 * sin(_tut_t * 5.0)
+	for k in tab_buttons.size():
+		tab_buttons[k].modulate = Color(1, 1, 1, pulse) if k == TUT_TAB[tut_step] and tab != k else Color.WHITE
+
+
+func _tut_next() -> void:
+	tut_step += 1
+	_tut_t = 0.0
+	sound.play("chime", 1.2, -10.0)
+
 
 func _build_toasts() -> void:
 	toasts_box = VBoxContainer.new()
@@ -1098,6 +1380,13 @@ func _build_settings() -> void:
 	chk_zen.button_pressed = zen
 	chk_zen.toggled.connect(set_zen)
 	_setting_row(grid, "", chk_zen)
+	var chk_locked := CheckButton.new()
+	chk_locked.focus_mode = Control.FOCUS_NONE
+	chk_locked.text = "Показывать закрытые постройки"
+	chk_locked.tooltip_text = "Выключено: в меню только то, что уже можно построить, а новое появляется по мере роста города. Включено: видно всё, закрытое — бледным."
+	chk_locked.button_pressed = show_locked
+	chk_locked.toggled.connect(_on_show_locked)
+	_setting_row(grid, "", chk_locked)
 	var hint_lbl := _label("Масштаб карты — колёсико мыши, клавиши − и + или два пальца на телефоне.", 13, false)
 	hint_lbl.add_theme_color_override("font_color", Color(INK, 0.7))
 	vb.add_child(hint_lbl)
@@ -1218,7 +1507,7 @@ func _on_unlim(on: bool) -> void:
 	unlimited = on
 	world.unlimited = on
 	_save_settings()
-	refresh_tools()
+	set_tab(tab)
 	toast(tr("Неограниченные ресурсы: ") + (tr("включены") if on else tr("выключены")), true)
 
 
@@ -1278,6 +1567,8 @@ func _load_settings() -> void:
 		ui_scale = float(cfg.get_value("display", "ui_scale", ui_scale))
 		unlimited = bool(cfg.get_value("game", "unlimited", false))
 		zen = bool(cfg.get_value("game", "zen", false))
+		show_locked = bool(cfg.get_value("game", "show_locked", false))
+		tutorial_done = bool(cfg.get_value("game", "tutorial_done", false))
 		if not UI_SCALES.has(ui_scale):
 			ui_scale = 1.0
 
@@ -1301,6 +1592,8 @@ func _save_settings() -> void:
 	cfg.set_value("display", "ui_scale", ui_scale)
 	cfg.set_value("game", "unlimited", unlimited)
 	cfg.set_value("game", "zen", zen)
+	cfg.set_value("game", "show_locked", show_locked)
+	cfg.set_value("game", "tutorial_done", tutorial_done)
 	cfg.save("user://settings.cfg")
 
 
@@ -1334,6 +1627,7 @@ func _process(delta: float) -> void:
 	if _info_t > 0.3:
 		_info_t = 0.0
 		_render_info()
+	_update_tutorial(delta)
 
 
 func _fmt(n: float) -> String:

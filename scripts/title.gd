@@ -14,6 +14,9 @@ var _name_box: VBoxContainer
 var _btn_continue: Button
 var _name_edit: LineEdit
 var _warn: Label
+var _island := "sa"
+var _isl_btns := {}
+var _isl_desc: Label
 var _t := 0.0
 var _drift := 1.0
 
@@ -102,6 +105,36 @@ func setup(user_interface, w, spr) -> void:
 	_name_edit.text_submitted.connect(func(_t): _on_found())
 	nr.add_child(_name_edit)
 	nr.add_child(ui._btn("Другое", func(): _name_edit.text = _random_name(), "Придумать другое название"))
+	# выбор острова: три карточки с картинкой
+	var iq := Label.new()
+	iq.text = "Какой остров?"
+	iq.add_theme_font_size_override("font_size", 18)
+	iq.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pv.add_child(iq)
+	var ir := HBoxContainer.new()
+	ir.alignment = BoxContainer.ALIGNMENT_CENTER
+	ir.add_theme_constant_override("separation", 8)
+	pv.add_child(ir)
+	for it in world.ISLANDS:
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.icon = _island_preview(it[0])
+		b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		b.text = it[1]
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.add_theme_font_size_override("font_size", 13)
+		b.pressed.connect(_pick_island.bind(it[0]))
+		ir.add_child(b)
+		_isl_btns[it[0]] = b
+	_isl_desc = Label.new()
+	_isl_desc.add_theme_font_size_override("font_size", 13)
+	_isl_desc.add_theme_color_override("font_color", Color(INK, 0.75))
+	_isl_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_isl_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_isl_desc.custom_minimum_size = Vector2(340, 0)
+	pv.add_child(_isl_desc)
+	_pick_island("sa")
 	_warn = Label.new()
 	_warn.add_theme_color_override("font_color", Color("c24a5a"))
 	_warn.add_theme_font_size_override("font_size", 14)
@@ -192,6 +225,26 @@ func _random_name() -> String:
 	return n
 
 
+## Маленькая карта острова для карточки выбора.
+func _island_preview(kind: String) -> Texture2D:
+	var cols := [Color("9bd67f"), Color("6cc1e0"), Color("f1dfa6"), Color("b4e294"), Color("b4a48c"), Color("d4c88a"), Color("c8e8a0")]
+	var t: PackedByteArray = world.gen_terrain(kind, 4242)
+	var img := Image.create_empty(world.W, world.H, false, Image.FORMAT_RGBA8)
+	for y in world.H:
+		for x in world.W:
+			img.set_pixel(x, y, cols[t[y * world.W + x]])
+	return ImageTexture.create_from_image(img)
+
+
+func _pick_island(kind: String) -> void:
+	_island = kind
+	for k in _isl_btns:
+		_isl_btns[k].add_theme_stylebox_override("normal", ui._sb(ui.PINK, INK, 3, 8, 6.0) if k == kind else ui._sb(ui.PAPER, Color(INK, 0.4), 2, 8, 6.0))
+	for it in world.ISLANDS:
+		if it[0] == kind:
+			_isl_desc.text = tr(it[2])
+
+
 func _on_continue() -> void:
 	ui.hide_title()
 
@@ -209,6 +262,7 @@ func _on_found() -> void:
 	var n := _name_edit.text.strip_edges()
 	if n == "":
 		n = "Котоград"
+	world.island = _island
 	world.new_game()
 	world.city_name = n
 	world.save_game()
@@ -216,6 +270,7 @@ func _on_found() -> void:
 	ui.hide_title()
 	ui.toast(tr("Добро пожаловать в %s!") % tr(n), true)
 	ui.open_modal(ui.help_modal)
+	ui.start_tutorial()
 
 
 func _process(delta: float) -> void:

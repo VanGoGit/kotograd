@@ -72,7 +72,20 @@ func all_quests_done() -> bool:
 	return quest().is_empty()
 
 
+var _m_cache := {}
+var _m_at := -100000
+
+
+## Показатели города с кэшем на секунду: обход всей карты не нужен каждый кадр.
 func metrics() -> Dictionary:
+	var now := Time.get_ticks_msec()
+	if _m_cache.is_empty() or now - _m_at > 1000:
+		_m_cache = _metrics()
+		_m_at = now
+	return _m_cache
+
+
+func _metrics() -> Dictionary:
 	var st: Dictionary = world.stats
 	var m := {
 		"houses": st.houses.size(), "cats": world.cats.size(), "employed": world.employed_count(),
@@ -149,4 +162,5 @@ func check() -> Array:
 
 ## Для старых сохранений: отметить уже выполненное без наград и уведомлений.
 func sync_silently() -> void:
+	_m_cache = {}
 	check()

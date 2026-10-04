@@ -89,7 +89,10 @@ var tourism := 0.0
 var eat_rate := 0.0
 var tool := "hand"
 var terrain_img: Image
-var terrain_tex: ImageTexture
+var terrain_tex: Array = []     # земля кусками по 16×16 клеток: при стройке обновляем только свой кусок
+const CHUNK := 16
+const CW := (W + CHUNK - 1) / CHUNK
+const CH := (H + CHUNK - 1) / CHUNK
 var dirty_tiles := {}
 var cars: Array = []
 var parts: Array = []
@@ -105,6 +108,15 @@ var _service_t := 0.0
 var _freight_t := 0.0
 var _ambient_t := 0.0
 var _save_t := 0.0
+var _maps_t := 0.0
+var _econ_dt := 0.0
+var island := "sa"               # форма острова: sa — Сан-Андреас, bay — бухта Мурлибу, isles — острова Каталины
+var tut_cat = null
+var wind := 0.0                  # лёгкий бриз: -1…1 (влево/вправо), 0 — штиль
+var _wind_to := 0.0
+var _wind_t := 8.0
+const WINDY := ["palm", "wildpalm"]               # котик, на которого показывает обучение
+var mobile := false              # телефон или планшет в браузере: 30 кадров и реже тяжёлые расчёты
 var _had_goals := false
 var _pan_active := false
 var _pan_moved := false
@@ -129,6 +141,10 @@ func setup(sprites, snd, user_interface, camera: Camera2D) -> bool:
 	ui = user_interface
 	cam = camera
 	terrain_img = Image.create_empty(W * T, H * T, false, Image.FORMAT_RGBA8)
+	# телефон в браузере: 30 кадров в секунду хватает для уютной игры и бережёт батарею
+	mobile = OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile")
+	if mobile:
+		Engine.max_fps = 30
 	goals = Goals.new(self)
 	events = Events.new(self)
 	transit = Transit.new(self)
@@ -137,7 +153,7 @@ func setup(sprites, snd, user_interface, camera: Camera2D) -> bool:
 	if not loaded:
 		new_game()
 	_render_terrain_full()
-	terrain_tex = ImageTexture.create_from_image(terrain_img)
+	refresh_terrain()
 	rebuild_maps()
 	if loaded and not _had_goals:
 		goals.sync_silently()
@@ -164,6 +180,7 @@ func new_game() -> void:
 	deliveries = 0
 	exported = 0
 	goals.done = {}
+	goals._m_cache = {}
 	events.active = null
 	events.visitors = []
 	events.cool = 4.0
@@ -178,9 +195,9 @@ func new_game() -> void:
 	center_cam(st.x, st.y)
 	recalc()
 	rebuild_maps()
-	if terrain_tex:
+	if not terrain_tex.is_empty():
 		_render_terrain_full()
-		terrain_tex.update(terrain_img)
+		refresh_terrain()
 
 
 func save_game() -> void:
@@ -224,7 +241,7 @@ func serialize() -> String:
 			k["y"] = roundf(c.y)
 		cat_list.append(k)
 	var data := {
-		"v": 5, "seed": map_seed, "terrain": Array(terrain), "objs": mains, "coins": coins, "food": food,
+		"v": 5, "seed": map_seed, "island": island, "terrain": Array(terrain), "objs": mains, "coins": coins, "food": food,
 		"time": time, "day": day, "cats": cat_list, "max_cats": max_cats, "next_id": next_id, "speed": speed,
 		"used_names": used_names, "cam": [cam.position.x, cam.position.y, zoom],
 		"name": city_name, "goals": goals.done.keys(), "pets": pets_total, "events": events_seen, "rides": transit.rides,
@@ -249,7 +266,7 @@ func import_save(text: String) -> bool:
 	cars = []
 	info_target = null
 	_render_terrain_full()
-	terrain_tex.update(terrain_img)
+	refresh_terrain()
 	rebuild_maps()
 	if not _had_goals:
 		goals.sync_silently()
@@ -300,6 +317,7 @@ func deserialize(text: String) -> bool:
 	if d.terrain.size() != W * H:
 		return false
 	map_seed = int(d.seed)
+	island = str(d.get("island", "sa"))
 	terrain = PackedByteArray(d.terrain)
 	objs = []
 	objs.resize(W * H)
@@ -336,6 +354,7 @@ func deserialize(text: String) -> bool:
 	transit.helis = []
 	_had_goals = d.has("goals")
 	goals.done = {}
+	goals._m_cache = {}
 	for g in d.get("goals", []):
 		goals.done[str(g)] = true
 	events.active = null
@@ -400,20 +419,148 @@ static func _in_poly(p: Vector2, poly: Array) -> bool:
 
 ## Клетка-центр Лос-Сантоса — отсюда начинается город.
 func start_spot() -> Vector2:
+	match island:
+		"bay":
+			return Vector2(60, 33)
+		"isles":
+			return Vector2(57, 50)
 	return Vector2(SA_X0 + SA_W * 0.5, SA_Y0 + SA_H * 0.84)
 
 
-func _gen_map(s: int) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = s
-	terrain = PackedByteArray()
-	terrain.resize(W * H)
-	terrain.fill(WATER)
-	objs = []
-	objs.resize(W * H)
+const ISLANDS := [
+	["sa", "Сан-Андреас", "Большой остров: горы на севере, пустыня, озеро и солнечный Лос-Сантос на юге."],
+	["bay", "Бухта Мурлибу", "Широкая бухта с длинными пляжами, холмы вдоль берега и маленький остров вдали."],
+	["isles", "Острова Каталины", "Уютный остров с холмом посередине и бухточками, а рядом ещё три островка."],
+]
+
+
+## Рельеф острова без построек — для карты и для картинки-превью при выборе.
+func gen_terrain(kind: String, s: int) -> PackedByteArray:
+	match kind:
+		"bay":
+			return _gen_bay(s)
+		"isles":
+			return _gen_isles(s)
+	return _gen_sa(s)
+
+
+## Неровный берег: радиус «дышит» в зависимости от угла.
+static func _blob(p: Vector2, c: Vector2, r: Vector2, s: int, wob := 0.12) -> float:
+	var d := (p - c) / r
+	var a := atan2(d.y, d.x)
+	var k := 1.0 + wob * sin(a * 3.0 + s % 7) + wob * 0.6 * sin(a * 7.0 + s % 11) + wob * 0.4 * sin(a * 13.0 + s % 5)
+	return d.length() / k
+
+
+## Песок по краю суши (шире там, где берег смотрит на юг — как пляжи Калифорнии).
+static func _beaches(t: PackedByteArray) -> void:
+	var out := t.duplicate()
+	for y in H:
+		for x in W:
+			var i := y * W + x
+			if t[i] == WATER:
+				continue
+			var near := false
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var nx := x + dx
+					var ny := y + dy
+					if nx < 0 or ny < 0 or nx >= W or ny >= H or t[ny * W + nx] == WATER:
+						near = true
+			if not near and y + 2 < H and t[(y + 2) * W + x] == WATER:
+				near = true
+			if near:
+				out[i] = SAND
+	for i in W * H:
+		t[i] = out[i]
+
+
+func _gen_bay(s: int) -> PackedByteArray:
+	var t := PackedByteArray()
+	t.resize(W * H)
+	t.fill(WATER)
 	var sm := s % 100000
-	# остров в форме Сан-Андреаса: север — Палето-Бей и гора Чилиад, середина — пустыня и озеро Аламо,
-	# восток — горы, юг — Лос-Сантос с холмами Вайнвуда и пляжами Веспуччи
+	for y in H:
+		for x in W:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var land := _blob(p, Vector2(68, 34), Vector2(52, 30), sm, 0.08) < 1.0
+			# сама бухта открыта на юг и юго-запад
+			if land and _blob(p, Vector2(56, 64), Vector2(34, 27), sm + 3, 0.06) < 1.0:
+				land = false
+			# мыс Палос-Вердес на юго-востоке
+			if not land and _blob(p, Vector2(98, 60), Vector2(14, 10), sm + 5, 0.15) < 1.0:
+				land = true
+			# островок вдали
+			if not land and _blob(p, Vector2(24, 74), Vector2(9, 5), sm + 9, 0.2) < 1.0:
+				land = true
+			if not land:
+				continue
+			var i := y * W + x
+			var n := hashf(x / 3, y / 3, sm + 3)
+			t[i] = GRASS
+			# горы Санта-Моники вдоль севера
+			var ridge := (y - 10.0 - 4.0 * sin(x * 0.12 + sm)) / 7.0
+			if absf(ridge) < 0.45 and x > 24 and x < 108:
+				t[i] = MOUNTAIN if n < 0.55 else HILL
+			elif absf(ridge) < 1.2 and x > 18:
+				t[i] = HILL
+			elif x > 92 and n < 0.6:
+				t[i] = DRY
+			elif n > 0.78:
+				t[i] = MEADOW
+			# холмы на мысе
+			if _blob(p, Vector2(100, 58), Vector2(6, 4), sm, 0.1) < 1.0:
+				t[i] = HILL
+	_beaches(t)
+	return t
+
+
+func _gen_isles(s: int) -> PackedByteArray:
+	var t := PackedByteArray()
+	t.resize(W * H)
+	t.fill(WATER)
+	var sm := s % 100000
+	var isles := [[Vector2(58, 44), Vector2(30, 19), 0.14], [Vector2(101, 24), Vector2(11, 7), 0.2],
+		[Vector2(99, 66), Vector2(13, 8), 0.18], [Vector2(22, 22), Vector2(9, 6), 0.22]]
+	for y in H:
+		for x in W:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var best := 9.0
+			var which := -1
+			for k in isles.size():
+				var b := _blob(p, isles[k][0], isles[k][1], sm + k * 13, isles[k][2])
+				if b < best:
+					best = b
+					which = k
+			if best >= 1.0:
+				continue
+			var i := y * W + x
+			var n := hashf(x / 3, y / 3, sm + 3)
+			t[i] = GRASS
+			# холм с вершиной посередине каждого острова
+			if best < 0.28 and which == 0:
+				t[i] = MOUNTAIN
+			elif best < 0.55:
+				t[i] = HILL if n < 0.75 else MEADOW
+			elif n > 0.72:
+				t[i] = MEADOW
+			elif which == 2 and n < 0.4:
+				t[i] = DRY
+	# бухточки на главном острове
+	for c in [Vector2(46, 61), Vector2(76, 28), Vector2(32, 40)]:
+		for y in range(int(c.y) - 4, int(c.y) + 5):
+			for x in range(int(c.x) - 5, int(c.x) + 6):
+				if in_map(x, y) and Vector2((x - c.x) / 5.0, (y - c.y) / 3.5).length() < 1.0:
+					t[y * W + x] = WATER
+	_beaches(t)
+	return t
+
+
+func _gen_sa(s: int) -> PackedByteArray:
+	var t := PackedByteArray()
+	t.resize(W * H)
+	t.fill(WATER)
+	var sm := s % 100000
 	for y in H:
 		for x in W:
 			var u := (x + 0.5 - SA_X0) / SA_W
@@ -425,40 +572,47 @@ func _gen_map(s: int) -> void:
 			if not _in_poly(p, SA_SHAPE):
 				continue
 			var i := y * W + x
-			terrain[i] = GRASS
-			# пляж по краю
+			t[i] = GRASS
 			var edge := false
 			for d in [Vector2(0.03, 0), Vector2(-0.03, 0), Vector2(0, 0.02), Vector2(0, -0.02)]:
 				if not _in_poly(p + d, SA_SHAPE):
 					edge = true
 			if edge:
-				terrain[i] = SAND
+				t[i] = SAND
 				continue
 			var n := hashf(x / 3, y / 3, sm + 3)
-			# гора Чилиад на северо-западе
 			var chil := Vector2((u - 0.28) / 0.13, (v - 0.17) / 0.09).length()
 			if chil < 0.6:
-				terrain[i] = MOUNTAIN
+				t[i] = MOUNTAIN
 			elif chil < 1.0:
-				terrain[i] = HILL
-			# леса Палето на севере
+				t[i] = HILL
 			elif v < 0.22 and n < 0.55:
-				terrain[i] = MEADOW
-			# горы Татавиам на востоке
+				t[i] = MEADOW
 			elif Vector2((u - 0.83) / 0.11, (v - 0.57) / 0.15).length() + (n - 0.5) * 0.4 < 1.0:
-				terrain[i] = MOUNTAIN if Vector2((u - 0.84) / 0.07, (v - 0.57) / 0.1).length() < 1.0 else HILL
-			# гора Гордо на северо-востоке
+				t[i] = MOUNTAIN if Vector2((u - 0.84) / 0.07, (v - 0.57) / 0.1).length() < 1.0 else HILL
 			elif Vector2((u - 0.86) / 0.08, (v - 0.27) / 0.07).length() < 1.0:
-				terrain[i] = HILL
-			# пустыня Гранд-Сенора в середине
+				t[i] = HILL
 			elif Vector2((u - 0.57) / 0.25, (v - 0.45) / 0.16).length() + (n - 0.5) * 0.45 < 1.0:
-				terrain[i] = DRY
-			# холмы Вайнвуда над городом
+				t[i] = DRY
 			elif Vector2((u - 0.52) / 0.2, (v - 0.665) / 0.04).length() + (n - 0.5) * 0.5 < 1.0:
-				terrain[i] = HILL
-			# озеро Аламо-Си
+				t[i] = HILL
 			if Vector2((u - 0.56) / 0.13, (v - 0.40) / 0.045).length() < 1.0:
-				terrain[i] = WATER
+				t[i] = WATER
+	return t
+
+
+func _gen_map(s: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = s
+	terrain = gen_terrain(island, s)
+	objs = []
+	objs.resize(W * H)
+	# вокруг места, где начинается город, — ровная трава без гор
+	var c0 := start_spot()
+	for y in range(int(c0.y) - 3, int(c0.y) + 4):
+		for x in range(int(c0.x) - 4, int(c0.x) + 5):
+			if in_map(x, y) and terrain[y * W + x] != WATER and terrain[y * W + x] != SAND:
+				terrain[y * W + x] = GRASS
 	# природа: пальмы у Лос-Сантоса и на пляжах, агавы в пустыне, камни в горах
 	var spots := []
 	var center := start_spot()
@@ -1353,6 +1507,7 @@ func spawn_cat() -> void:
 			opened.append(tr(D.DEFS[t].name))
 	if opened.size() > 0:
 		ui.toast(tr("Открыто: %s!") % ", ".join(opened), true, true)
+		ui.on_unlocked()
 		sound.play("chime")
 	ui.refresh_tools()
 
@@ -2617,8 +2772,9 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 		return
 	coins -= r.cost
 	place_obj(y * W + x, tool, randi() % 1000, d.get("build", 0.0))
-	sound.play("pop")
 	var w := D.size_of(tool)
+	# большое здание — тёплое арпеджио, мелочь — привычный «поп»
+	sound.play("build" if w >= 2 else "pop", 1.0, -6.0 if w >= 2 else -4.0)
 	for k in w * w:
 		_dust(x + k % w, y + k / w)
 	if r.cost > 0:
@@ -2847,14 +3003,17 @@ func _process(delta: float) -> void:
 		_ambient_gulls(_ambient_t)
 		_ambient_t = 0.0
 	_update_parts(dt)
+	_update_wind(dt)
 	dark = darkness(hour())
 	if not dirty_tiles.is_empty():
+		var chunks := {}
 		for key in dirty_tiles:
 			_draw_tile(key % W, key / W)
+			chunks[(key / W) / CHUNK * CW + (key % W) / CHUNK] = true
 		dirty_tiles.clear()
-		terrain_tex.update(terrain_img)
+		refresh_terrain(chunks.keys())
 	_goal_t += dt
-	if _goal_t > 1.0:
+	if _goal_t > 3.0:
 		_goal_t = 0.0
 		var got: Array = goals.check()
 		if not got.is_empty():
@@ -2864,10 +3023,17 @@ func _process(delta: float) -> void:
 		_amb_t = 0.0
 		_update_ambience()
 	_save_t += dt
-	if _save_t > 10.0:
+	if _save_t > (30.0 if OS.has_feature("web") else 10.0):
 		_save_t = 0.0
 		save_game()
 	queue_redraw()
+
+
+## Вкладку свернули или закрыли — сохраняемся сразу (в браузере автосохранение редкое).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		if not terrain_tex.is_empty() and OS.get_environment("KOTO_TEST") == "":
+			save_game()
 
 
 func _step(gdt: float) -> void:
@@ -2879,13 +3045,19 @@ func _step(gdt: float) -> void:
 		ui.toast(tr("Доброе утро! Начинается день %d") % day, false, true)
 	if was_night != is_night():
 		sound.night = is_night()
-	rebuild_maps()
+	# карты жильцов и работников и экономику пересчитываем 4 раза в секунду, а не каждый кадр
+	_maps_t -= gdt
+	_econ_dt += gdt
 	_job_t -= gdt
+	if _maps_t <= 0.0 or _job_t <= 0.0:
+		_maps_t = 0.25
+		rebuild_maps()
+		_update_economy(_econ_dt)
+		_econ_dt = 0.0
 	if _job_t <= 0.0:
 		_job_t = 1.0
 		_assign_homes()
 		_assign_jobs()
-	_update_economy(gdt)
 	_update_construction(gdt)
 	for c in cats:
 		_update_cat(c, gdt)
@@ -3213,6 +3385,24 @@ func compute_shore() -> void:
 
 func _is_land(x: int, y: int) -> bool:
 	return in_map(x, y) and terrain[y * W + x] != WATER
+
+
+## Загрузить нарисованную землю в текстуры: все куски или только перечисленные.
+func refresh_terrain(only = null) -> void:
+	if terrain_tex.size() != CW * CH:
+		terrain_tex = []
+		for k in CW * CH:
+			terrain_tex.append(ImageTexture.create_from_image(terrain_img.get_region(_chunk_rect(k))))
+		return
+	var list: Array = only if only != null else range(CW * CH)
+	for k in list:
+		(terrain_tex[k] as ImageTexture).update(terrain_img.get_region(_chunk_rect(k)))
+
+
+func _chunk_rect(k: int) -> Rect2i:
+	var cx := k % CW * CHUNK * T
+	var cy := k / CW * CHUNK * T
+	return Rect2i(cx, cy, mini(CHUNK * T, W * T - cx), mini(CHUNK * T, H * T - cy))
 
 
 func _r(px: int, py: int, a: int, b: int, w: int, h: int, col: String) -> void:
@@ -3590,13 +3780,16 @@ func _draw_blvd(px: int, py: int, x: int, y: int) -> void:
 # =====================================================================
 
 func _draw() -> void:
-	if terrain_tex == null:
+	if terrain_tex.is_empty():
 		return
-	draw_texture(terrain_tex, Vector2.ZERO)
 	var v := visible_range()
+	for cy in range(v[1] / CHUNK, v[3] / CHUNK + 1):
+		for cx in range(v[0] / CHUNK, v[2] / CHUNK + 1):
+			if cx < CW and cy < CH:
+				draw_texture(terrain_tex[cy * CW + cx], Vector2(cx * CHUNK * T, cy * CHUNK * T))
 	var tick := int(anim_time * 1.5)
 	var sparkle := Color("d6f2fa")
-	for y in range(v[1], v[3] + 1):
+	for y in (range(v[1], v[3] + 1) if zoom >= 2 else []):
 		for x in range(v[0], v[2] + 1):
 			if terrain[y * W + x] != WATER or objs[y * W + x] != null:
 				continue
@@ -3680,6 +3873,7 @@ func _draw() -> void:
 	_draw_crossings(v)
 	_draw_ramp_signs(v)
 	_draw_ghost()
+	_draw_tut_arrow()
 	_draw_particles()
 	transit.draw_planes()
 
@@ -3704,6 +3898,15 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	var span: int = 2 if paired else o.w
 	var sx: int = x * T + (span * T - tx.get_width()) / 2
 	var sy: int = (y + o.w) * T - tx.get_height()
+	if WINDY.has(o.t) and absf(wind) > 0.02:
+		# пальма чуть покачивается на ветру: верхушка смещается, корни на месте
+		var ph := hashf(x, y, 31) * TAU
+		var sway := wind * (0.035 + 0.02 * sin(anim_time * 1.7 + ph))
+		var base := float(sy + tx.get_height())
+		draw_set_transform_matrix(Transform2D(Vector2(1, 0), Vector2(-sway, 1), Vector2(0, base)))
+		draw_texture(tx, Vector2(sx, -tx.get_height()))
+		draw_set_transform_matrix(Transform2D.IDENTITY)
+		return
 	draw_texture(tx, Vector2(sx, sy))
 	var mk = D.MAKES.get(o.t)
 	if mk != null and float(o.get("out", 0.0)) >= 4.0:
@@ -3744,6 +3947,25 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 			var r := 48.0 if o.t == "lantern" else (34.0 if o.w == 2 or paired else 18.0)
 			var mid: Rect2i = wins[wins.size() / 2]
 			lights.append(Vector3(sx + mid.position.x + 2, sy + mid.position.y + 2, r))
+
+
+## Обучение: розовая стрелочка над первым котиком.
+func _draw_tut_arrow() -> void:
+	if tut_cat == null or not cats.has(tut_cat) or tut_cat.state == "in" or tut_cat.state == "drive" or tut_cat.state == "ride":
+		return
+	var p := cat_pos(tut_cat) + Vector2(0, -24 + roundf(sin(anim_time * 5.0) * 2.0))
+	var tri := PackedVector2Array([p + Vector2(-5, -6), p + Vector2(5, -6), p])
+	draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -7), p + Vector2(7, -7), p + Vector2(0, 2)]), INK)
+	draw_colored_polygon(tri, Color("ff8fb1"))
+
+
+## Бриз сам меняется: то слабый ветерок в одну сторону, то в другую, то штиль.
+func _update_wind(dt: float) -> void:
+	_wind_t -= dt
+	if _wind_t <= 0.0:
+		_wind_t = randf_range(20.0, 60.0)
+		_wind_to = 0.0 if randf() < 0.3 else randf_range(0.4, 1.0) * (1.0 if randf() < 0.5 else -1.0)
+	wind = move_toward(wind, _wind_to, dt * 0.08)
 
 
 func _draw_construction(o: Dictionary, x: int, y: int) -> void:

@@ -246,6 +246,9 @@ func _ready() -> void:
 	_sfx["horn"] = _wav(_synth_horn())
 	_sfx["ding"] = _wav(_synth_ding())
 	_sfx["whoosh"] = _wav(_synth_whoosh())
+	_sfx["click"] = _wav(_synth_click())
+	_sfx["tab"] = _wav(_synth_tab())
+	_sfx["build"] = _wav(_synth_build())
 	for k in 3:
 		_birds.append(_wav(_synth_bird(k)))
 	_build_ambience()
@@ -957,6 +960,48 @@ func _synth_pop() -> PackedFloat32Array:
 		var f := 420.0 * pow(900.0 / 420.0, minf(1.0, t / 0.08))
 		ph += f / RATE
 		out[i] = sin(TAU * ph) * exp(-t * 30.0) * 0.7
+	return out
+
+
+## Мягкий деревянный щелчок кнопки.
+func _synth_click() -> PackedFloat32Array:
+	var n := int(0.06 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		var t := float(i) / RATE
+		out[i] = (sin(TAU * 1180.0 * t) * 0.6 + sin(TAU * 590.0 * t) * 0.4) * exp(-t * 85.0) * 0.45
+	return out
+
+
+## Короткое «плип» при смене вкладки: тон чуть поднимается.
+func _synth_tab() -> PackedFloat32Array:
+	var n := int(0.14 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var ph := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var f := 620.0 + 380.0 * minf(1.0, t / 0.05)
+		ph += f / RATE
+		out[i] = sin(TAU * ph) * exp(-t * 32.0) * 0.4
+	return out
+
+
+## Тёплое арпеджио, когда ставим большое здание.
+func _synth_build() -> PackedFloat32Array:
+	var n := int(0.9 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var notes := [[523.25, 0.0], [659.25, 0.07], [783.99, 0.14], [1046.5, 0.21]]
+	for i in n:
+		var t := float(i) / RATE
+		var v := 0.0
+		for nt in notes:
+			var tt: float = t - nt[1]
+			if tt > 0.0:
+				v += (sin(TAU * nt[0] * tt) + 0.3 * sin(TAU * nt[0] * 2.0 * tt)) * exp(-tt * 5.5)
+		out[i] = v * 0.16
 	return out
 
 
