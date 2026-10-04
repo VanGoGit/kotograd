@@ -3,6 +3,8 @@ extends CanvasLayer
 
 const D = preload("res://scripts/defs.gd")
 const Spr = preload("res://scripts/sprites.gd")
+const Goals = preload("res://scripts/goals.gd")
+const Title = preload("res://scripts/title.gd")
 
 const INK := Color("3b2a3a")
 const PAPER := Color("fff6ea")
@@ -52,12 +54,27 @@ var settings_modal: Control
 var opt_res: OptionButton
 var opt_scale: OptionButton
 var chk_full: CheckButton
-var chk_music: CheckButton
+var title
+var top_bar: HFlowContainer
+var bottom_box: VBoxContainer
+var lbl_brand: Label
+var left_col: VBoxContainer
+var goal_panel: PanelContainer
+var goal_name: Label
+var goal_desc: Label
+var goal_bar: ProgressBar
+var goal_count: Label
+var event_panel: PanelContainer
+var event_lbl: Label
+var goals_modal: Control
+var goals_list: VBoxContainer
+var celebrate_modal: Control
+var _ev_pos := Vector2.ZERO
 var ui_scale := 1.0
 var res_idx := 1
 var fullscreen := false
 const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1280, 800), Vector2i(1440, 900), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
-const UI_SCALES := [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+const UI_SCALES := [0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 var new_game_btn: Button
 var _confirm_new := false
 var _web := OS.has_feature("web")
@@ -82,7 +99,14 @@ func build(w, sprites, snd) -> void:
 	_build_bottom()
 	_build_info()
 	_build_toasts()
+	_build_left()
+	title = Title.new()
+	title.setup(self, world, spr)
+	title.visible = false
+	root.add_child(title)
 	_build_help()
+	_build_goals()
+	_build_celebrate()
 	_build_menu()
 	_build_settings()
 	set_tab(2)
@@ -187,6 +211,7 @@ func _res(tex: Texture2D, tip: String) -> Array:
 
 func _build_top() -> void:
 	var top := HFlowContainer.new()
+	top_bar = top
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.offset_left = 10
 	top.offset_top = 10
@@ -203,6 +228,7 @@ func _build_top() -> void:
 	bh.add_child(_icon(spr.icons.cat, 20))
 	var bl := Label.new()
 	bl.text = "Котоград"
+	lbl_brand = bl
 	bl.add_theme_font_size_override("font_size", 20)
 	bh.add_child(bl)
 	top.add_child(brand)
@@ -233,11 +259,10 @@ func _build_top() -> void:
 
 	btn_speed = _btn("", func(): world.cycle_speed(), "Скорость времени (пробел)")
 	top.add_child(btn_speed)
-	top.add_child(_btn(" − ", func(): world.set_zoom(world.zoom - 1), "Отдалить (−)"))
-	top.add_child(_btn(" + ", func(): world.set_zoom(world.zoom + 1), "Приблизить (+)"))
 	btn_music = _btn("", _toggle_music, "Включить / выключить музыку")
 	top.add_child(btn_music)
 	_update_music_btn()
+	top.add_child(_btn("Цели", _open_goals, "Задания и достижения"))
 	top.add_child(_btn(" ? ", func(): open_modal(help_modal), "Как играть"))
 	top.add_child(_btn("Меню", func(): open_modal(menu_modal)))
 
@@ -245,7 +270,6 @@ func _build_top() -> void:
 func _toggle_music() -> void:
 	sound.set_music(not sound.music_on)
 	_update_music_btn()
-	chk_music.set_pressed_no_signal(sound.music_on)
 
 
 func _update_music_btn() -> void:
@@ -260,6 +284,7 @@ func refresh_speed() -> void:
 
 func _build_bottom() -> void:
 	var bottom := VBoxContainer.new()
+	bottom_box = bottom
 	bottom.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -670,8 +695,10 @@ func toast(msg: String, gold := false) -> void:
 	l.text = msg
 	p.add_child(l)
 	toasts_box.add_child(p)
-	if toasts_box.get_child_count() > 4:
-		toasts_box.get_child(0).queue_free()
+	while toasts_box.get_child_count() > 4:
+		var old := toasts_box.get_child(0)
+		toasts_box.remove_child(old)
+		old.queue_free()
 	var tw := p.create_tween()
 	tw.tween_interval(3.6)
 	tw.tween_property(p, "modulate:a", 0.0, 0.5)
@@ -739,21 +766,27 @@ func _build_help() -> void:
 		"• Работа и бизнес — котики сами устраиваются на работу и надевают форму: блогеры, разработчики в худи, актёры, серферы, строители в касках…\n" +
 		"• Город — мэрия, школа, больница, полиция, почта. Делают районы уютнее, а их машины разъезжают по улицам.\n" +
 		"• Дороги — двусторонние, по ним котики утром едут на работу, а вечером домой. Дом и работа должны стоять у дороги. Пешком котики ходят по тротуарам и только переходят дорогу.\n" +
-		"• Магистраль — по 2 полосы в каждую сторону: быстро и с обгонами. Здания к ней не подключаются.\n" +
+		"• Магистраль — по 2 полосы в каждую сторону: быстро и с обгонами. Здания к ней не подключаются: подведите обычную дорогу вплотную — на стыке появится съезд с зелёным указателем.\n" +
+		"• Перекрёстки — где сходятся 3–4 дороги, сами появляются светофоры и пешеходные зебры: машины ждут зелёного, а котики переходят по зебре.\n" +
+		"• Поезда — проложите рельсы и поставьте вплотную к ним вокзал или платформу (минимум две). Поезд будет ходить сам, а котики — ездить в другие районы. Рельсы через дорогу — переезд со шлагбаумом.\n" +
+		"• Аэропорты — если их хотя бы два, котики летают между ними. Удобно для дальних островов.\n" +
 		"• Холмы и горы — дома с видом уютнее, а особняки строятся только наверху.\n" +
 		"• Улучшения — нажмите на здание: многие можно улучшить до 3 уровня — здание станет выше и наряднее.\n" +
 		"• Лимиты — монеты и еда копятся до предела хранилищ: банки, склады и супермаркеты поднимают его.\n" +
 		"• Парковки — котики оставляют на них машины. Если парковки рядом нет, машину бросают прямо на дороге, и начинаются пробки!\n" +
 		"• Еда — рыбные причалы и пекарни. Отдых и природа — пляжи, пальмы, зонтики, фонтаны и знак KOTOWOOD.\n" +
 		"• Чудеса — достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждое строится один раз и привлекает туристов.\n" +
-		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.", 15))
+		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.\n" +
+		"• Цели — слева сверху текущее задание, за каждое дают монетки. Все задания и достижения — кнопка «Цели».\n" +
+		"• События — иногда в городе праздник: фестиваль на пляже, ярмарка, премьера, салют. Гости приходят сами, а котики становятся счастливее.", 15))
 	var keys := PanelContainer.new()
 	keys.add_theme_stylebox_override("panel", _sb(PAPER2, Color(0, 0, 0, 0), 0, 6, 10.0))
 	keys.add_child(_label(
 		"ЛКМ — строить (дороги можно вести мышью) · ПКМ / перетаскивание — двигать карту\n" +
 		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка\n" +
 		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой\n" +
-		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Esc — отмена", 13))
+		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Esc — отмена\n" +
+		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб", 13))
 	vb.add_child(keys)
 	var start := _btn("Мяу, начинаем!", func(): close_modals())
 	start.add_theme_font_size_override("font_size", 20)
@@ -774,6 +807,7 @@ func _build_menu() -> void:
 	row.add_child(new_game_btn)
 	row.add_child(_btn("Настройки", func(): open_modal(settings_modal)))
 	row.add_child(_btn("Продолжить", func(): close_modals()))
+	row.add_child(_btn("Главное меню", func(): show_title(true)))
 	if not _web:  # из браузера выходят, просто закрыв вкладку
 		row.add_child(_btn("Выйти из игры", _quit_game, "Город сохранится автоматически"))
 	vb.add_child(row)
@@ -832,12 +866,9 @@ func _build_settings() -> void:
 	opt_scale.selected = maxi(0, UI_SCALES.find(ui_scale))
 	opt_scale.item_selected.connect(_on_scale)
 	_setting_row(grid, "Масштаб интерфейса", opt_scale)
-	chk_music = CheckButton.new()
-	chk_music.focus_mode = Control.FOCUS_NONE
-	chk_music.text = "Включена"
-	chk_music.button_pressed = sound.music_on
-	chk_music.toggled.connect(_on_music)
-	_setting_row(grid, "Музыка", chk_music)
+	_setting_row(grid, "Музыка", _volume_slider("music", sound.music_vol))
+	_setting_row(grid, "Звуки", _volume_slider("sfx", sound.sfx_vol))
+	_setting_row(grid, "Окружение", _volume_slider("amb", sound.amb_vol))
 	chk_unlim = CheckButton.new()
 	chk_unlim.focus_mode = Control.FOCUS_NONE
 	chk_unlim.text = "Неограниченные ресурсы"
@@ -969,9 +1000,16 @@ func _on_unlim(on: bool) -> void:
 	toast("Неограниченные ресурсы: " + ("включены" if on else "выключены"), true)
 
 
-func _on_music(on: bool) -> void:
-	sound.set_music(on)
-	_update_music_btn()
+func _volume_slider(kind: String, v: float) -> HSlider:
+	var sl := HSlider.new()
+	sl.min_value = 0
+	sl.max_value = 100
+	sl.step = 5
+	sl.value = v * 100.0
+	sl.focus_mode = Control.FOCUS_NONE
+	sl.custom_minimum_size = Vector2(240, 24)
+	sl.value_changed.connect(func(x: float): sound.set_volume(kind, x / 100.0))
+	return sl
 
 
 func _fit_root() -> void:
@@ -1007,13 +1045,26 @@ func _apply_display() -> void:
 
 func _load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load("user://settings.cfg") == OK:
+	# первый запуск: масштаб интерфейса по плотности экрана (телефоны, Retina)
+	ui_scale = _auto_scale()
+	if cfg.load("user://settings.cfg") == OK and cfg.has_section_key("display", "ui_scale"):
 		res_idx = clampi(int(cfg.get_value("display", "resolution", 1)), 0, RESOLUTIONS.size() - 1)
 		fullscreen = bool(cfg.get_value("display", "fullscreen", false))
-		ui_scale = float(cfg.get_value("display", "ui_scale", 1.0))
+		ui_scale = float(cfg.get_value("display", "ui_scale", ui_scale))
 		unlimited = bool(cfg.get_value("game", "unlimited", false))
 		if not UI_SCALES.has(ui_scale):
 			ui_scale = 1.0
+
+
+func _auto_scale() -> float:
+	if DisplayServer.get_name() == "headless":
+		return 1.0
+	var sc := DisplayServer.screen_get_scale()
+	var best := 1.0
+	for k in UI_SCALES:
+		if absf(k - sc) < absf(best - sc):
+			best = k
+	return best
 
 
 func _save_settings() -> void:
@@ -1035,6 +1086,10 @@ func open_modal(m: Control) -> void:
 func close_modals() -> void:
 	help_modal.visible = false
 	menu_modal.visible = false
+	if goals_modal:
+		goals_modal.visible = false
+	if celebrate_modal:
+		celebrate_modal.visible = false
 	if settings_modal:
 		settings_modal.visible = false
 	_confirm_new = false
@@ -1076,6 +1131,9 @@ func _update_hud() -> void:
 	var mm := int((h - hh) * 6.0) * 10
 	lbl_clock.text = "День %d · %02d:%02d" % [world.day, hh, mm]
 	hint.text = _hint_text()
+	lbl_brand.text = world.city_name
+	_update_goal_panel()
+	left_col.position.y = top_bar.position.y + top_bar.size.y + 8.0
 	refresh_tools()
 
 
@@ -1089,7 +1147,7 @@ func _hint_text() -> String:
 	if homeless > 0:
 		return "Котиков без дома: %d. Постройте жильё — они сразу переедут!" % homeless
 	if st.workplaces.is_empty():
-		return "Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Работа»)."
+		return "Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Еда»)."
 	if world.hungry:
 		return "Еда закончилась! Нужен ещё один рыбный причал или пекарня."
 	var roads := 0
@@ -1114,3 +1172,277 @@ func _hint_text() -> String:
 	if world.happy < 45.0:
 		return "Котикам скучновато: украсьте город клумбами и деревьями рядом с домами."
 	return ""
+
+
+# ---------- стартовый экран ----------
+
+func title_open() -> bool:
+	return title != null and title.visible
+
+
+func show_title(has_city: bool) -> void:
+	close_modals()
+	world.info_target = null
+	world.select_tool("hand")
+	set_hud(false)
+	title.open(has_city)
+
+
+func hide_title() -> void:
+	title.visible = false
+	set_hud(true)
+
+
+func set_hud(v: bool) -> void:
+	top_bar.visible = v
+	bottom_box.visible = v
+	left_col.visible = v
+	toasts_box.visible = v
+	if not v:
+		info_panel.visible = false
+
+
+# ---------- цели ----------
+
+func _build_left() -> void:
+	left_col = VBoxContainer.new()
+	left_col.add_theme_constant_override("separation", 8)
+	left_col.position = Vector2(10, 64)
+	left_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(left_col)
+
+	goal_panel = PanelContainer.new()
+	goal_panel.add_theme_stylebox_override("panel", _sb(PAPER, INK, 3, 8, 10.0))
+	goal_panel.custom_minimum_size = Vector2(250, 0)
+	goal_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	goal_panel.tooltip_text = "Нажмите, чтобы увидеть все цели и достижения"
+	goal_panel.gui_input.connect(_on_goal_panel_input)
+	left_col.add_child(goal_panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 3)
+	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	goal_panel.add_child(vb)
+	var hb := HBoxContainer.new()
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vb.add_child(hb)
+	hb.add_child(_icon(spr.icons.heart, 14))
+	goal_name = Label.new()
+	goal_name.add_theme_font_size_override("font_size", 15)
+	hb.add_child(goal_name)
+	goal_desc = Label.new()
+	goal_desc.add_theme_font_size_override("font_size", 13)
+	goal_desc.add_theme_color_override("font_color", Color(INK, 0.8))
+	goal_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_desc.custom_minimum_size = Vector2(230, 0)
+	vb.add_child(goal_desc)
+	var pr := HBoxContainer.new()
+	pr.add_theme_constant_override("separation", 6)
+	vb.add_child(pr)
+	goal_bar = ProgressBar.new()
+	goal_bar.show_percentage = false
+	goal_bar.custom_minimum_size = Vector2(150, 12)
+	goal_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	goal_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	goal_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pr.add_child(goal_bar)
+	goal_count = Label.new()
+	goal_count.add_theme_font_size_override("font_size", 13)
+	pr.add_child(goal_count)
+
+	event_panel = PanelContainer.new()
+	event_panel.add_theme_stylebox_override("panel", _sb(GOLD, INK, 3, 8, 10.0))
+	event_panel.visible = false
+	left_col.add_child(event_panel)
+	var eh := HBoxContainer.new()
+	eh.add_theme_constant_override("separation", 8)
+	event_panel.add_child(eh)
+	event_lbl = Label.new()
+	event_lbl.add_theme_font_size_override("font_size", 14)
+	event_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	event_lbl.custom_minimum_size = Vector2(150, 0)
+	event_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	eh.add_child(event_lbl)
+	eh.add_child(_btn("Показать", func(): world.center_cam(_ev_pos.x, _ev_pos.y), "Перенести камеру к празднику"))
+
+
+func _on_goal_panel_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+		_open_goals()
+
+
+func _update_goal_panel() -> void:
+	var q: Dictionary = world.goals.quest()
+	if q.is_empty():
+		goal_name.text = "Все задания выполнены!"
+		goal_desc.text = "Город стал легендой. Стройте дальше в своё удовольствие."
+		goal_bar.value = 100
+		goal_count.text = ""
+	else:
+		var m: Dictionary = world.goals.metrics()
+		var p: int = world.goals.progress(q, m)
+		goal_name.text = q.name
+		goal_desc.text = q.desc
+		goal_bar.max_value = float(q.n)
+		goal_bar.value = float(p)
+		goal_count.text = "%d/%d" % [p, q.n]
+	# на маленьком экране — компактно, чтобы не закрывать карту
+	goal_desc.visible = root.size.y >= 620.0
+	var ev = world.events.active
+	event_panel.visible = ev != null
+	if ev != null:
+		event_lbl.text = "Праздник: %s\nещё %d ч." % [ev.name, maxi(1, ceili(ev.left))]
+
+
+## Несколько целей сразу (например, после загрузки) — одним сообщением.
+func goals_done(list: Array) -> void:
+	if list.size() <= 2:
+		for g in list:
+			goal_done(g)
+		return
+	var reward := 0
+	for g in list:
+		reward += int(g.get("r", 0))
+		if g.id == "legend":
+			goal_done(g)
+	if reward > 0 and not world.unlimited:
+		world.coins += reward
+	sound.play("fanfare", 1.0, -6.0)
+	toast("Выполнено целей и достижений: %d!%s" % [list.size(), ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true)
+	_confetti(40)
+
+
+func goal_done(g: Dictionary) -> void:
+	var reward := int(g.get("r", 0))
+	var is_quest := g.has("r")
+	if reward > 0 and not world.unlimited:
+		world.coins += reward
+	sound.play("fanfare", 1.0, -6.0)
+	if is_quest:
+		toast("Цель выполнена: «%s»%s" % [g.name, ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true)
+	else:
+		toast("Достижение: «%s» — %s" % [g.name, g.desc], true)
+	_confetti(40 if is_quest else 24)
+	if g.id == "legend":
+		open_modal(celebrate_modal)
+		world.events.force("fireworks")
+
+
+## Конфетти над экраном.
+func _confetti(n: int) -> void:
+	var vs: Vector2 = world.view_size()
+	var tl: Vector2 = world.cam.position - vs / 2.0
+	for k in n:
+		world.add_p({"type": "confetti", "x": tl.x + randf() * vs.x, "y": tl.y - randf() * 10.0, "vx": randf_range(-8, 8), "vy": randf_range(10, 30), "g": 25.0, "life": randf_range(2.5, 4.0), "col": ["ff6b8b", "ffd75e", "7fc4e8", "c8a8ff", "9ed8c8"].pick_random(), "ph": randf() * 6.0})
+
+
+func _build_goals() -> void:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	vb.add_child(_label("Цели и достижения", 24, false))
+	goals_list = VBoxContainer.new()
+	goals_list.add_theme_constant_override("separation", 4)
+	vb.add_child(goals_list)
+	var done_b := _btn("Закрыть", func(): close_modals())
+	done_b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(done_b)
+	goals_modal = _modal(vb)
+
+
+func _goal_row(g: Dictionary, m: Dictionary, current: bool) -> Control:
+	var done: bool = world.goals.done.has(g.id)
+	var p := PanelContainer.new()
+	var bg := GOLD if done else (PINK if current else PAPER2)
+	p.add_theme_stylebox_override("panel", _sb(bg, Color(0, 0, 0, 0), 0, 6, 8.0))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	p.add_child(hb)
+	var mark := Label.new()
+	mark.text = "✓" if done else ("→" if current else "·")
+	mark.custom_minimum_size = Vector2(18, 0)
+	mark.add_theme_font_size_override("font_size", 18)
+	hb.add_child(mark)
+	var tv := VBoxContainer.new()
+	tv.add_theme_constant_override("separation", 0)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(tv)
+	var n := Label.new()
+	n.text = g.name
+	n.add_theme_font_size_override("font_size", 15)
+	tv.add_child(n)
+	var d := Label.new()
+	d.text = g.desc
+	d.add_theme_font_size_override("font_size", 13)
+	d.add_theme_color_override("font_color", Color(INK, 0.75))
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(380, 0)
+	tv.add_child(d)
+	var r := Label.new()
+	r.add_theme_font_size_override("font_size", 13)
+	if done:
+		r.text = "готово"
+	else:
+		r.text = "%d/%d" % [world.goals.progress(g, m), g.n]
+	if g.has("r"):
+		r.text += "\n+%d мон." % g.r
+	r.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	r.custom_minimum_size = Vector2(80, 0)
+	hb.add_child(r)
+	return p
+
+
+func _open_goals() -> void:
+	for c in goals_list.get_children():
+		c.queue_free()
+	var m: Dictionary = world.goals.metrics()
+	var cur: Dictionary = world.goals.quest()
+	var nq := 0
+	for q in Goals.QUESTS:
+		if world.goals.done.has(q.id):
+			nq += 1
+	goals_list.add_child(_label("Задания: %d из %d" % [nq, Goals.QUESTS.size()], 18, false))
+	for q in Goals.QUESTS:
+		goals_list.add_child(_goal_row(q, m, not cur.is_empty() and q.id == cur.id))
+	var na := 0
+	for a in Goals.ACHIEVEMENTS:
+		if world.goals.done.has(a.id):
+			na += 1
+	goals_list.add_child(_label("Достижения: %d из %d" % [na, Goals.ACHIEVEMENTS.size()], 18, false))
+	for a in Goals.ACHIEVEMENTS:
+		goals_list.add_child(_goal_row(a, m, false))
+	open_modal(goals_modal)
+
+
+func _build_celebrate() -> void:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	vb.alignment = BoxContainer.ALIGNMENT_CENTER
+	var t := _label("Город-легенда!", 30, false)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(t)
+	var cats := HBoxContainer.new()
+	cats.alignment = BoxContainer.ALIGNMENT_CENTER
+	cats.add_theme_constant_override("separation", 14)
+	for pair in [["ginger", "builder"], ["white", "doctor"], ["calico", "blogger"], ["cream", "actor"], ["siamese", "lifeguard"]]:
+		var r := TextureRect.new()
+		r.texture = Spr.scaled(spr.cat_set(pair[0], pair[1]).stand[0], 4)
+		cats.add_child(r)
+	vb.add_child(cats)
+	var txt := _label("Все шесть чудес света построены, и о вашем городе знает всё побережье. Котики устраивают в вашу честь большой салют!\n\nВсе задания выполнены, но город можно строить и дальше: ищите новые достижения и праздники.")
+	txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(txt)
+	var ok := _btn("Ура!", func(): close_modals())
+	ok.add_theme_font_size_override("font_size", 20)
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(ok)
+	celebrate_modal = _modal(vb)
+
+
+# ---------- события ----------
+
+func event_started(ev: Dictionary, desc: String) -> void:
+	_ev_pos = ev.pos
+	toast("%s! %s" % [ev.name, desc], true)
+
+
+func event_finished(ev: Dictionary) -> void:
+	toast("%s закончился — котики довольны!" % ev.name if ev.kind == "game" or ev.kind == "fireworks" else "Праздник «%s» закончился — котики довольны!" % ev.name)

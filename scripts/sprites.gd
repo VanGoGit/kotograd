@@ -1261,6 +1261,12 @@ func _make_icons() -> void:
 		p.R(0, 1, 16, 14, "5d5b6a"); p.R(0, 7, 16, 1, "ffd23f"); p.R(0, 8, 16, 1, "ffd23f")
 		p.R(1, 4, 3, 1, "ffffff"); p.R(8, 4, 3, 1, "ffffff"); p.R(1, 11, 3, 1, "ffffff"); p.R(8, 11, 3, 1, "ffffff")
 	, false)
+	icons["rail"] = drawn(16, 16, func(p: Painter) -> void:
+		p.R(0, 3, 16, 10, "b8ad9a")
+		for x in range(1, 16, 4):
+			p.R(x, 3, 2, 10, "7a5a3b")
+		p.R(0, 5, 16, 1, "8a8fa0"); p.R(0, 10, 16, 1, "8a8fa0")
+	, false)
 	icons["t_water"] = drawn(16, 16, func(p: Painter) -> void:
 		p.R(0, 0, 16, 16, "6cc1e0"); p.R(3, 5, 4, 1, "d6f2fa"); p.R(9, 9, 4, 1, "d6f2fa"); p.R(5, 12, 3, 1, "a3dcef")
 	)
@@ -1396,6 +1402,6 @@ func tool_texture(t: String) -> Texture2D:
 			return icons["road"]
 		"flowers":
 			return flowers[0]
-		"t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow", "highway":
+		"t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow", "highway", "rail":
 			return icons[t]
 	return obj.get(t)

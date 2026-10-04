@@ -93,6 +93,10 @@ const SCALE_PCS := [2, 4, 6, 7, 9, 11, 1]
 const FORM := ["A", "A", "B", "break", "A", "lite", "B"]
 
 var music_on := true
+var music_vol := 0.8         # громкость: музыка, звуки, окружение (0..1)
+var sfx_vol := 0.8
+var amb_vol := 0.7
+var amb := {"waves": 0.0, "birds": 0.0, "crickets": 0.0, "traffic": 0.0}  # уровни окружения, выставляет мир
 var night := false           # выставляет мир; оставлено для совместимости
 var hour := 12.0             # игровое время, выставляет main.gd
 
@@ -162,15 +166,30 @@ func _ready() -> void:
 	_lp.cutoff_hz = _lp_cut
 	_lp.resonance = 0.6
 	AudioServer.add_bus_effect(_music_bus, _lp)
-	AudioServer.set_bus_volume_db(_music_bus, 0.0 if music_on else -80.0)
+	for bn in ["Sfx", "Ambient"]:
+		var bi := AudioServer.bus_count
+		AudioServer.add_bus()
+		AudioServer.set_bus_name(bi, bn)
+		AudioServer.set_bus_send(bi, "Master")
+	apply_volumes()
 
 	_sfx["pop"] = _wav(_synth_pop())
 	_sfx["dig"] = _wav(_synth_dig())
 	_sfx["mew"] = _wav(_synth_mew())
 	_sfx["chime"] = _wav(_synth_chime())
-	for i in 6:
+	_sfx["fanfare"] = _wav(_synth_fanfare())
+	_sfx["boom"] = _wav(_synth_boom())
+	_sfx["cheer"] = _wav(_synth_cheer())
+	_sfx["honk"] = _wav(_synth_honk())
+	_sfx["horn"] = _wav(_synth_horn())
+	_sfx["ding"] = _wav(_synth_ding())
+	_sfx["whoosh"] = _wav(_synth_whoosh())
+	for k in 3:
+		_birds.append(_wav(_synth_bird(k)))
+	_build_ambience()
+	for i in 8:
 		var p := AudioStreamPlayer.new()
-		p.bus = "Master"
+		p.bus = "Sfx"
 		add_child(p)
 		_sfx_players.append(p)
 
@@ -198,7 +217,8 @@ func _ready() -> void:
 	_gen_section()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_update_ambience(delta)
 	_warm_up(3000)
 	var target: float = MOODS[_mood_for(hour)].lp
 	_lp_cut = lerpf(_lp_cut, target, 0.01)
@@ -882,23 +902,54 @@ func _synth_chime() -> PackedFloat32Array:
 	return out
 
 
-func play(name: String, pitch := 1.0) -> void:
+func play(name: String, pitch := 1.0, db := -4.0) -> void:
 	if not _sfx.has(name):
 		return
 	var p: AudioStreamPlayer = _sfx_players[_sp]
 	_sp = (_sp + 1) % _sfx_players.size()
 	p.stream = _sfx[name]
 	p.pitch_scale = pitch
-	p.volume_db = -4.0
+	p.volume_db = db
 	p.play()
 
 
 func set_music(on: bool) -> void:
 	music_on = on
-	AudioServer.set_bus_volume_db(_music_bus, 0.0 if on else -80.0)
+	apply_volumes()
+	_save_audio()
+
+
+## kind: "music", "sfx" или "amb"; v от 0 до 1
+func set_volume(kind: String, v: float) -> void:
+	match kind:
+		"music": music_vol = v
+		"sfx": sfx_vol = v
+		"amb": amb_vol = v
+	apply_volumes()
+	_save_audio()
+
+
+func apply_volumes() -> void:
+	var mv := music_vol if music_on else 0.0
+	AudioServer.set_bus_volume_db(_music_bus, linear_to_db(maxf(mv, 0.0001)))
+	AudioServer.set_bus_mute(_music_bus, mv <= 0.001)
+	var sb := AudioServer.get_bus_index("Sfx")
+	var ab := AudioServer.get_bus_index("Ambient")
+	if sb >= 0:
+		AudioServer.set_bus_volume_db(sb, linear_to_db(maxf(sfx_vol, 0.0001)))
+		AudioServer.set_bus_mute(sb, sfx_vol <= 0.001)
+	if ab >= 0:
+		AudioServer.set_bus_volume_db(ab, linear_to_db(maxf(amb_vol, 0.0001)))
+		AudioServer.set_bus_mute(ab, amb_vol <= 0.001)
+
+
+func _save_audio() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load("user://settings.cfg")
-	cfg.set_value("audio", "music", on)
+	cfg.set_value("audio", "music", music_on)
+	cfg.set_value("audio", "music_vol", music_vol)
+	cfg.set_value("audio", "sfx_vol", sfx_vol)
+	cfg.set_value("audio", "amb_vol", amb_vol)
 	cfg.save("user://settings.cfg")
 
 
@@ -906,3 +957,266 @@ func _load_settings() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load("user://settings.cfg") == OK:
 		music_on = cfg.get_value("audio", "music", true)
+		music_vol = float(cfg.get_value("audio", "music_vol", 0.8))
+		sfx_vol = float(cfg.get_value("audio", "sfx_vol", 0.8))
+		amb_vol = float(cfg.get_value("audio", "amb_vol", 0.7))
+
+
+# ---------- звуки окружения ----------
+# Волны, птицы, сверчки и гул города. Громкость каждого зависит от того,
+# что сейчас видно на экране, — её выставляет мир через словарь amb.
+
+var _amb_players := {}
+var _birds: Array = []
+var _bird_t := 0.0
+var _bird_player: AudioStreamPlayer
+const AMB_BASE := {"waves": -9.0, "crickets": -16.0, "traffic": -14.0}
+
+
+func _build_ambience() -> void:
+	var loops := {"waves": _loop(_synth_waves(12.0), 0.6), "crickets": _wav(_synth_crickets(4.0)), "traffic": _loop(_synth_traffic(3.0), 0.4)}
+	for k in loops:
+		var w: AudioStreamWAV = loops[k]
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = w.data.size() / 2
+		var p := AudioStreamPlayer.new()
+		p.bus = "Ambient"
+		p.stream = w
+		p.volume_db = -80.0
+		add_child(p)
+		_amb_players[k] = p
+	_bird_player = AudioStreamPlayer.new()
+	_bird_player.bus = "Ambient"
+	add_child(_bird_player)
+
+
+func _update_ambience(dt: float) -> void:
+	for k in _amb_players:
+		var p: AudioStreamPlayer = _amb_players[k]
+		var lv: float = amb.get(k, 0.0)
+		var target: float = AMB_BASE[k] + linear_to_db(maxf(lv, 0.001))
+		var cur := p.volume_db
+		p.volume_db = move_toward(cur, target, dt * 12.0)
+		if lv > 0.01 and not p.playing:
+			p.volume_db = -60.0
+			p.play()
+		elif lv <= 0.01 and p.volume_db < -50.0 and p.playing:
+			p.stop()
+	# птички щебечут сами по себе, чаще — где много зелени
+	_bird_t -= dt
+	if _bird_t <= 0.0:
+		_bird_t = randf_range(1.5, 5.0)
+		if randf() < amb.birds:
+			_bird_player.stream = _birds.pick_random()
+			_bird_player.pitch_scale = randf_range(0.9, 1.15)
+			_bird_player.volume_db = -15.0
+			_bird_player.play()
+
+
+## Плавная склейка конца с началом, чтобы шумовая петля не щёлкала.
+func _loop(samples: PackedFloat32Array, fade_sec: float) -> AudioStreamWAV:
+	var f := int(fade_sec * RATE)
+	var n := samples.size() - f
+	var out := samples.slice(0, n)
+	for k in f:
+		var a := float(k) / f
+		out[k] = out[k] * a + samples[n + k] * (1.0 - a)
+	return _wav(out)
+
+
+func _synth_waves(sec: float) -> PackedFloat32Array:
+	var n := int((sec + 0.6) * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var l1 := 0.0
+	var l2 := 0.0
+	var hp := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var x := randf() * 2.0 - 1.0
+		l1 += (x - l1) * 0.04
+		l2 += (l1 - l2) * 0.04
+		hp += (x - hp) * 0.3
+		# накат волны каждые 6 секунд: нарастает, разбивается пеной и отступает
+		var ph := fposmod(t / 6.0, 1.0)
+		var swell := pow(sin(ph * PI), 2.0)
+		var foam := exp(-pow((ph - 0.55) * 7.0, 2.0))
+		out[i] = l2 * (2.2 + 4.0 * swell) + (x - hp) * 0.12 * foam
+	return out
+
+
+func _synth_crickets(sec: float) -> PackedFloat32Array:
+	var n := int(sec * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	# два сверчка с разным тоном и ритмом; сетка выбрана так, чтобы петля сходилась
+	for cr in [[4300.0, 0.5, 0.0, 0.22], [3800.0, 0.8, 0.27, 0.15]]:
+		var period: float = cr[1]
+		var start: float = cr[2]
+		while start < sec:
+			for pulse in 3:
+				var t0: float = start + pulse * 0.035
+				for k in int(0.022 * RATE):
+					var t := float(k) / RATE
+					var idx := int((t0 + t) * RATE) % n
+					out[idx] += sin(TAU * cr[0] * t) * sin(PI * t / 0.022) * cr[3]
+			start += period
+	return out
+
+
+func _synth_traffic(sec: float) -> PackedFloat32Array:
+	var n := int((sec + 0.4) * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var l1 := 0.0
+	var l2 := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var x := randf() * 2.0 - 1.0
+		l1 += (x - l1) * 0.02
+		l2 += (l1 - l2) * 0.05
+		out[i] = l2 * 5.0 + sin(TAU * 62.0 * t) * 0.05 * (0.6 + 0.4 * sin(TAU * 0.5 * t))
+	return out
+
+
+func _synth_bird(kind: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(int(0.6 * RATE))
+	var notes: Array = [[[2600.0, 3900.0], [3000.0, 4200.0]], [[4200.0, 3200.0], [4200.0, 3200.0], [4400.0, 3000.0]], [[3200.0, 3600.0], [2800.0, 4600.0]]][kind]
+	var pos := 0
+	for nt in notes:
+		var len := int(0.07 * RATE)
+		var ph := 0.0
+		for k in len:
+			var a := float(k) / len
+			ph += lerpf(nt[0], nt[1], a) / RATE
+			if pos + k < out.size():
+				out[pos + k] += sin(TAU * ph) * sin(PI * a) * 0.35
+		pos += len + int(0.05 * RATE)
+	return out
+
+
+func _synth_fanfare() -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(int(1.3 * RATE))
+	# весёлое чиптюн-арпеджио: до-ми-соль-до
+	var seq := [[72, 0.0, 0.12], [76, 0.11, 0.12], [79, 0.22, 0.12], [84, 0.33, 0.7]]
+	for nt in seq:
+		var f := _mtof(nt[0])
+		var st := int(nt[1] * RATE)
+		var len := int((nt[2] + 0.25) * RATE)
+		var ph := 0.0
+		for k in len:
+			var t := float(k) / RATE
+			ph += f * (1.0 + 0.008 * sin(TAU * 6.0 * t) * minf(1.0, t * 4.0)) / RATE
+			var sq := 1.0 if fposmod(ph, 1.0) < 0.25 else -1.0
+			var env := minf(1.0, t / 0.004) * (exp(-t * 3.0) if t < nt[2] else exp(-nt[2] * 3.0) * exp(-(t - nt[2]) * 18.0))
+			if st + k < out.size():
+				out[st + k] += (sq * 0.12 + sin(TAU * ph) * 0.2) * env
+	return out
+
+
+func _synth_boom() -> PackedFloat32Array:
+	var n := int(1.6 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	var ph := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var x := randf() * 2.0 - 1.0
+		lp += (x - lp) * 0.08
+		ph += (60.0 + 80.0 * exp(-t * 20.0)) / RATE
+		var crackle := 0.0
+		if t > 0.25 and randf() < 0.004 * exp(-(t - 0.25) * 2.0):
+			crackle = randf_range(-0.5, 0.5)
+		out[i] = (lp * 1.6 + sin(TAU * ph) * 0.5) * exp(-t * 5.0) + crackle
+	return out
+
+
+func _synth_cheer() -> PackedFloat32Array:
+	var n := int(2.2 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var l1 := 0.0
+	var l2 := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var x := randf() * 2.0 - 1.0
+		l1 += (x - l1) * 0.25
+		l2 += (l1 - l2) * 0.25
+		var bp := l1 - l2
+		var env := minf(1.0, t / 0.3) * clampf((2.2 - t) / 1.2, 0.0, 1.0)
+		var wob := 0.75 + 0.25 * sin(TAU * 5.0 * t + sin(TAU * 1.3 * t) * 2.0)
+		out[i] = bp * env * wob * 1.4
+	return out
+
+
+## Гудок поезда: два мягких аккордовых «ту-ту».
+func _synth_horn() -> PackedFloat32Array:
+	var n := int(1.1 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phs := [0.0, 0.0, 0.0]
+	for i in n:
+		var t := float(i) / RATE
+		var on := t < 0.38 or (t > 0.5 and t < 1.0)
+		var env := 0.0
+		if on:
+			var tt := t if t < 0.38 else t - 0.5
+			var ln := 0.38 if t < 0.38 else 0.5
+			env = minf(1.0, tt / 0.03) * minf(1.0, (ln - tt) / 0.06)
+		var s := 0.0
+		var fr := [311.0, 370.0, 466.0]
+		for k in 3:
+			phs[k] += fr[k] / RATE
+			s += (2.0 * fposmod(phs[k], 1.0) - 1.0) * 0.12
+		out[i] = s * env
+	var lp := 0.0
+	for i in n:
+		lp += (out[i] - lp) * 0.25
+		out[i] = lp * 1.6
+	return out
+
+
+func _synth_ding() -> PackedFloat32Array:
+	var n := int(0.9 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		var t := float(i) / RATE
+		var s := 0.0
+		for st in [0.0, 0.42]:
+			var tt: float = t - st
+			if tt > 0.0:
+				s += (sin(TAU * 1250.0 * tt) * 0.5 + sin(TAU * 3100.0 * tt) * 0.2) * exp(-tt * 9.0)
+		out[i] = s * 0.35
+	return out
+
+
+func _synth_whoosh() -> PackedFloat32Array:
+	var n := int(2.2 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var a := 0.03 + 0.12 * minf(1.0, t / 1.2)
+		lp += (randf() * 2.0 - 1.0 - lp) * a
+		var env := minf(1.0, t / 0.8) * clampf((2.2 - t) / 0.9, 0.0, 1.0)
+		out[i] = lp * env * 1.2
+	return out
+
+
+func _synth_honk() -> PackedFloat32Array:
+	var n := int(0.32 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		var t := float(i) / RATE
+		var f := 520.0 if t < 0.14 else 440.0
+		var env := 1.0 if fposmod(t, 0.16) < 0.12 else 0.0
+		var sq := 1.0 if fposmod(f * t, 1.0) < 0.5 else -1.0
+		out[i] = sq * env * 0.16
+	return out

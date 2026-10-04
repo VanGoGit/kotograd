@@ -4,6 +4,8 @@ extends RefCounted
 
 
 const GLYPHS := {
+	"train": [".xxx.", "x.x.x", "xxxxx", "xxxxx", ".x.x."],
+	"plane": ["..x..", ".xxx.", "xxxxx", "..x..", ".xxx."],
 	"tv": ["xxxxx", "x...x", "x...x", "xxxxx", ".x.x."],
 	"chip": [".x.x.", "xxxxx", "x.x.x", "xxxxx", ".x.x."],
 	"shirt": ["xx.xx", "xxxxx", ".xxx.", ".xxx.", ".xxx."],

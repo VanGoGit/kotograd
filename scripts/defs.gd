@@ -17,6 +17,11 @@ const DEFS := {
 	"parking": {"name": "Парковка", "cost": 10, "unlock": 0, "parking": 4, "walk": true, "up": [10, 20], "desc": "Стоянка на 4 машины у дороги. Котики оставляют здесь машины и идут пешком. Без парковок машины стоят прямо на дорогах — бывают пробки!"},
 	"garage": {"name": "Паркинг", "cost": 90, "unlock": 8, "size": 2, "parking": 20, "build": 8.0, "up": [70, 140], "desc": "Многоэтажный паркинг на 20 машин. Ставьте рядом с офисами и чудесами."},
 	"highway": {"name": "Магистраль", "cost": 6, "unlock": 5, "walk": false, "paint": true, "desc": "Широкое шоссе: по 2 полосы в каждую сторону, машины едут быстрее и обгоняют. Пешеходам сюда нельзя. Дома к магистрали не подключаются — нужна обычная дорога."},
+	"rail": {"name": "Железная дорога", "cost": 6, "unlock": 6, "walk": true, "paint": true, "desc": "Рельсы для поездов. Поезд сам ходит между вокзалами и платформами одной линии, а котики ездят на нём в другие районы. Через дорогу получится переезд со шлагбаумом, через воду — мост."},
+	"crossing": {"name": "Железнодорожный переезд", "cost": 6, "unlock": 99999, "walk": true, "desc": "Когда идёт поезд, шлагбаум закрывается и машины ждут."},
+	"platform": {"name": "Платформа", "cost": 50, "unlock": 6, "jobs": 1, "job": "conductor", "hub": "rail", "need_rail": true, "build": 4.0, "look": {"wall": "efe6d6", "roof": "shed", "rc": "2f8a4f", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "2f8a4f", "fg": "ffffff", "h": 16}, "desc": "Маленькая остановка поезда. Ставьте вплотную к рельсам."},
+	"station": {"name": "Вокзал «Юнион»", "cost": 160, "unlock": 10, "size": 2, "jobs": 4, "job": "conductor", "hub": "rail", "need_rail": true, "nopad": true, "shop": 0.6, "service": 5, "sradius": 8, "build": 10.0, "up": [120, 240], "look": {"wall": "f2dcc0", "roof": "gable", "rc": "c8553d", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "c8553d", "fg": "ffffff", "h": 30, "extra": ["tower"]}, "desc": "Большой вокзал с часовой башней. Ставьте вплотную к рельсам — поезд будет останавливаться здесь."},
+	"airport": {"name": "Аэропорт", "cost": 450, "unlock": 25, "size": 3, "jobs": 8, "job": "pilot", "hub": "air", "shop": 1.2, "tourism": 1.5, "build": 20.0, "look": {"wall": "e8eef4", "roof": "flat", "rc": "9aa6b8", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "sign": "plane", "sc": "3d5a98", "fg": "ffffff", "h": 30, "extra": ["tower"]}, "desc": "Самолёты летают в другие аэропорты вашего города. Нужно хотя бы два аэропорта — иначе лететь некуда. Отлично связывает дальние острова!"},
 	"path": {"name": "Тротуар", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Пешеходная дорожка: по ней котики ходят быстрее."},
 
 	"house": {"name": "Домик", "cost": 30, "unlock": 0, "cap": 4, "build": 4.0, "up": [25, 50], "desc": "Домик с ушками на крыше. Живут 4 котика."},
@@ -156,7 +161,7 @@ const DEFS := {
 
 const TABS := [
 	{"name": "Рельеф", "icon": "t_grass", "tools": ["t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow"]},
-	{"name": "Дороги", "icon": "road", "tools": ["road", "highway", "path", "parking", "garage"]},
+	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "parking", "garage", "rail", "platform", "station", "airport"]},
 	{"name": "Жильё", "icon": "house", "tools": ["trailer", "house", "bungalow", "townhouse", "cottage", "villa", "mansion", "apartments", "condo"]},
 	{"name": "Магазины", "icon": "shop", "tools": ["shop", "techstore", "boutique", "bookstore", "toystore", "petshop", "florist", "pharmacy", "supermarket", "mall"]},
 	{"name": "Еда", "icon": "sushi", "tools": ["pier", "farm", "bakery", "cafe", "sushi", "pizzeria", "icecream", "burger", "tacotruck", "donut", "boba", "juicebar", "restaurant", "market"]},
@@ -236,6 +241,7 @@ const PROFESSIONS := {
 	"professor": "Профессор",
 	"scientist": "Учёный",
 	"metroman": "Машинист метро",
+	"conductor": "Кондуктор",
 	"busdriver": "Водитель автобуса",
 	"taxi": "Таксист",
 	"pilot": "Пилот",
@@ -253,6 +259,9 @@ const PROFESSIONS := {
 
 ## Одежда новых профессий (старые описаны в sprites.gd).
 const JOB_OUTFITS := {
+	"conductor": {"s": "2f3a5a", "t": "ffffff", "w": "2f3a5a", "l": "2f3a5a", "hat": "cap", "hc": "2f3a5a", "badge": true},
+	"fan": {"s": "2f5fb0", "t": "ffffff", "w": "2f5fb0", "l": "3b3b4a", "hat": "cap", "hc": "2f5fb0"},
+	"tourist": {"s": "ffb07a", "t": "7fc4e8", "w": "ffb07a", "l": "c8b896", "hat": "straw", "hc": "e8c870", "shades": true},
 	"techseller": {"s": "5b8de4", "t": "ffffff", "w": "5b8de4", "l": "3b3b4a", "hat": "cap", "hc": "3d5a98"},
 	"stylist": {"s": "2b2b3a", "t": "ffd23f", "w": "ffffff", "l": "2b2b3a", "shades": true},
 	"bookseller": {"s": "7a5a48", "t": "c9a77a", "w": "ffffff", "l": "5a4a3a", "glasses": true},

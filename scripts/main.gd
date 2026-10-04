@@ -54,8 +54,7 @@ func _ready() -> void:
 
 	var loaded: bool = world.setup(spr, sound, ui, cam)
 	ui.build(world, spr, sound)
-	if not loaded:
-		ui.open_modal(ui.help_modal)
+	ui.show_title(loaded)
 
 
 func _process(_delta: float) -> void:
