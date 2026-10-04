@@ -56,6 +56,7 @@ var opt_res: OptionButton
 var opt_scale: OptionButton
 var chk_full: CheckButton
 var title
+var ui_font: SystemFont
 var top_bar: HFlowContainer
 var bottom_box: VBoxContainer
 var lbl_brand: Label
@@ -144,6 +145,13 @@ func _sb(bg: Color, border := INK, bw := 3, radius := 8, pad := 8.0) -> StyleBox
 func _make_theme() -> Theme:
 	var t := Theme.new()
 	t.default_font_size = 16
+	# мягкий округлый шрифт; в браузере системных шрифтов нет — там встроенный
+	ui_font = SystemFont.new()
+	ui_font.font_names = PackedStringArray(["Avenir Next", "Nunito", "Segoe UI", "Helvetica Neue"])
+	ui_font.font_weight = 600
+	ui_font.hinting = TextServer.HINTING_LIGHT
+	ui_font.fallbacks = [ThemeDB.fallback_font]
+	t.default_font = ui_font
 	t.set_stylebox("panel", "PanelContainer", _sb(PAPER))
 	t.set_stylebox("normal", "Button", _sb(PAPER, INK, 3, 8, 8.0))
 	t.set_stylebox("hover", "Button", _sb(Color.WHITE, INK, 3, 8, 8.0))
@@ -1110,6 +1118,9 @@ func _fit_root() -> void:
 
 func _apply_ui_scale() -> void:
 	scale = Vector2(ui_scale, ui_scale)
+	# буквы растеризуем сразу в нужном размере — иначе при масштабе 175–200% они мутные
+	ui_font.oversampling = ui_scale
+	ThemeDB.fallback_font.oversampling = ui_scale
 	_fit_root()
 
 
@@ -1486,7 +1497,7 @@ func _goal_row(g: Dictionary, m: Dictionary, current: bool) -> Control:
 	var r := Label.new()
 	r.add_theme_font_size_override("font_size", 13)
 	if done:
-		r.text = "готово"
+		r.text = tr("готово")
 	else:
 		r.text = "%d/%d" % [world.goals.progress(g, m), g.n]
 	if g.has("r"):

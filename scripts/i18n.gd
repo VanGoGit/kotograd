@@ -14,6 +14,8 @@ static var _ready := false
 
 
 static func set_lang(code: String) -> void:
+	# русские строки — это ключи, поэтому запасной язык — русский (иначе Godot подставит английский)
+	ProjectSettings.set_setting("internationalization/locale/fallback", "ru")
 	if not _ready:
 		_ready = true
 		var t := Translation.new()
