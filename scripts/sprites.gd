@@ -1300,6 +1300,72 @@ func windows_for(o: Dictionary) -> Array:
 
 
 var _lvl_cache := {}
+var _pair_cache := {}
+
+
+## Два одинаковых маленьких здания рядом — одно широкое здание-близнец:
+## правая половина зеркальная, а стена между ними убрана.
+func pair_variant(o: Dictionary) -> Array:
+	var key: String = o.t + "|" + str(int(o.get("lvl", 1)))
+	if _pair_cache.has(key):
+		return _pair_cache[key]
+	var base: Texture2D = obj_texture(o)
+	var img: Image = base.get_image()
+	img.convert(Image.FORMAT_RGBA8)
+	var wins: Array = windows_for(o)
+	var w := img.get_width()
+	var h := img.get_height()
+	var r := 0
+	for x in w:
+		for y in h - 1:
+			if img.get_pixel(x, y).a > 0.5:
+				r = maxi(r, x)
+	var flip := img.duplicate()
+	flip.flip_x()
+	var off := maxi(0, 2 * r + 2 - w)
+	var c := Image.create_empty(off + w, h, false, Image.FORMAT_RGBA8)
+	c.blend_rect(img, Rect2i(0, 0, w, h), Vector2i.ZERO)
+	c.blend_rect(flip, Rect2i(0, 0, w, h), Vector2i(off, 0))
+	# стык: заполняем щель между стенами цветом стены — получается одно здание с двумя крышами
+	var cw := off + w
+	var mid := r + 1
+	var filled: Array = []
+	for y in h - 1:
+		var a := -1
+		for x in range(mid - 1, maxi(-1, mid - 8), -1):
+			if c.get_pixel(x, y).a > 0.63:
+				a = x
+				break
+		var b := -1
+		for x in range(mid, mini(cw, mid + 7)):
+			if c.get_pixel(x, y).a > 0.63:
+				b = x
+				break
+		if a < 2 or b < 0:
+			continue
+		var fill := Color(0, 0, 0, 0)
+		for k in range(1, 5):
+			var cand := c.get_pixel(a - k, y)
+			var glassy := cand.b > cand.r + 0.12 and cand.b > cand.g
+			if cand.a > 0.63 and cand.get_luminance() >= 0.25 and not glassy:
+				fill = cand
+				break
+		if fill.a == 0.0:
+			continue
+		for x in range(a, b + 1):
+			c.set_pixel(x, y, fill)
+			filled.append(Vector2i(x, y))
+	for p in filled:
+		for dv in [Vector2i(0, -1), Vector2i(0, 1)]:
+			var n: Vector2i = p + dv
+			if n.y >= 0 and n.y < h - 1 and c.get_pixel(n.x, n.y).a < 0.1:
+				c.set_pixel(n.x, n.y, INK)
+	var wins2: Array = wins.duplicate()
+	for wr in wins:
+		wins2.append(Rect2i(off + w - wr.position.x - wr.size.x, wr.position.y, wr.size.x, wr.size.y))
+	var out := [ImageTexture.create_from_image(c), wins2]
+	_pair_cache[key] = out
+	return out
 
 
 ## Улучшенное здание: на каждый уровень — ещё один этаж (копия ряда окон),

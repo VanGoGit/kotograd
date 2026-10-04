@@ -52,7 +52,52 @@ const MOODS := {
 		"swing": 0.2, "drums": "lofi", "bass": "slow", "keys": "long", "pad": true,
 		"lead": "tri", "arp": false, "dense": 0.55, "lp": 3400.0, "crackle": true,
 	},
+	# --- отдельные треки ---
+	"beach": {
+		"progs": [
+			[[38, "6"], [43, "6"], [45, "7"], [43, "6"]],
+			[[38, "maj7"], [47, "m7"], [43, "maj7"], [45, "7"]],
+			[[43, "6"], [45, "7"], [42, "m7"], [47, "m7"]],
+		],
+		"swing": 0.0, "drums": "surf", "bass": "walk", "keys": "stab", "pad": false, "bpm": 118.0, "tr": 2,
+		"lead": "surf", "arp": false, "dense": 0.9, "lp": 12000.0, "crackle": false,
+	},
+	"boulevard": {
+		"progs": [
+			[[47, "m9"], [43, "maj7"], [38, "maj7"], [45, "sus"]],
+			[[47, "m7"], [40, "m7"], [43, "maj9"], [45, "6"]],
+		],
+		"swing": 0.0, "drums": "synth", "bass": "eighths", "keys": "none", "pad": true, "bpm": 104.0, "tr": -2,
+		"lead": "square", "arp": true, "arp16": true, "dense": 0.75, "lp": 8000.0, "crackle": false,
+	},
+	"lazy": {
+		"progs": [
+			[[40, "m9"], [45, "13"], [38, "maj9"], [38, "maj9"]],
+			[[43, "maj9"], [42, "m7"], [40, "m9"], [45, "13"]],
+		],
+		"swing": 0.24, "drums": "lofi", "bass": "walk", "keys": "long", "pad": false, "bpm": 76.0, "tr": 3,
+		"lead": "tri", "arp": false, "dense": 0.45, "lp": 3800.0, "crackle": true,
+	},
+	"dawn": {
+		"progs": [
+			[[38, "maj9"], [43, "maj9"], [40, "m9"], [43, "6"]],
+			[[43, "maj9"], [38, "maj9"], [47, "m9"], [45, "sus"]],
+		],
+		"swing": 0.0, "drums": "none", "bass": "simple", "keys": "none", "pad": true, "bpm": 72.0, "tr": 5,
+		"lead": "bell", "arp": true, "dense": 0.5, "lp": 9000.0, "crackle": false,
+	},
 }
+## Треки для выбора в настройках. auto — музыка меняется вместе со временем суток.
+const TRACKS := [
+	{"id": "auto", "name": "Авто: по времени суток"},
+	{"id": "day", "name": "Котоград — дневной грув"},
+	{"id": "beach", "name": "Санта-Мурика Бич"},
+	{"id": "boulevard", "name": "Сансет-бульвар"},
+	{"id": "lazy", "name": "Ленивое воскресенье"},
+	{"id": "dawn", "name": "Мурлибу на рассвете"},
+	{"id": "shuffle", "name": "Все треки по кругу"},
+]
+const SHUFFLE := ["day", "beach", "boulevard", "lazy", "dawn", "morning", "night", "sunset"]
 # Ударные: 16 шагов (шестнадцатые), число — громкость
 const DRUMS := {
 	"groove": {
@@ -70,6 +115,13 @@ const DRUMS := {
 		"rim": [0, 0, 0, 0, .7, 0, 0, 0, 0, 0, 0, 0, .7, 0, 0, 0],
 		"shaker": [.35, .2, .3, .2, .35, .2, .3, .2, .35, .2, .3, .2, .35, .2, .3, .2],
 	},
+	"surf": {
+		"kick": [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, .7, 0, 0, 0, 0, 0],
+		"snare": [0, 0, 0, 0, .85, 0, 0, 0, 0, 0, 0, 0, .85, 0, 0, .3],
+		"hat": [.35, .2, .3, .2, .35, .2, .3, .2, .35, .2, .3, .2, .35, .2, .3, .2],
+		"shaker": [0, .25, 0, .25, 0, .25, 0, .25, 0, .25, 0, .25, 0, .25, 0, .25],
+	},
+	"none": {},
 	"synth": {
 		"kick": [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, .6, 0, 0, 0, 0, 0],
 		"snare": [0, 0, 0, 0, .9, 0, 0, 0, 0, 0, 0, 0, .9, 0, 0, 0],
@@ -83,11 +135,13 @@ const BASS := {
 	"simple": [[0, "r", 6], [8, "5", 4], [12, "r", 2], [14, "a", 2]],
 	"eighths": [[0, "r", 2], [2, "r", 2], [4, "r", 2], [6, "o", 2], [8, "r", 2], [10, "r", 2], [12, "r", 2], [14, "o", 2]],
 	"slow": [[0, "r", 10], [10, "5", 4], [14, "a", 2]],
+	"walk": [[0, "r", 4], [4, "3", 4], [8, "5", 4], [12, "a", 4]],
 }
 const KEYS := {
 	"comp": [[[0, 5], [6, 2], [10, 5]], [[0, 3], [3, 3], [8, 2], [11, 4]]],
 	"pulse": [[[0, 6], [6, 4], [10, 6]], [[0, 4], [4, 4], [8, 4], [12, 4]]],
 	"long": [[[0, 14]], [[0, 10], [10, 6]]],
+	"stab": [[[2, 1], [6, 1], [10, 1], [14, 1]], [[2, 1], [6, 2], [10, 1], [13, 2]]],
 }
 const SCALE_PCS := [2, 4, 6, 7, 9, 11, 1]
 const FORM := ["A", "A", "B", "break", "A", "lite", "B"]
@@ -115,7 +169,10 @@ var _t := 0                  # номер следующего сэмпла на
 var _events: Array = []      # [сэмпл, ключ звука, громкость, панорама]
 var _ev_i := 0
 var _voices: Array = []      # [буфер, позиция, задержка, гл, гп]
-var _sec_step := 0           # первый шаг следующей части
+var _sec_sample := 0.0       # сэмпл, с которого начинается следующая часть
+var _tr := 0                 # транспонирование текущего трека
+var track := "auto"          # выбранный трек (см. TRACKS)
+var _shuffle_i := 0
 var _sec_n := 0
 var _new: Array = []
 var _cache := {}
@@ -220,7 +277,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_ambience(delta)
 	_warm_up(3000)
-	var target: float = MOODS[_mood_for(hour)].lp
+	var target: float = MOODS[_mood].lp
 	_lp_cut = lerpf(_lp_cut, target, 0.01)
 	_lp.cutoff_hz = _lp_cut
 	if _web:
@@ -365,7 +422,7 @@ func render(n: int) -> PackedVector2Array:
 func _schedule(n: int) -> void:
 	var end := _t + n
 	# всегда держим сочинённой минимум одну часть вперёд
-	while float(_sec_step) * _step_len < float(end) + _step_len * 16.0 * BARS:
+	while _sec_sample < float(end) + _step_len * 16.0 * BARS:
 		_gen_section()
 	while _ev_i < _events.size():
 		var e: Array = _events[_ev_i]
@@ -403,23 +460,43 @@ func _mood_for(h: float) -> String:
 
 
 func _ev(step: float, inst: String, midi: int, dur: int, vel: float, pan: float) -> void:
-	var key := "%s|%d|%d" % [inst, midi, dur]
+	# длительность — в миллисекундах: у треков разный темп
+	var key := "%s|%d|%d" % [inst, midi, int(dur * _step_len / SR * 1000.0)]
 	if not _cache.has(key) and not _warm.has(key):
 		_warm.append(key)
-	var at := int(round((_sec_step + step) * _step_len))
+	var at := int(round(_sec_sample + step * _step_len))
 	_new.append([at, key, vel * randf_range(0.9, 1.05), pan])
 
 
+func _pick_mood() -> String:
+	match track:
+		"auto":
+			return _mood_for(hour)
+		"shuffle":
+			# каждые три части — следующий трек
+			var m: String = SHUFFLE[(_shuffle_i / 3) % SHUFFLE.size()]
+			_shuffle_i += 1
+			return m
+	return track if MOODS.has(track) else _mood_for(hour)
+
+
 func _gen_section() -> void:
-	var mood: String = _mood_for(hour)
+	var mood: String = _pick_mood()
 	var M: Dictionary = MOODS[mood]
+	_step_len = SR * 60.0 / float(M.get("bpm", BPM)) / 4.0
+	_tr = int(M.get("tr", 0))
 	var kind: String = "intro" if _sec_n == 0 else FORM[(_sec_n - 1) % FORM.size()]
 	_sec_n += 1
 	# темы повторяются — так мелодии запоминаются
 	var tk := mood + ("B" if kind == "B" else "A")
 	var theme: Dictionary = _themes.get(tk, {})
 	if theme.is_empty() or (kind == "B" and randf() < 0.5):
-		var pr: Array = M.progs.pick_random()
+		var pr: Array = []
+		for ch in M.progs.pick_random():
+			var r: int = (ch[0] as int) + _tr
+			if r > 49:
+				r -= 12
+			pr.append([r, ch[1]])
 		theme = {"prog": pr, "mel": _gen_melody(pr, M.dense)}
 		_themes[tk] = theme
 	var prog: Array = theme.prog
@@ -472,6 +549,7 @@ func _gen_section() -> void:
 					"o": m = root + 12
 					"5": m = root + 7
 					"a": m = (nxt[0] as int) - 1 if randf() < 0.6 else (nxt[0] as int) + 2
+					"3": m = root + (3 if Q[ch[1]].has(3) else 4)
 				var dur: int = nb[2] if kind != "break" else 14
 				_ev(b0 + nb[0] + (swing if int(nb[0]) % 2 == 1 else 0.0), "bass", m, dur, 0.9, 0.0)
 		# клавиши (электропиано)
@@ -482,18 +560,18 @@ func _gen_section() -> void:
 		# пэд
 		if M.pad or kind == "break" or kind == "intro":
 			for j in voicing.size():
-				_ev(b0, "pad", voicing[j], 16, 0.55 if mood == "sunset" else 0.38, -0.5 if j % 2 == 0 else 0.5)
+				_ev(b0, "pad", voicing[j], 16, 0.55 if mood == "sunset" or mood == "boulevard" or mood == "dawn" else 0.38, -0.5 if j % 2 == 0 else 0.5)
 		# арпеджио
 		if arp_on and kind != "intro":
 			var tones: Array = []
 			for m in voicing:
 				tones.append(m + 12)
 			var order := [0, 1, 2, 3, 2, 1, 0, 1] if tones.size() >= 4 else [0, 1, 2, 1]
-			var stride := 1 if mood == "sunset" else 2
+			var stride := 1 if mood == "sunset" or M.get("arp16", false) else 2
 			var av := 0.28 if lead_on else 0.45
 			for s in range(0, 16, stride):
 				var m: int = tones[order[(s / stride) % order.size()] % tones.size()]
-				_ev(b0 + s, "arp", m, 1, av * (1.2 if s % 4 == 0 else 1.0), -0.25)
+				_ev(b0 + s, "bellarp" if M.lead == "bell" else "arp", m, 1, av * (1.2 if s % 4 == 0 else 1.0), -0.25)
 				if s % 4 == 0:
 					_ev(b0 + s + 3, "arp", m, 1, av * 0.35, 0.4)
 		# треск пластинки
@@ -513,7 +591,7 @@ func _gen_section() -> void:
 	_ev_i = 0
 	_events.append_array(_new)
 	_events.sort_custom(_ev_less)
-	_sec_step += BARS * 16
+	_sec_sample += BARS * 16 * _step_len
 
 
 func _ev_less(a: Array, b: Array) -> bool:
@@ -617,7 +695,7 @@ func _scale_step(m: int, d: int) -> int:
 	var moved := 0
 	while moved < absi(d):
 		x += signi(d)
-		if SCALE_PCS.has(x % 12):
+		if SCALE_PCS.has(posmod(x - _tr, 12)):
 			moved += 1
 	return x
 
@@ -632,7 +710,7 @@ func _synth(key: String) -> PackedFloat32Array:
 	var parts := key.split("|")
 	var inst := parts[0]
 	var m := int(parts[1])
-	var dur := float(int(parts[2])) * _step_len / SR
+	var dur := float(int(parts[2])) / 1000.0
 	match inst:
 		"kick": return _s_kick()
 		"snare": return _s_snare()
@@ -650,7 +728,40 @@ func _synth(key: String) -> PackedFloat32Array:
 		"pulse25": return _s_lead(m, dur, 0.25, false)
 		"square": return _s_lead(m, dur, 0.5, false)
 		"tri": return _s_lead(m, dur, -1.0, false)
+		"bell": return _s_bell(m, dur, 0.22)
+		"bellarp": return _s_bell(m, 0.6, 0.12)
+		"surf": return _s_surf(m, dur)
 	return PackedFloat32Array()
+
+
+## Музыкальная шкатулка: чистый тон и звонкий обертон.
+func _s_bell(m: int, dur: float, vol: float) -> PackedFloat32Array:
+	var out := _buf(maxf(dur, 0.5) + 0.6)
+	var f := _mtof(m)
+	for i in out.size():
+		var t := float(i) / SR
+		var env := minf(1.0, t / 0.002) * exp(-t * 2.6)
+		out[i] = (sin(TAU * f * t) + sin(TAU * f * 2.76 * t) * 0.35 * exp(-t * 6.0) + sin(TAU * f * 5.4 * t) * 0.1 * exp(-t * 12.0)) * env * vol
+	return out
+
+
+## Сёрф-гитара в пиксельном стиле: квадрат с быстрым тремоло и «пружинным» затуханием.
+func _s_surf(m: int, dur: float) -> PackedFloat32Array:
+	var out := _buf(dur + 0.08)
+	var f := _mtof(m)
+	var ph := 0.0
+	var lp := 0.0
+	for i in out.size():
+		var t := float(i) / SR
+		ph += f * (1.0 + 0.012 * sin(TAU * 6.5 * t) * minf(1.0, t * 3.0)) / SR
+		var x := 1.0 if fposmod(ph, 1.0) < 0.4 else -1.0
+		lp += (x - lp) * 0.3
+		var trem := 0.65 + 0.35 * sin(TAU * 14.0 * t)
+		var env := minf(1.0, t / 0.003) * (0.55 + 0.45 * exp(-t * 7.0)) * trem
+		if t > dur:
+			env *= maxf(0.0, 1.0 - (t - dur) / 0.08)
+		out[i] = lp * env * 0.15
+	return out
 
 
 func _buf(sec: float) -> PackedFloat32Array:
@@ -929,6 +1040,26 @@ func set_volume(kind: String, v: float) -> void:
 	_save_audio()
 
 
+func set_track(id: String) -> void:
+	if id == track:
+		return
+	track = id
+	_save_audio()
+	# новая музыка — со следующего такта: отбрасываем сочинённое наперёд
+	_events = _events.slice(0, _ev_i)
+	_ev_i = _events.size()
+	_sec_sample = float(_t) + SR * 0.3
+	_sec_n = 0
+	_gen_section()
+
+
+func track_name() -> String:
+	for tk in TRACKS:
+		if tk.id == track:
+			return tk.name
+	return ""
+
+
 func apply_volumes() -> void:
 	var mv := music_vol if music_on else 0.0
 	AudioServer.set_bus_volume_db(_music_bus, linear_to_db(maxf(mv, 0.0001)))
@@ -950,6 +1081,7 @@ func _save_audio() -> void:
 	cfg.set_value("audio", "music_vol", music_vol)
 	cfg.set_value("audio", "sfx_vol", sfx_vol)
 	cfg.set_value("audio", "amb_vol", amb_vol)
+	cfg.set_value("audio", "track", track)
 	cfg.save("user://settings.cfg")
 
 
@@ -960,6 +1092,7 @@ func _load_settings() -> void:
 		music_vol = float(cfg.get_value("audio", "music_vol", 0.8))
 		sfx_vol = float(cfg.get_value("audio", "sfx_vol", 0.8))
 		amb_vol = float(cfg.get_value("audio", "amb_vol", 0.7))
+		track = str(cfg.get_value("audio", "track", "auto"))
 
 
 # ---------- звуки окружения ----------

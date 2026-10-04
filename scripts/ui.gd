@@ -77,6 +77,8 @@ const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1280, 800), Vector2i(1440, 9
 const UI_SCALES := [0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 var new_game_btn: Button
 var _confirm_new := false
+var build_hidden := false     # панель построек спрятана — любуемся городом
+var show_build_btn: Button
 var zen := false             # режим «Дзен»: без целей, подсказок и новостей
 var btn_zen: Button
 var chk_zen: CheckButton
@@ -314,6 +316,10 @@ func _build_bottom() -> void:
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	toolbar_panel = panel
 	bottom.add_child(panel)
+	show_build_btn = _btn("Постройки ▴", func(): set_build_hidden(false), "Показать панель построек (V)")
+	show_build_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	show_build_btn.visible = false
+	bottom.add_child(show_build_btn)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 6)
 	panel.add_child(vb)
@@ -331,6 +337,7 @@ func _build_bottom() -> void:
 		b.add_theme_constant_override("icon_max_width", 18)
 		tabs.add_child(b)
 		tab_buttons.append(b)
+	tabs.add_child(_btn("Скрыть ▾", func(): set_build_hidden(true), "Спрятать панель построек и любоваться городом (V)"))
 
 	# постройки — в одну строку с прокруткой вправо (колесо мыши тоже листает)
 	tools_scroll = ScrollContainer.new()
@@ -498,6 +505,8 @@ func next_tab(dir: int) -> void:
 func select_tab_tool(n: int) -> void:
 	var tools: Array = D.TABS[tab].tools
 	if n < tools.size():
+		if build_hidden:
+			set_build_hidden(false)
 		world.select_tool(tools[n])
 
 
@@ -793,7 +802,7 @@ func _build_help() -> void:
 		"ЛКМ — строить (дороги можно вести мышью) · ПКМ / перетаскивание — двигать карту\n" +
 		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка\n" +
 		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой\n" +
-		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · Esc — отмена\n" +
+		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · V — спрятать постройки · Esc — отмена\n" +
 		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб", 13))
 	vb.add_child(keys)
 	var start := _btn("Мяу, начинаем!", func(): close_modals())
@@ -875,6 +884,14 @@ func _build_settings() -> void:
 	opt_scale.item_selected.connect(_on_scale)
 	_setting_row(grid, "Масштаб интерфейса", opt_scale)
 	_setting_row(grid, "Музыка", _volume_slider("music", sound.music_vol))
+	var opt_track := OptionButton.new()
+	opt_track.focus_mode = Control.FOCUS_NONE
+	for tk in sound.TRACKS:
+		opt_track.add_item(tk.name)
+		if tk.id == sound.track:
+			opt_track.selected = opt_track.item_count - 1
+	opt_track.item_selected.connect(_on_track)
+	_setting_row(grid, "Трек", opt_track)
 	_setting_row(grid, "Звуки", _volume_slider("sfx", sound.sfx_vol))
 	_setting_row(grid, "Окружение", _volume_slider("amb", sound.amb_vol))
 	chk_unlim = CheckButton.new()
@@ -891,7 +908,7 @@ func _build_settings() -> void:
 	chk_zen.button_pressed = zen
 	chk_zen.toggled.connect(set_zen)
 	_setting_row(grid, "", chk_zen)
-	var hint_lbl := _label("Масштаб карты меняется колёсиком мыши или кнопками − и +.", 13, false)
+	var hint_lbl := _label("Масштаб карты — колёсико мыши, клавиши − и + или два пальца на телефоне.", 13, false)
 	hint_lbl.add_theme_color_override("font_color", Color(INK, 0.7))
 	vb.add_child(hint_lbl)
 	vb.add_child(_label("Сохранения", 18, false))
@@ -1484,3 +1501,19 @@ func set_zen(on: bool, announce := true) -> void:
 	if announce:
 		_save_settings()
 		toast("Режим «Дзен»: только город, музыка и стройка" if on else "Режим «Дзен» выключен: цели и подсказки снова на месте", true)
+
+
+func _on_track(i: int) -> void:
+	sound.set_track(sound.TRACKS[i].id)
+	toast("Сейчас играет: %s" % sound.TRACKS[i].name, true)
+
+
+# ---------- любоваться городом ----------
+
+func set_build_hidden(on: bool) -> void:
+	build_hidden = on
+	toolbar_panel.visible = not on
+	show_build_btn.visible = on
+	if on:
+		world.select_tool("hand")
+		hide_tooltip()

@@ -62,6 +62,7 @@ var _touch_pending := false
 var junctions := {}
 var crosswalks := {}
 var crossings := {}
+var pairs := {}              # объединённые соседние здания: клетка -> "L" или "R"
 var ramps: Array = []
 var _light_clock := 0.0
 const LIGHT_CYCLE := 9.0
@@ -621,6 +622,31 @@ func _compute_roads() -> void:
 				break
 	if transit != null:
 		transit.rebuild()
+	_compute_pairs()
+
+
+func _pairable(o) -> bool:
+	if o == null or o.w != 1 or o.build > 0.0:
+		return false
+	var d := D.def(o.t)
+	return d.has("cap") or d.has("jobs")
+
+
+## Два одинаковых маленьких здания одного уровня рядом по горизонтали рисуются как одно.
+func _compute_pairs() -> void:
+	pairs = {}
+	for y in H:
+		var x := 0
+		while x < W - 1:
+			var i := y * W + x
+			var a = objs[i]
+			var b = objs[i + 1]
+			if _pairable(a) and _pairable(b) and a.t == b.t and int(a.get("lvl", 1)) == int(b.get("lvl", 1)):
+				pairs[i] = "L"
+				pairs[i + 1] = "R"
+				x += 2
+			else:
+				x += 1
 
 
 ## Сигнал светофора для машины: 2 — зелёный, 1 — жёлтый, 0 — красный.
@@ -2423,6 +2449,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_zoom(zoom - 1)
 			KEY_Z:
 				ui.set_zen(not ui.zen)
+			KEY_V:
+				ui.set_build_hidden(not ui.build_hidden)
 			KEY_SPACE:
 				cycle_speed()
 			_:
@@ -2907,7 +2935,7 @@ func _draw() -> void:
 		for x in range(v[0], v[2] + 1):
 			var i := y * W + x
 			var o = objs[i]
-			if o != null and o.i == i and o.t != "path" and o.t != "road":
+			if o != null and o.i == i and o.t != "path" and o.t != "road" and pairs.get(i, "") != "R":
 				list.append([(y + o.w) * T, 0, o, x, y])
 	for c in cats:
 		if c.state == "in" or c.state == "drive" or c.state == "ride":
@@ -2956,10 +2984,21 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	if o.build > 0.0:
 		_draw_construction(o, x, y)
 		return
-	var tx: Texture2D = spr.obj_texture(o)
+	var paired: bool = pairs.get(o.i, "") == "L"
+	var tx: Texture2D
+	var wins: Array
+	if paired:
+		var pv: Array = spr.pair_variant(o)
+		tx = pv[0]
+		wins = pv[1]
+	else:
+		tx = spr.obj_texture(o)
+		if tx != null:
+			wins = spr.windows_for(o)
 	if tx == null:
 		return
-	var sx: int = x * T + (o.w * T - tx.get_width()) / 2
+	var span: int = 2 if paired else o.w
+	var sx: int = x * T + (span * T - tx.get_width()) / 2
 	var sy: int = (y + o.w) * T - tx.get_height()
 	draw_texture(tx, Vector2(sx, sy))
 	if o.t == "parking" or o.t == "garage":
@@ -2970,7 +3009,6 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 			var big: bool = o.t == "parking"
 			draw_rect(Rect2(sx + sl.x, sy + sl.y, 5 if big else 4, 3 if big else 2), Color(cols[k]))
 			draw_rect(Rect2(sx + sl.x + 1, sy + sl.y, 2, 1), Color("bfe6f7"))
-	var wins: Array = spr.windows_for(o)
 	if wins.size() > 0 and dark > 0.08:
 		var d := D.def(o.t)
 		var lit: bool
@@ -2979,7 +3017,7 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 		elif d.get("leisure", false) or d.get("wonder", false):
 			lit = (h >= 17.0 and h < 23.5) or inside_count.get(o.i, 0) > 0
 		else:
-			lit = inside_count.get(o.i, 0) > 0
+			lit = inside_count.get(o.i, 0) > 0 or (paired and inside_count.get(o.i + 1, 0) > 0)
 		if lit:
 			# горят не все окна — у каждого здания свой рисунок света
 			var few: bool = wins.size() <= 2 or o.t == "lantern"
@@ -2989,7 +3027,7 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 				var wr: Rect2i = wins[k]
 				var glow := Color("ffd36e") if hashf(o.i, k, 78) < 0.7 else Color("ffe9a8")
 				draw_rect(Rect2(sx + wr.position.x, sy + wr.position.y, wr.size.x, wr.size.y), glow)
-			var r := 48.0 if o.t == "lantern" else (34.0 if o.w == 2 else 18.0)
+			var r := 48.0 if o.t == "lantern" else (34.0 if o.w == 2 or paired else 18.0)
 			var mid: Rect2i = wins[wins.size() / 2]
 			lights.append(Vector3(sx + mid.position.x + 2, sy + mid.position.y + 2, r))
 
