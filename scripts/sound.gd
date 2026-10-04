@@ -207,10 +207,13 @@ var _dmr := 0.0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load_settings()
-	_music_bus = AudioServer.bus_count
-	AudioServer.add_bus()
-	AudioServer.set_bus_name(_music_bus, "Music")
-	AudioServer.set_bus_send(_music_bus, "Master")
+	# В браузере шины, созданные при запуске, сцепляются в кольцо, и Web Audio глушит весь звук.
+	# Поэтому там всё играет через главную шину, а громкость задаётся каждому звуку отдельно.
+	if not _web:
+		_music_bus = AudioServer.bus_count
+		AudioServer.add_bus()
+		AudioServer.set_bus_name(_music_bus, "Music")
+		AudioServer.set_bus_send(_music_bus, "Master")
 	var rev := AudioEffectReverb.new()
 	rev.room_size = 0.5
 	rev.damping = 0.55
@@ -218,12 +221,14 @@ func _ready() -> void:
 	rev.dry = 1.0
 	rev.wet = 0.13
 	rev.hipass = 0.25
-	AudioServer.add_bus_effect(_music_bus, rev)
+	if not _web:
+		AudioServer.add_bus_effect(_music_bus, rev)
 	_lp = AudioEffectLowPassFilter.new()
 	_lp.cutoff_hz = _lp_cut
 	_lp.resonance = 0.6
-	AudioServer.add_bus_effect(_music_bus, _lp)
-	for bn in ["Sfx", "Ambient"]:
+	if not _web:
+		AudioServer.add_bus_effect(_music_bus, _lp)
+	for bn in ([] if _web else ["Sfx", "Ambient"]):
 		var bi := AudioServer.bus_count
 		AudioServer.add_bus()
 		AudioServer.set_bus_name(bi, bn)
@@ -246,7 +251,7 @@ func _ready() -> void:
 	_build_ambience()
 	for i in 8:
 		var p := AudioStreamPlayer.new()
-		p.bus = "Sfx"
+		p.bus = _b("Sfx")
 		add_child(p)
 		_sfx_players.append(p)
 
@@ -255,8 +260,8 @@ func _ready() -> void:
 		_dly_r.resize(DLY)
 		for i in 3:
 			var wp := AudioStreamPlayer.new()
-			wp.bus = "Music"
-			wp.volume_db = -3.0
+			wp.bus = _b("Music")
+			wp.volume_db = -3.0 + _lin(music_vol)
 			add_child(wp)
 			_wplayers.append(wp)
 		_gen_section()
@@ -1020,7 +1025,7 @@ func play(name: String, pitch := 1.0, db := -4.0) -> void:
 	_sp = (_sp + 1) % _sfx_players.size()
 	p.stream = _sfx[name]
 	p.pitch_scale = pitch
-	p.volume_db = db
+	p.volume_db = db + (_lin(sfx_vol) if _web else 0.0)
 	p.play()
 
 
@@ -1060,7 +1065,20 @@ func track_name() -> String:
 	return ""
 
 
+## Шина для звука: в браузере — всегда главная.
+func _b(bus_name: String) -> String:
+	return "Master" if _web else bus_name
+
+
+func _lin(v: float) -> float:
+	return linear_to_db(maxf(v, 0.0001))
+
+
 func apply_volumes() -> void:
+	if _web:
+		for wp in _wplayers:
+			wp.volume_db = -3.0 + _lin(music_vol)
+		return
 	var mv := music_vol if music_on else 0.0
 	AudioServer.set_bus_volume_db(_music_bus, linear_to_db(maxf(mv, 0.0001)))
 	AudioServer.set_bus_mute(_music_bus, mv <= 0.001)
@@ -1114,13 +1132,13 @@ func _build_ambience() -> void:
 		w.loop_begin = 0
 		w.loop_end = w.data.size() / 2
 		var p := AudioStreamPlayer.new()
-		p.bus = "Ambient"
+		p.bus = _b("Ambient")
 		p.stream = w
 		p.volume_db = -80.0
 		add_child(p)
 		_amb_players[k] = p
 	_bird_player = AudioStreamPlayer.new()
-	_bird_player.bus = "Ambient"
+	_bird_player.bus = _b("Ambient")
 	add_child(_bird_player)
 
 
@@ -1128,7 +1146,7 @@ func _update_ambience(dt: float) -> void:
 	for k in _amb_players:
 		var p: AudioStreamPlayer = _amb_players[k]
 		var lv: float = amb.get(k, 0.0)
-		var target: float = AMB_BASE[k] + linear_to_db(maxf(lv, 0.001))
+		var target: float = AMB_BASE[k] + linear_to_db(maxf(lv, 0.001)) + (_lin(amb_vol) if _web else 0.0)
 		var cur := p.volume_db
 		p.volume_db = move_toward(cur, target, dt * 12.0)
 		if lv > 0.01 and not p.playing:
@@ -1143,7 +1161,7 @@ func _update_ambience(dt: float) -> void:
 		if randf() < amb.birds:
 			_bird_player.stream = _birds.pick_random()
 			_bird_player.pitch_scale = randf_range(0.9, 1.15)
-			_bird_player.volume_db = -15.0
+			_bird_player.volume_db = -15.0 + (_lin(amb_vol) if _web else 0.0)
 			_bird_player.play()
 
 
