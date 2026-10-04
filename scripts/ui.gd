@@ -72,6 +72,10 @@ var goals_modal: Control
 var goals_list: VBoxContainer
 var celebrate_modal: Control
 var _ev_pos := Vector2.ZERO
+var _tdrag_on := false        # листаем панель построек пальцем или мышью
+var _tdrag_moved := false
+var _tdrag_x := 0.0
+var _tdrag_scroll := 0
 var ui_scale := 1.0
 var res_idx := 1
 var fullscreen := false
@@ -400,10 +404,38 @@ func _tool_button(t: String, key: String) -> Button:
 	b.add_theme_stylebox_override("pressed", _styles.tool_sel)
 	b.set_meta("key", key)
 	b.tooltip_text = _tooltip(t)
-	b.pressed.connect(func(): world.select_tool(t))
+	b.pressed.connect(func(): _pick_tool(t))
+	# пальцем по кнопкам можно листать панель — кнопка сама забирает касание у прокрутки
+	b.gui_input.connect(_on_tools_drag)
 	tool_buttons[t] = b
 	_update_tool_button(t)
 	return b
+
+
+func _pick_tool(t: String) -> void:
+	# кнопку отпустили после перелистывания — это не выбор постройки
+	if _tdrag_moved:
+		_tdrag_moved = false
+		return
+	world.select_tool(t)
+
+
+func _on_tools_drag(e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if e.pressed:
+			_tdrag_on = true
+			_tdrag_moved = false
+			_tdrag_x = e.global_position.x
+			_tdrag_scroll = tools_scroll.scroll_horizontal
+		else:
+			_tdrag_on = false
+	elif e is InputEventMouseMotion and _tdrag_on:
+		var dx: float = (e.global_position.x - _tdrag_x) / ui_scale
+		if absf(dx) > 8.0:
+			_tdrag_moved = true
+		if _tdrag_moved:
+			tools_scroll.scroll_horizontal = int(_tdrag_scroll - dx)
+			hide_tooltip()
 
 
 func _tooltip(t: String) -> String:
