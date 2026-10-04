@@ -57,6 +57,12 @@ jobs:
           ~/godot/godot --headless --path . --export-release "Web" build/web/index.html
           test -f build/web/index.wasm
 
+      - name: Метка версии, чтобы браузер не брал старую игру из кэша
+        run: |
+          v=${GITHUB_SHA::8}
+          sed -i "s/\"executable\":\"index\",/\"executable\":\"index\",\"mainPack\":\"index.pck?v=$v\",/; s/\"fileSizes\":{\"index.pck\":/\"fileSizes\":{\"index.pck?v=$v\":/" build/web/index.html
+          grep -q "index.pck?v=$v" build/web/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web

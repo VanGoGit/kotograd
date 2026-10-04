@@ -329,6 +329,15 @@ func _update_train(tr: Dictionary, dt: float) -> void:
 		tr.dwell = 2.0
 		return
 	var route: Array = tr.route
+	# впереди переезд, а на нём машина — поезд ждёт, пока она проедет
+	for ahead in range(1, 3):
+		var ti: int = tr.k + ahead
+		if ti >= route.size():
+			break
+		var at: Vector2i = route[ti]
+		var ai: int = at.y * W + at.x
+		if world.crossings.has(ai) and _car_on(at):
+			return
 	var pos: float = tr.k + tr.prog
 	var remaining: float = route.size() - 1 - pos
 	# плавный разгон и торможение у платформ
@@ -463,6 +472,27 @@ func train_segments(tr: Dictionary) -> Array:
 	return out
 
 
+## Машина уже въехала на переезд (а не ждёт перед шлагбаумом).
+func _car_on(t: Vector2i) -> bool:
+	for car in world.cars:
+		var r: Array = car.route
+		if car.k < r.size() and r[car.k] == t:
+			return true
+	return false
+
+
+## Поезд рядом с клеткой — котикам на рельсы пока нельзя.
+func train_near(t: Vector2i) -> bool:
+	var cpos := Vector2(t.x * T + 8.0, t.y * T + 8.0)
+	for tr in trains:
+		if Vector2(tr.hx, tr.hy).distance_to(cpos) > 90.0:
+			continue
+		for sg in train_segments(tr):
+			if (sg[0] as Vector2).distance_to(cpos) < 30.0:
+				return true
+	return false
+
+
 func _update_crossings() -> void:
 	var was := closed
 	closed = {}
@@ -472,7 +502,8 @@ func _update_crossings() -> void:
 			if Vector2(tr.hx, tr.hy).distance_to(cpos) > 90.0:
 				continue
 			for sg in train_segments(tr):
-				if (sg[0] as Vector2).distance_to(cpos) < 30.0:
+				# шлагбаум закрывается заранее, пока поезд ещё на подходе
+				if (sg[0] as Vector2).distance_to(cpos) < 48.0:
 					closed[i] = true
 					break
 			if closed.has(i):

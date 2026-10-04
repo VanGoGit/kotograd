@@ -1593,6 +1593,9 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 				_go_to(c, d)
 		"walk":
 			var tgt: Vector2i = c.path[c.pi]
+			# перед рельсами ждём, пока проедет поезд
+			if is_rail(tgt.x, tgt.y) and not is_rail(roundi(c.x), roundi(c.y)) and transit.train_near(tgt):
+				return
 			var dx: float = tgt.x - c.x
 			var dy: float = tgt.y - c.y
 			var dist := sqrt(dx * dx + dy * dy)
