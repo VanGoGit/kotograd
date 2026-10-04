@@ -67,6 +67,7 @@ var pairs := {}              # объединённые соседние зда�
 var ramps: Array = []
 var _light_clock := 0.0
 const LIGHT_CYCLE := 9.0
+const FLAT := ["parking", "tennis", "volleyball", "skatepark", "helipad"]
 
 # --- производное / временное ---
 var stats := {}
@@ -238,11 +239,47 @@ func import_save(text: String) -> bool:
 	return true
 
 
+## Сохранение с прежней маленькой карты: город переезжает в центр большой.
+func _migrate_small(d: Dictionary) -> void:
+	var ox: int = (W - D.OLD_W) / 2
+	var oy: int = (H - D.OLD_H) / 2
+	var remap := func(i) -> int:
+		var ii := int(i)
+		if ii < 0:
+			return ii
+		return (ii / D.OLD_W + oy) * W + (ii % D.OLD_W + ox)
+	var t: Array = []
+	t.resize(W * H)
+	t.fill(WATER)
+	for y in D.OLD_H:
+		for x in D.OLD_W:
+			t[(y + oy) * W + x + ox] = d.terrain[y * D.OLD_W + x]
+	d.terrain = t
+	for m in d.objs:
+		m[0] = remap.call(m[0])
+	for c in d.cats:
+		for k in ["home", "job", "at", "car_lot", "car_tile"]:
+			if c.has(k):
+				c[k] = remap.call(c[k])
+		for k in ["x", "ax", "lx"]:
+			if c.has(k):
+				c[k] = float(c[k]) + ox
+		for k in ["y", "ay", "ly"]:
+			if c.has(k):
+				c[k] = float(c[k]) + oy
+	if d.has("cam"):
+		d.cam = [float(d.cam[0]) + ox * T, float(d.cam[1]) + oy * T, d.cam[2]]
+
+
 func deserialize(text: String) -> bool:
 	var d = JSON.parse_string(text)
 	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != 5:
 		return false
-	if not d.has("terrain") or d.terrain.size() != W * H:
+	if not d.has("terrain"):
+		return false
+	if d.terrain.size() == D.OLD_W * D.OLD_H:
+		_migrate_small(d)
+	if d.terrain.size() != W * H:
 		return false
 	map_seed = int(d.seed)
 	terrain = PackedByteArray(d.terrain)
@@ -318,24 +355,24 @@ func _gen_map(s: int) -> void:
 	# маленький островок посреди океана — дальше остров расширяет сам игрок
 	for y in H:
 		for x in W:
-			var d := pow((x + 0.5 - cx) / 12.5, 2.0) + pow((y + 0.5 - cy) / 8.5, 2.0)
+			var d := pow((x + 0.5 - cx) / 28.0, 2.0) + pow((y + 0.5 - cy) / 19.0, 2.0)
 			d += (hashf(x, y, sm) - 0.5) * 0.25
 			if d < 1.0:
 				terrain[y * W + x] = SAND if d > 0.7 else GRASS
-				var hd := pow((x + 0.5 - cx - 6.0) / 3.2, 2.0) + pow((y + 0.5 - cy + 2.5) / 2.2, 2.0)
+				var hd := pow((x + 0.5 - cx - 13.0) / 7.0, 2.0) + pow((y + 0.5 - cy + 5.5) / 5.0, 2.0)
 				if hd < 1.0 and d < 0.5:
 					terrain[y * W + x] = HILL
 	var spots := []
 	for y in H:
 		for x in W:
-			if terrain[y * W + x] != WATER and Vector2(x + 0.5 - cx, y + 0.5 - cy).length() > 5.5:
+			if terrain[y * W + x] != WATER and Vector2(x + 0.5 - cx, y + 0.5 - cy).length() > 8.0:
 				spots.append(Vector2i(x, y))
 	spots.shuffle()
 	var n := 0
 	for p in spots:
-		if n >= 18:
+		if n >= 80:
 			break
-		var t := "wildpalm" if n < 12 else ("agave" if n < 16 else "rock")
+		var t := "wildpalm" if n < 54 else ("agave" if n < 70 else "rock")
 		if t == "rock" and terrain[p.y * W + p.x] != SAND:
 			continue
 		place_obj(p.y * W + p.x, t, rng.randi() % 3, 0.0)
@@ -1007,25 +1044,26 @@ func _desired(c: Dictionary) -> Dictionary:
 	if c.job >= 0 and is_ready(c.job) and h >= c.work_at and h < c.off:
 		return _maybe_transit(c, {"kind": "work", "b": c.job})
 	var pl = c.plan
-	if pl != null and ah < pl.until and pl.until - ah < 2.0 and (not pl.has("b") or is_ready(pl.b)):
+	if pl != null and ah < pl.until and pl.until - ah < 3.0 and (not pl.has("b") or is_ready(pl.b)):
 		return pl
 	var p = null
+	# у котика есть дела: сходить в кафе или магазин, прогуляться к красивому месту, съездить в другой район
 	var r := randf()
-	if r < 0.35:
+	if r < 0.45:
 		var l := _pick_leisure(c)
 		if l >= 0:
 			p = {"kind": "visit", "b": l}
-	elif r < 0.6:
+	elif r < 0.7:
 		var s = _pick_stroll(c)
 		if s != null:
 			p = {"kind": "stroll", "tx": s.x, "ty": s.y, "sb": s.b}
-	elif r < 0.68 and transit.hubs.size() >= 2:
+	elif r < 0.76 and transit.hubs.size() >= 2:
 		p = _leisure_trip(c)
-	elif r < 0.8 and not homeless:
+	elif r < 0.92 and not homeless:
 		p = _maybe_transit(c, {"kind": "home", "b": c.home})
 	if p == null:
 		p = {"kind": "wander"}
-	p["until"] = ah + randf_range(0.6, 1.6)
+	p["until"] = ah + randf_range(1.0, 2.5)
 	c.plan = p
 	return p
 
@@ -1440,9 +1478,13 @@ func _go_to(c: Dictionary, d: Dictionary, allow_car := true) -> void:
 		c.fail_until = ah + 0.6
 		c.state = "idle"
 		c.timer = 0.5
-		if is_night():
-			c.state = "sleep"
-			c.timer = randf_range(10, 20)
+		# домой пешком не дойти — после пары попыток котик вызывает такси, а не спит на улице
+		if kind == "home" and is_ready(d.b):
+			c["home_fails"] = int(c.get("home_fails", 0)) + 1
+			if c.home_fails >= 2:
+				c.home_fails = 0
+				float_text(cat_pos(c) + Vector2(0, -14), tr("Такси!"), Color("c8a020"))
+				_enter(c, d.b)
 		return
 	c.path = path
 	c.pi = 0
@@ -1491,6 +1533,8 @@ func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
 			w *= 0.6
 		if c.lx == o.x and c.ly == o.y:
 			w *= 0.25
+		if _standing_at(o.x, o.y, c):
+			w *= 0.05
 		if da > rad and Vector2(o).distance_to(anchor) < da:
 			w *= 4.0
 		total += w
@@ -1508,6 +1552,16 @@ func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
 	c.pi = 0
 	c.dest = {"kind": "wander"}
 	c.state = "walk"
+
+
+## Стоит или спит ли на клетке другой котик (проходить мимо можно, стоять вдвоём — нет).
+func _standing_at(x: int, y: int, me: Dictionary) -> bool:
+	for o in cats:
+		if is_same(o, me) or (o.state != "idle" and o.state != "sleep"):
+			continue
+		if roundi(o.x) == x and roundi(o.y) == y:
+			return true
+	return false
 
 
 func _walk_done(c: Dictionary) -> void:
@@ -1530,14 +1584,19 @@ func _walk_done(c: Dictionary) -> void:
 			return
 	var o = obj_at(roundi(c.x), roundi(c.y))
 	c.state = "idle"
-	if o != null and o.t == "cushion" and randf() < 0.6:
+	var daytime := hour() >= 9.0 and hour() < 18.0
+	if o != null and o.t == "cushion" and daytime and randf() < 0.6:
 		c.state = "sleep"
 		c.timer = randf_range(8, 16)
 		return
-	if o != null and o.t == "bench" and randf() < 0.6:
+	if o != null and o.t == "bench" and daytime and randf() < 0.6:
 		c.timer = randf_range(4, 9)
 		return
 	c.timer = randf_range(1.2, 3.5) if randf() < 0.22 else 0.0
+	# на этой клетке уже кто-то стоит — отойти на соседнюю свободную
+	if _standing_at(roundi(c.x), roundi(c.y), c):
+		c.timer = 0.0
+		_wander_step(c, Vector2(c.x, c.y), 1.0)
 
 
 func _update_cat(c: Dictionary, dt: float) -> void:
@@ -1688,16 +1747,18 @@ func _traffic(car: Dictionary) -> int:
 	var fwd_v: Vector2 = DIR_VEC[car.dir]
 	var me := Vector2(car.bx, car.by)
 	var hw: bool = car.get("hw", false)
+	var my_p := Vector2(car.px, car.py)
 	for o in cars:
-		if is_same(o, car) or o.dir != car.dir:
+		if is_same(o, car):
 			continue
 		# на магистрали мешает только машина в своей полосе
 		if hw and o.get("hw", false) and o.get("lane", 0) != car.get("lane", 0):
 			continue
-		var rel := Vector2(o.bx, o.by) - me
+		# любая машина прямо впереди в моей полосе (в том числе поворачивающая) — ждём
+		var rel := Vector2(o.px, o.py) - my_p
 		var fwd := rel.dot(fwd_v)
 		var side := absf(rel.dot(Vector2(fwd_v.y, fwd_v.x)))
-		if fwd > 0.5 and fwd < 12.0 and side < 4.0:
+		if fwd > 0.5 and fwd < 11.0 and side < 3.5:
 			if hw and _lane_free(car, 1 - int(car.get("lane", 0))):
 				car["lane"] = 1 - int(car.get("lane", 0))
 				return 0
@@ -1783,7 +1844,8 @@ func _update_cars(dt: float) -> void:
 		car["red"] = false
 		var tr := _traffic(car)
 		car["passing"] = tr == 1
-		if tr == 2 and car.get("wait", 0.0) < 6.0:
+		# ждём, пока впереди освободится (сквозь машины не проезжаем; 30 с — аварийный выход из затора)
+		if tr == 2 and car.get("wait", 0.0) < 30.0:
 			car["wait"] = car.get("wait", 0.0) + dt
 			if car.wait > 4.0 and randf() < dt * 0.25:
 				float_text(Vector2(car.px, car.py - 10), tr("Би-бип!"), Color("6a6478"))
@@ -2988,7 +3050,8 @@ func _draw() -> void:
 			var i := y * W + x
 			var o = objs[i]
 			if o != null and o.i == i and o.t != "path" and o.t != "road" and pairs.get(i, "") != "R":
-				list.append([(y + o.w) * T, 0, o, x, y])
+				# плоские постройки (парковки, корты) — часть земли: котики и машины поверх них
+				list.append([(y * T - 8.0) if FLAT.has(o.t) else float((y + o.w) * T), 0, o, x, y])
 	for c in cats:
 		if c.state == "in" or c.state == "drive" or c.state == "ride":
 			continue

@@ -1577,7 +1577,7 @@ func _build_celebrate() -> void:
 		r.texture = Spr.scaled(spr.cat_set(pair[0], pair[1]).stand[0], 4)
 		cats.add_child(r)
 	vb.add_child(cats)
-	var txt := _label("Все шесть чудес света построены, и о вашем городе знает всё побережье. Котики устраивают в вашу честь большой салют!\n\nВсе задания выполнены, но город можно строить и дальше: ищите новые достижения и праздники.")
+	var txt := _label("Все чудеса света построены, и о вашем городе знает всё побережье. Котики устраивают в вашу честь большой салют!\n\nВсе задания выполнены, но город можно строить и дальше: ищите новые достижения и праздники.")
 	txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(txt)
 	var ok := _btn("Ура!", func(): close_modals())

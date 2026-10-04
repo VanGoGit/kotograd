@@ -1139,6 +1139,77 @@ func _make_more() -> void:
 		p.win(10, 30, 12, 3, "fff1b0")
 		p.R(14, 31, 4, 3, "6a6478")
 	)
+	bld("urban_light", 32, 30, func(p: Painter) -> void:
+		p.R(1, 24, 30, 5, "d8d4e4"); p.R(1, 24, 30, 1, "e8e6f0")
+		# ряды старинных фонарей
+		for row in 3:
+			for col in 6:
+				var x := 3 + col * 5 + (row % 2)
+				var y := 6 + row * 6
+				p.R(x, y, 1, 22 - row * 6, "6a6478")
+				p.R(x - 1, y - 2, 3, 2, "8a8fa0")
+				p.P(x, y - 3, "fff6c2")
+				p.wins.append(Rect2i(x - 1, y - 2, 3, 2))
+	)
+	bld("bowl", 32, 36, func(p: Painter) -> void:
+		p.C(16, 44, 22, "8fae68"); p.C(16, 44, 20, "a3c27a")
+		# концентрические арки «ракушки»
+		var arcs := [[13, "ffffff"], [11, "e6e8f0"], [9, "ffffff"], [7, "e6e8f0"], [5, "fff6e0"]]
+		for a in arcs:
+			p.C(16, 22, a[0], a[1])
+		p.R(2, 22, 28, 14, "ffffff00")
+		p.R(3, 22, 26, 3, "c8a070"); p.R(3, 22, 26, 1, "e0b888")
+		# ряды зрителей
+		for k in 4:
+			p.R(4 - k, 26 + k * 2, 24 + k * 2, 1, "5b8de4" if k % 2 == 0 else "4a7ac8")
+		p.wins.append(Rect2i(11, 18, 10, 3))
+	)
+	bld("chinese", 32, 40, func(p: Painter) -> void:
+		p.R(1, 34, 30, 4, "e8dcc4"); p.R(1, 34, 30, 1, "f4ead8")
+		p.R(5, 20, 22, 14, "c8323a")
+		for x in [6, 12, 19, 25]:
+			p.R(x, 20, 1, 14, "8a1e26")
+		p.R(13, 26, 6, 8, "ffd23f"); p.R(14, 27, 4, 7, "c89a28")
+		# многоярусная крыша-пагода с загнутыми краями
+		p.R(2, 16, 28, 3, "2f8a6a"); p.P(1, 15, "2f8a6a"); p.P(30, 15, "2f8a6a")
+		p.R(6, 10, 20, 3, "2f8a6a"); p.P(5, 9, "2f8a6a"); p.P(26, 9, "2f8a6a")
+		p.R(7, 13, 18, 3, "c8323a")
+		p.R(10, 5, 12, 3, "2f8a6a"); p.P(9, 4, "2f8a6a"); p.P(22, 4, "2f8a6a")
+		p.R(11, 8, 10, 2, "c8323a")
+		p.R(15, 1, 2, 4, "ffd23f")
+		# отпечатки лапок у входа
+		for x in [4, 8, 22, 26]:
+			p.P(x, 36, "8a6a48")
+		p.wins.append(Rect2i(8, 22, 3, 3)); p.wins.append(Rect2i(21, 22, 3, 3))
+	)
+	bld("capitol", 32, 46, func(p: Painter) -> void:
+		p.R(2, 40, 28, 5, "d8d4e4")
+		# круглая башня — стопка «пластинок»
+		for i in 10:
+			var y := 10 + i * 3
+			p.R(9, y, 14, 2, "f4f4f8")
+			p.R(8, y + 2, 16, 1, "3b3b4a")
+			p.wins.append(Rect2i(10, y, 3, 1)); p.wins.append(Rect2i(19, y, 3, 1))
+		p.R(9, 40, 14, 1, "3b3b4a")
+		# шпиль-игла с красным огоньком
+		p.R(15, 1, 2, 9, "8a8fa0"); p.P(15, 0, "ff4a4a")
+		p.wins.append(Rect2i(15, 0, 1, 1))
+		p.R(14, 34, 4, 6, "8a5a3b")
+	)
+	bld("getty", 32, 36, func(p: Painter) -> void:
+		p.C(16, 44, 22, "8fae68"); p.C(16, 44, 20, "a3c27a")
+		# белые травертиновые корпуса и круглый павильон
+		p.R(2, 16, 12, 12, "f4efe6"); p.R(2, 16, 12, 1, "ffffff")
+		p.R(16, 12, 14, 16, "efe8da"); p.R(16, 12, 14, 1, "ffffff")
+		p.C(14, 20, 5, "fbf8f0"); p.R(9, 20, 10, 8, "fbf8f0")
+		for x in [4, 8, 18, 22, 26]:
+			p.win(x, 19, 2, 6)
+		p.R(12, 23, 4, 5, "8a6a48")
+		# сады
+		for x in [3, 7, 25, 28]:
+			p.C(x, 30, 1.8, "5fae73")
+		p.R(1, 28, 30, 2, "d8d0c4")
+	)
 	bld("stadium", 32, 34, func(p: Painter) -> void:
 		for y in range(6, 32):
 			var t := (y - 19.0) / 13.0

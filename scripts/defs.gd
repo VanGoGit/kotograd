@@ -1,8 +1,11 @@
 extends RefCounted
 ## Все игровые данные: постройки, профессии, окрасы и имена котиков.
 
-const W := 56
-const H := 40
+# карта: в 5 раз больше прежней (56×40)
+const W := 126
+const H := 90
+const OLD_W := 56
+const OLD_H := 40
 const T := 16
 
 const DEFS := {
@@ -24,10 +27,10 @@ const DEFS := {
 	"airport": {"name": "Аэропорт", "cost": 450, "unlock": 25, "size": 3, "jobs": 8, "job": "pilot", "hub": "air", "shop": 1.2, "tourism": 1.5, "build": 20.0, "look": {"wall": "e8eef4", "roof": "flat", "rc": "9aa6b8", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "sign": "plane", "sc": "3d5a98", "fg": "ffffff", "h": 30, "extra": ["tower"]}, "desc": "Самолёты летают в другие аэропорты вашего города. Нужно хотя бы два аэропорта — иначе лететь некуда. Отлично связывает дальние острова!"},
 	"path": {"name": "Тротуар", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Пешеходная дорожка: по ней котики ходят быстрее."},
 
-	"house": {"name": "Домик", "cost": 30, "unlock": 0, "cap": 4, "build": 4.0, "up": [25, 50], "desc": "Домик с ушками на крыше. Живут 4 котика."},
-	"cottage": {"name": "Коттедж", "cost": 80, "unlock": 8, "size": 2, "cap": 8, "build": 9.0, "up": [60, 120], "desc": "Большой семейный дом с садиком. Живут 8 котиков."},
-	"villa": {"name": "Вилла с бассейном", "cost": 140, "unlock": 14, "size": 2, "cap": 6, "happy": 6, "radius": 3, "build": 10.0, "up": [100, 200], "desc": "Белая вилла в калифорнийском стиле. Бассейн, шезлонги и вид на океан."},
-	"apartments": {"name": "Многоэтажка", "cost": 200, "unlock": 20, "size": 2, "cap": 16, "build": 14.0, "up": [150, 300], "desc": "Многоквартирный дом с балкончиками. Живут 16 котиков."},
+	"house": {"name": "Домик", "cost": 30, "unlock": 0, "cap": 3, "build": 4.0, "up": [25, 50], "desc": "Домик с ушками на крыше. Живут 3 котика."},
+	"cottage": {"name": "Коттедж", "cost": 80, "unlock": 8, "size": 2, "cap": 5, "build": 9.0, "up": [60, 120], "desc": "Большой семейный дом с садиком. Живут 5 котиков."},
+	"villa": {"name": "Вилла с бассейном", "cost": 140, "unlock": 14, "size": 2, "cap": 4, "happy": 6, "radius": 3, "build": 10.0, "up": [100, 200], "desc": "Белая вилла в калифорнийском стиле. Бассейн, шезлонги и вид на океан."},
+	"apartments": {"name": "Многоэтажка", "cost": 200, "unlock": 20, "size": 2, "cap": 11, "build": 14.0, "up": [150, 300], "desc": "Многоквартирный дом с балкончиками. Живут 11 котиков."},
 
 	"pier": {"name": "Рыбный причал", "cost": 25, "unlock": 0, "jobs": 2, "job": "fisher", "food": 0.3, "food_per": 0.25, "need_water": true, "build": 3.0, "up": [20, 40], "store_food": 40, "desc": "Ставится у воды. Рыбаки ловят рыбку для всего города."},
 	"shop": {"name": "Магазин", "cost": 40, "unlock": 2, "jobs": 2, "job": "seller", "shop": 0.5, "leisure": true, "build": 4.0, "up": [30, 60], "desc": "Магазин клубков и всякой всячины. Котики заходят за покупками."},
@@ -76,13 +79,18 @@ const DEFS := {
 	"observatory": {"name": "Обсерватория Гриффит", "cost": 380, "unlock": 22, "size": 2, "wonder": true, "tourism": 3.5, "happy": 28, "radius": 10, "stroll": true, "build": 18.0, "desc": "Белые купола на холме. Отсюда котики смотрят на звёзды и огни города."},
 	"concert": {"name": "Концертный зал Диснейя", "cost": 420, "unlock": 26, "size": 2, "wonder": true, "tourism": 4.0, "happy": 30, "radius": 10, "stroll": true, "build": 18.0, "desc": "Серебряные паруса из стали. Здесь играет кошачий симфонический оркестр."},
 	"stadium": {"name": "Стадион «Котоджерс»", "cost": 480, "unlock": 30, "size": 2, "wonder": true, "tourism": 5.0, "happy": 30, "radius": 11, "stroll": true, "build": 20.0, "desc": "Бейсбол, хот-доги и волна на трибунах. Весь город болеет за своих!"},
+	"urban_light": {"name": "Городские огни", "cost": 260, "unlock": 16, "size": 2, "wonder": true, "tourism": 2.5, "happy": 25, "radius": 9, "stroll": true, "walk": true, "build": 12.0, "desc": "Роща из старинных уличных фонарей. Вечером здесь все делают фото!"},
+	"bowl": {"name": "Голливуд-Боул", "cost": 300, "unlock": 20, "size": 2, "wonder": true, "tourism": 3.0, "happy": 28, "radius": 10, "stroll": true, "build": 16.0, "desc": "Концертная «ракушка» под открытым небом на склоне холма."},
+	"chinese": {"name": "Китайский кинотеатр Мяуманна", "cost": 350, "unlock": 24, "size": 2, "wonder": true, "tourism": 3.5, "happy": 28, "radius": 10, "stroll": true, "build": 16.0, "desc": "Кинотеатр-пагода, а у входа — отпечатки лапок кинозвёзд."},
+	"capitol": {"name": "Башня Кэпитол-Мурекордс", "cost": 400, "unlock": 28, "size": 2, "wonder": true, "tourism": 4.0, "happy": 30, "radius": 10, "stroll": true, "build": 18.0, "desc": "Круглая башня звукозаписи, похожая на стопку пластинок с иглой."},
+	"getty": {"name": "Центр Гетти", "cost": 450, "unlock": 32, "size": 2, "wonder": true, "tourism": 4.5, "happy": 32, "radius": 10, "stroll": true, "need_high": true, "build": 20.0, "desc": "Белый музей на вершине холма с садами и видом на океан. Строится только на холмах и в горах."},
 	"tower": {"name": "Кошачья башня", "cost": 600, "unlock": 36, "wonder": true, "tourism": 6.0, "happy": 35, "radius": 9, "stroll": true, "build": 20.0, "desc": "Величайшая когтеточка мира — гордость Котограда!"},
 
-	"trailer": {"name": "Трейлер", "cost": 18, "unlock": 0, "cap": 2, "build": 2.0, "look": {"wall": "d8dce4", "roof": "none", "rc": "8a8fb0", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 16, "extra": ["trailer"]}, "desc": "Серебристый трейлер с гирляндой. Живут 2 котика."},
-	"bungalow": {"name": "Пляжное бунгало", "cost": 40, "unlock": 3, "cap": 3, "happy": 2, "radius": 2, "build": 4.0, "up": [30, 60], "look": {"wall": "f2e6cc", "roof": "gable", "rc": "5fbfb0", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 24, "extra": ["porch"]}, "desc": "Домик на пляже с верандой. Живут 3 котика."},
-	"townhouse": {"name": "Таунхаус", "cost": 55, "unlock": 6, "cap": 5, "build": 5.0, "up": [40, 80], "look": {"wall": "f7c6a8", "roof": "gable", "rc": "8a5a6a", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 28}, "desc": "Узкие разноцветные дома в ряд. Живут 5 котиков."},
-	"mansion": {"name": "Особняк на холмах", "cost": 160, "unlock": 12, "size": 2, "cap": 6, "happy": 8, "radius": 3, "need_high": true, "build": 10.0, "up": [120, 240], "look": {"wall": "fbfbf8", "roof": "flat", "rc": "c9a77a", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 40, "extra": ["pool", "palm"]}, "desc": "Роскошный особняк с видом на город. Строится только на холмах и в горах! Живут 6 котиков."},
-	"condo": {"name": "Жилая башня", "cost": 280, "unlock": 24, "size": 2, "cap": 24, "build": 18.0, "up": [200, 400], "look": {"wall": "a8c4e0", "roof": "flat", "rc": "6a7f9a", "win": "glass", "wc": "cfe6f7", "door": "8a5a3b", "h": 62, "extra": ["antenna"]}, "desc": "Стеклянный небоскрёб в Даунтауне. Живут 24 котика."},
+	"trailer": {"name": "Трейлер", "cost": 18, "unlock": 0, "cap": 1, "build": 2.0, "look": {"wall": "d8dce4", "roof": "none", "rc": "8a8fb0", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 16, "extra": ["trailer"]}, "desc": "Серебристый трейлер с гирляндой. Живёт 1 котик."},
+	"bungalow": {"name": "Пляжное бунгало", "cost": 40, "unlock": 3, "cap": 2, "happy": 2, "radius": 2, "build": 4.0, "up": [30, 60], "look": {"wall": "f2e6cc", "roof": "gable", "rc": "5fbfb0", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 24, "extra": ["porch"]}, "desc": "Домик на пляже с верандой. Живут 2 котика."},
+	"townhouse": {"name": "Таунхаус", "cost": 55, "unlock": 6, "cap": 3, "build": 5.0, "up": [40, 80], "look": {"wall": "f7c6a8", "roof": "gable", "rc": "8a5a6a", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "h": 28}, "desc": "Узкие разноцветные дома в ряд. Живут 3 котика."},
+	"mansion": {"name": "Особняк на холмах", "cost": 160, "unlock": 12, "size": 2, "cap": 4, "happy": 8, "radius": 3, "need_high": true, "build": 10.0, "up": [120, 240], "look": {"wall": "fbfbf8", "roof": "flat", "rc": "c9a77a", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 40, "extra": ["pool", "palm"]}, "desc": "Роскошный особняк с видом на город. Строится только на холмах и в горах! Живут 4 котика."},
+	"condo": {"name": "Жилая башня", "cost": 280, "unlock": 24, "size": 2, "cap": 16, "build": 18.0, "up": [200, 400], "look": {"wall": "a8c4e0", "roof": "flat", "rc": "6a7f9a", "win": "glass", "wc": "cfe6f7", "door": "8a5a3b", "h": 62, "extra": ["antenna"]}, "desc": "Стеклянный небоскрёб в Даунтауне. Живут 16 котиков."},
 	"techstore": {"name": "Магазин техники", "cost": 70, "unlock": 6, "jobs": 2, "job": "techseller", "shop": 0.8, "leisure": true, "build": 5.0, "up": [60, 120], "look": {"wall": "e8eef6", "roof": "flat", "rc": "3d5a98", "win": "shop", "wc": "cfe6f7", "door": "8a5a3b", "sign": "tv", "sc": "5b8de4", "fg": "ffffff", "h": 24}, "desc": "Ноутбуки, телефоны и игровые приставки."},
 	"boutique": {"name": "Бутик", "cost": 60, "unlock": 5, "jobs": 2, "job": "stylist", "shop": 0.8, "leisure": true, "build": 4.0, "look": {"wall": "f6e8f0", "roof": "awning", "rc": "2b2b3a", "win": "shop", "wc": "9fd3e6", "door": "8a5a3b", "sign": "shirt", "sc": "2b2b3a", "fg": "ffd23f", "h": 24, "awn": "2b2b3a"}, "desc": "Модная одежда с Родео-драйв."},
 	"bookstore": {"name": "Книжный магазин", "cost": 45, "unlock": 4, "jobs": 2, "job": "bookseller", "shop": 0.5, "leisure": true, "build": 4.0, "look": {"wall": "c9a77a", "roof": "awning", "rc": "3b7a4a", "win": "shop", "wc": "9fd3e6", "door": "8a5a3b", "sign": "book", "sc": "fff4e0", "fg": "8a5a3b", "h": 24, "awn": "3b7a4a"}, "desc": "Книги, комиксы и уютное кресло."},
@@ -172,7 +180,7 @@ const TABS := [
 	{"name": "Город", "icon": "townhall", "tools": ["townhall", "lifeguard", "post", "school", "police", "hospital", "fire", "library", "courthouse", "kindergarten", "university", "lab", "metro", "busstation", "taxidepot", "helipad"]},
 	{"name": "Отдых", "icon": "umbrella", "tools": ["umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "playground", "surf", "skatepark", "tennis", "volleyball", "arcade", "bowling", "nightclub", "aquarium", "zoo", "museum", "gallery"]},
 	{"name": "Природа", "icon": "palm", "tools": ["flowers", "palm", "jacaranda", "statue", "billboard", "watertower"]},
-	{"name": "Чудеса", "icon": "observatory", "tools": ["sign", "pier_wheel", "observatory", "concert", "stadium", "tower"]},
+	{"name": "Чудеса", "icon": "observatory", "tools": ["sign", "urban_light", "pier_wheel", "bowl", "observatory", "chinese", "concert", "capitol", "stadium", "getty", "tower"]},
 ]
 
 const TOOL_INFO := {
