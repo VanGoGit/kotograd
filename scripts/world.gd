@@ -3141,6 +3141,8 @@ func _draw() -> void:
 			if o != null and o.i == i and o.t != "path" and o.t != "road" and pairs.get(i, "") != "R":
 				# плоские постройки (парковки, корты) — часть земли: котики и машины поверх них
 				list.append([(y * T - 8.0) if FLAT.has(o.t) else float((y + o.w) * T), 0, o, x, y])
+				if SCENES.has(o.t) and _scene_on(o, h):
+					list.append([float((y + o.w) * T) + 2.0, 5, o])
 	for c in cats:
 		if c.state == "in" or c.state == "drive" or c.state == "ride":
 			continue
@@ -3175,6 +3177,8 @@ func _draw() -> void:
 				_draw_visitor(it[2])
 			4:
 				transit.draw_segment(it[2])
+			5:
+				_draw_scene(it[2])
 
 	_draw_bunting()
 	_draw_traffic_lights(v)
@@ -3414,6 +3418,153 @@ func _draw_driveways(v: Array) -> void:
 			var tip := c - fd * 1.0
 			for q in [tip, tip + fd + side, tip + fd - side, tip + fd * 2.0 + side * 2.0, tip + fd * 2.0 - side * 2.0, tip + fd * 2.0, tip + fd * 3.0]:
 				draw_rect(Rect2(q, Vector2.ONE), arrow)
+
+
+# ---------- сценки у построек ----------
+const SCENES := ["tennis", "volleyball", "skatepark", "playground", "umbrella", "fountain", "icecream", "cafe", "boba", "juicebar", "pier", "surf"]
+const SIT_OUTSIDE := ["cafe", "boba", "juicebar"]
+
+
+func _scene_on(o: Dictionary, h: float) -> bool:
+	if o.build > 0.0 or h < 8.0 or h > (21.5 if SIT_OUTSIDE.has(o.t) else 19.5):
+		return false
+	var d := D.def(o.t)
+	return not d.has("jobs") or not workers.get(o.i, []).is_empty()
+
+
+func _free_tile(x: int, y: int) -> bool:
+	return in_map(x, y) and objs[y * W + x] == null and terrain[y * W + x] != WATER
+
+
+func _scene_cat(k: int, i: int, outfit: String, feet: Vector2, face: int, frame := "stand", bob := 0) -> void:
+	var keys: Array = D.CAT_COLORS.keys()
+	var fs: Dictionary = spr.cat_set(keys[(i * 7 + k * 13) % keys.size()], outfit)
+	var tx: Texture2D = fs[frame][1 if face < 0 else 0]
+	var pos := Vector2(roundi(feet.x - tx.get_width() / 2.0), roundi(feet.y - tx.get_height() + bob))
+	draw_rect(Rect2(pos.x + 1, feet.y - 1, tx.get_width() - 2, 1), Color(0.157, 0.118, 0.196, 0.2))
+	draw_texture(tx, pos)
+
+
+func _draw_scene(o: Dictionary) -> void:
+	var bx := float(o.i % W * T)
+	var by := float(o.i / W * T)
+	var t := anim_time + hashf(o.i, 3) * 10.0
+	var i: int = o.i
+	match o.t:
+		"tennis":
+			# двое перекидывают мячик через сетку
+			var cyc := fposmod(t * 0.9, 2.0)
+			var k := fposmod(cyc, 1.0)
+			var lr := int(cyc) == 0
+			var bxp := lerpf(bx + 10.0, bx + 22.0, k if lr else 1.0 - k)
+			var byp := by + 22.0 - sin(k * PI) * 8.0
+			_scene_cat(0, i, "trainer", Vector2(bx + 7, by + 27), 1, "walkA" if lr and k < 0.2 else "stand")
+			_scene_cat(1, i, "trainer", Vector2(bx + 25, by + 27), -1, "walkA" if not lr and k < 0.2 else "stand")
+			draw_rect(Rect2(bx + 11, by + 19, 1, 3), Color("8a5a3b"))
+			draw_rect(Rect2(bx + 20, by + 19, 1, 3), Color("8a5a3b"))
+			draw_rect(Rect2(roundi(bxp), by + 26, 2, 1), Color(0.157, 0.118, 0.196, 0.25))
+			draw_rect(Rect2(roundi(bxp), roundi(byp), 2, 2), Color("f2e060"))
+		"volleyball":
+			# по бокам сетки игроки, мяч летает через сетку, бьющий подпрыгивает
+			var cyc := fposmod(t * 0.7, 2.0)
+			var k := fposmod(cyc, 1.0)
+			var lr := int(cyc) == 0
+			var xl := bx - 3.0
+			var xr := bx + 19.0
+			var bxp := lerpf(xl + 3.0, xr - 3.0, k if lr else 1.0 - k)
+			var byp := by + 6.0 - sin(k * PI) * 12.0
+			_scene_cat(0, i, "surfer", Vector2(xl, by + 15), 1, "stand", -2 if lr and k < 0.15 else 0)
+			_scene_cat(1, i, "casual2", Vector2(xr, by + 15), -1, "stand", -2 if not lr and k < 0.15 else 0)
+			draw_rect(Rect2(roundi(bxp), roundi(byp), 2, 2), Color("fff6e0"))
+			draw_rect(Rect2(roundi(bxp), roundi(byp), 1, 1), Color("ff9f43"))
+		"skatepark":
+			# скейтер катается по рампе туда-сюда
+			var k := sin(t * 1.4)
+			var px := bx + 16.0 + k * 10.0
+			var py := by + 27.0 - k * k * 9.0
+			var face := 1 if cos(t * 1.4) > 0.0 else -1
+			_scene_cat(0, i, "casual4", Vector2(px, py - 1), face)
+			draw_rect(Rect2(roundi(px) - 4, roundi(py) - 1, 8, 1), Color("3b3b4a"))
+			draw_rect(Rect2(roundi(px) - 3, roundi(py), 1, 1), Color("ffd23f"))
+			draw_rect(Rect2(roundi(px) + 2, roundi(py), 1, 1), Color("ffd23f"))
+		"playground":
+			# котёнок качается на качелях
+			var pv := Vector2(bx + 9, by + 12)
+			var ang := sin(t * 2.2) * 0.7
+			var seat := pv + Vector2(sin(ang), cos(ang)) * 9.0
+			draw_rect(Rect2(pv.x - 6, pv.y - 1, 13, 1), Color("8a5a3b"))
+			draw_line(pv + Vector2(-2, 0), seat + Vector2(-2, 0), Color("6a6478"), 1.0)
+			draw_line(pv + Vector2(2, 0), seat + Vector2(2, 0), Color("6a6478"), 1.0)
+			_scene_cat(0, i, "casual1", seat + Vector2(0, 2), 1 if cos(t * 2.2) > 0.0 else -1)
+			draw_rect(Rect2(seat.x - 3, seat.y, 6, 1), Color("e45b6b"))
+		"umbrella":
+			# котик загорает на полотенце
+			if hour() < 9.0 or hour() > 18.0:
+				return
+			draw_rect(Rect2(bx + 1, by + 11, 13, 4), Color("ff8fab"))
+			draw_rect(Rect2(bx + 1, by + 12, 13, 1), Color("ffffff"))
+			_scene_cat(0, i, "surfer", Vector2(bx + 8, by + 15), 1, "sleep")
+		"fountain":
+			_scene_cat(0, i, "casual3", Vector2(bx - 3, by + 15), 1)
+		"icecream":
+			# покупатели едят рожки
+			if not _free_tile(o.i % W, o.i / W + 1):
+				return
+			for k in 2:
+				var fx := bx + 4.0 + k * 9.0
+				var fy := by + 30.0 + k
+				_scene_cat(k, i, "casual%d" % ((i + k) % 6), Vector2(fx, fy), 1 if k == 0 else -1)
+				var lick := int(t * 3.0 + k) % 2
+				var cx := fx + (3.0 if k == 0 else -4.0)
+				draw_rect(Rect2(cx, fy - 9 - lick, 2, 3), Color("d8a060"))
+				draw_rect(Rect2(cx, fy - 11 - lick, 2, 2), Color("ff9fc0") if k == 0 else Color("9ed8c8"))
+		"cafe", "boba", "juicebar":
+			# столик на улице: двое болтают, над чашками пар
+			if not _free_tile(o.i % W, o.i / W + 1):
+				return
+			draw_rect(Rect2(bx + 5, by + 22, 7, 2), Color("f4ead8"))
+			draw_rect(Rect2(bx + 8, by + 24, 1, 5), Color("8a5a3b"))
+			draw_rect(Rect2(bx + 6, by + 20, 1, 2), Color("ffffff"))
+			draw_rect(Rect2(bx + 10, by + 20, 1, 2), Color("ffffff") if o.t == "cafe" else Color("c8a8ff"))
+			if o.t == "cafe":
+				for k in 2:
+					var st := fposmod(t * 0.8 + k * 0.5, 1.0)
+					draw_rect(Rect2(bx + 6 + k * 4 + roundi(sin(st * 6.0)), by + 19 - st * 6.0, 1, 1), Color(1, 1, 1, 0.8 * (1.0 - st)))
+			_scene_cat(0, i, "casual%d" % (i % 6), Vector2(bx + 1, by + 30), 1)
+			_scene_cat(1, i, "casual%d" % ((i + 3) % 6), Vector2(bx + 16, by + 30), -1)
+		"pier":
+			# рыбак с удочкой, поплавок качается на воде
+			var wd := Vector2i(0, 0)
+			for dv in DIRS:
+				var nx: int = o.i % W + dv.x
+				var ny: int = o.i / W + dv.y
+				if in_map(nx, ny) and terrain[ny * W + nx] == WATER:
+					wd = dv
+					break
+			if wd == Vector2i(0, 0):
+				return
+			var feet := Vector2(bx + 8, by + 14) + Vector2(wd) * 5.0
+			_scene_cat(0, i, "fisher", feet, 1 if wd.x >= 0 else -1)
+			var tip := feet + Vector2(wd.x * 6 + (3 if wd.x == 0 else 0), -12)
+			draw_line(feet + Vector2(0, -8), tip, Color("8a5a3b"), 1.0)
+			var bob := feet + Vector2(wd) * 12.0 + Vector2(0, 2 + roundi(sin(t * 3.0)))
+			draw_line(tip, bob, Color(1, 1, 1, 0.6), 1.0)
+			draw_rect(Rect2(bob.x, bob.y, 2, 2), Color("e0483a"))
+		"surf":
+			# серфер качается на волне у берега
+			var wd := Vector2i(0, 0)
+			for dv in DIRS:
+				var nx: int = o.i % W + dv.x
+				var ny: int = o.i / W + dv.y
+				if in_map(nx, ny) and terrain[ny * W + nx] == WATER:
+					wd = dv
+					break
+			if wd == Vector2i(0, 0):
+				return
+			var c := Vector2(bx + 8, by + 13) + Vector2(wd) * 16.0 + Vector2(sin(t * 0.5) * 4.0, sin(t * 2.0) * 1.5)
+			draw_rect(Rect2(roundi(c.x) - 5, roundi(c.y), 10, 2), Color("ffd23f"))
+			draw_rect(Rect2(roundi(c.x) - 6, roundi(c.y) + 2, 12, 1), Color(1, 1, 1, 0.7))
+			_scene_cat(0, i, "surfer", c, 1 if wd.x >= 0 else -1)
 
 
 func on_screen(wp: Vector2) -> bool:
