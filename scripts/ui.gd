@@ -496,7 +496,7 @@ func _update_tool_button(t: String) -> void:
 		line2 = tr("нужно %d кот.") % d.unlock
 	elif d.get("wonder", false) and world.wonder_built(t):
 		line2 = tr("построено")
-	elif d.has("terra") or (world.unlimited and d.has("cost")):
+	elif d.has("terra") or d.get("free", false) or (world.unlimited and d.has("cost")):
 		line2 = tr("бесплатно")
 	elif d.has("cost"):
 		line2 = tr("%d мон.") % d.cost

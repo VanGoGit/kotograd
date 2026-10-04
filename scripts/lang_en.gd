@@ -790,4 +790,7 @@ const EN := {
 	"Центр Гетти": "Getty Center",
 	"Белый музей на вершине холма с садами и видом на океан. Строится только на холмах и в горах.": "A white hilltop museum with gardens and an ocean view. Built only on hills and mountains.",
 	"Такси!": "Taxi!",
+	"Одностороннее движение": "One-way street",
+	"Проведите по дороге — она станет односторонней в эту сторону, и машины поедут по ней в две полосы. Нажатие на дорогу меняет направление по кругу, ещё раз — снова двустороннее. Бесплатно.": "Drag along a road to make it one-way in that direction — cars will use both lanes. Clicking a road cycles the direction, and once more makes it two-way again. Free.",
+	"Проведите по обычной дороге": "Drag along a regular road",
 }

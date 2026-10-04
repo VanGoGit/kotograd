@@ -20,6 +20,7 @@ const DEFS := {
 	"parking": {"name": "Парковка", "cost": 10, "unlock": 0, "parking": 4, "walk": true, "up": [10, 20], "desc": "Стоянка на 4 машины у дороги. Котики оставляют здесь машины и идут пешком. Без парковок машины стоят прямо на дорогах — бывают пробки!"},
 	"garage": {"name": "Паркинг", "cost": 90, "unlock": 8, "size": 2, "parking": 20, "build": 8.0, "up": [70, 140], "desc": "Многоэтажный паркинг на 20 машин. Ставьте рядом с офисами и чудесами."},
 	"highway": {"name": "Магистраль", "cost": 6, "unlock": 5, "walk": false, "paint": true, "desc": "Широкое шоссе: по 2 полосы в каждую сторону, машины едут быстрее и обгоняют. Пешеходам сюда нельзя. Дома к магистрали не подключаются — нужна обычная дорога."},
+	"oneway": {"name": "Одностороннее движение", "cost": 0, "free": true, "unlock": 0, "paint": true, "desc": "Проведите по дороге — она станет односторонней в эту сторону, и машины поедут по ней в две полосы. Нажатие на дорогу меняет направление по кругу, ещё раз — снова двустороннее. Бесплатно."},
 	"rail": {"name": "Железная дорога", "cost": 6, "unlock": 6, "walk": true, "paint": true, "desc": "Рельсы для поездов. Поезд сам ходит между вокзалами и платформами одной линии, а котики ездят на нём в другие районы. Через дорогу получится переезд со шлагбаумом, через воду — мост."},
 	"crossing": {"name": "Железнодорожный переезд", "cost": 6, "unlock": 99999, "walk": true, "desc": "Когда идёт поезд, шлагбаум закрывается и машины ждут."},
 	"platform": {"name": "Платформа", "cost": 50, "unlock": 6, "jobs": 1, "job": "conductor", "hub": "rail", "need_rail": true, "build": 4.0, "look": {"wall": "efe6d6", "roof": "shed", "rc": "2f8a4f", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "2f8a4f", "fg": "ffffff", "h": 16}, "desc": "Маленькая остановка поезда. Ставьте вплотную к рельсам."},
@@ -169,7 +170,7 @@ const DEFS := {
 
 const TABS := [
 	{"name": "Рельеф", "icon": "t_grass", "tools": ["t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow"]},
-	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "parking", "garage", "rail", "platform", "station", "airport"]},
+	{"name": "Транспорт", "icon": "road", "tools": ["road", "oneway", "highway", "path", "parking", "garage", "rail", "platform", "station", "airport"]},
 	{"name": "Жильё", "icon": "house", "tools": ["trailer", "house", "bungalow", "townhouse", "cottage", "villa", "mansion", "apartments", "condo"]},
 	{"name": "Магазины", "icon": "shop", "tools": ["shop", "techstore", "boutique", "bookstore", "toystore", "petshop", "florist", "pharmacy", "supermarket", "mall"]},
 	{"name": "Еда", "icon": "sushi", "tools": ["pier", "farm", "bakery", "cafe", "sushi", "pizzeria", "icecream", "burger", "tacotruck", "donut", "boba", "juicebar", "restaurant", "market"]},
@@ -384,7 +385,7 @@ static func def(t: String) -> Dictionary:
 
 
 ## Улучшения есть у всех построек, кроме дорог, природы, мелкого декора и чудес.
-const NO_UPGRADE := ["road", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
+const NO_UPGRADE := ["road", "oneway", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
 	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
 
 

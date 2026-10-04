@@ -108,6 +108,8 @@ var _pan_start := Vector2.ZERO
 var _pan_cam := Vector2.ZERO
 var _painting := false
 var _last_paint := -1
+var _ow_prev := -1               # прошлая клетка, по которой провели «односторонним движением»
+var _cong := {}                  # клетка -> сколько машин там стоит (для объезда пробок)
 var _last_reason_ms := 0
 var mouse_tile := Vector2i(-1, -1)
 var mouse_in := false
@@ -184,7 +186,7 @@ func serialize() -> String:
 	for i in W * H:
 		var o = objs[i]
 		if o != null and o.i == i:
-			mains.append([i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1))])
+			mains.append([i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), int(o.get("ow", -1))])
 	var cat_list := []
 	for c in cats:
 		var k: Dictionary = c.duplicate()
@@ -292,6 +294,8 @@ func deserialize(text: String) -> bool:
 		var o := place_obj(int(m[0]), str(m[1]), int(m[2]), float(m[3]))
 		if m.size() > 4:
 			o["lvl"] = int(m[4])
+		if m.size() > 5 and int(m[5]) >= 0:
+			o["ow"] = int(m[5])
 	coins = float(d.coins)
 	food = float(d.food)
 	time = float(d.time)
@@ -577,7 +581,18 @@ func upgrade_cost(b: int) -> int:
 	var lvl := int(o.get("lvl", 1))
 	if lvl - 1 >= ups.size():
 		return -1
-	return int(ups[lvl - 1])
+	# объединённая пара улучшается целиком — платим за обе половинки
+	return int(ups[lvl - 1]) * (2 if pair_mate(b) >= 0 else 1)
+
+
+## Вторая половинка объединённого здания (или -1).
+func pair_mate(b: int) -> int:
+	match pairs.get(b, ""):
+		"L":
+			return b + 1
+		"R":
+			return b - 1
+	return -1
 
 
 func upgrade(b: int) -> bool:
@@ -590,7 +605,11 @@ func upgrade(b: int) -> bool:
 		return false
 	coins -= cost
 	var o = objs[b]
+	var mate := pair_mate(b)
 	o["lvl"] = int(o.get("lvl", 1)) + 1
+	if mate >= 0 and objs[mate] != null:
+		objs[mate]["lvl"] = o.lvl
+		mark_dirty(mate % W, mate / W, 1)
 	var cp := center_of(b) * T + Vector2(8, 0)
 	for k in 16:
 		add_p({"type": "sparkle", "x": cp.x + randf_range(-12, 12), "y": cp.y + randf_range(-16, 8), "vx": randf_range(-25, 25), "vy": randf_range(-40, -10), "life": randf_range(0.7, 1.4)})
@@ -781,8 +800,10 @@ func light_state(i: int, horizontal: bool) -> int:
 	return 0
 
 
-## Машина перед перекрёстком на красный или перед въездом на магистраль, где едут другие.
+## Машина перед перекрёстком на красный, перед въездом на магистраль, где едут другие,
+## или перед перекрёстком/переездом, за которым нет места («не запирай перекрёсток»).
 func _must_stop(car: Dictionary) -> bool:
+	car["blk"] = null
 	var route: Array = car.route
 	if car.k + 1 >= route.size() or car.prog < 0.4:
 		return false
@@ -790,11 +811,27 @@ func _must_stop(car: Dictionary) -> bool:
 	var b: Vector2i = route[car.k + 1]
 	var ai := a.y * W + a.x
 	var bi := b.y * W + b.x
-	if crossings.has(bi) and not crossings.has(ai) and transit.closed.has(bi):
+	var box := (junctions.has(bi) and not junctions.has(ai)) or (crossings.has(bi) and not crossings.has(ai))
+	# правила перекрёстка — только перед въездом; кто уже внутри, тот освобождает его
+	if box and car.prog >= 0.5:
+		box = false
+	if box and crossings.has(bi) and not crossings.has(ai) and transit.closed.has(bi):
 		return true
-	if junctions.has(bi) and not junctions.has(ai):
+	if box and junctions.has(bi):
 		var stt := light_state(bi, car.dir == "r" or car.dir == "l")
 		if stt == 0 or (stt == 1 and car.prog < 0.7):
+			return true
+		# поперёк перекрёстка ещё кто-то едет — пропускаем
+		var fwd_v: Vector2 = DIR_VEC[car.dir]
+		for o in cars:
+			if not is_same(o, car) and _tile_of(o) == bi and absf((DIR_VEC[o.dir] as Vector2).dot(fwd_v)) < 0.5:
+				car["blk"] = o
+				return true
+	if box and car.k + 2 < route.size():
+		var c2: Vector2i = route[car.k + 2]
+		var blocker = _exit_blocked(car, c2, c2 - b)
+		if blocker != null:
+			car["blk"] = blocker
 			return true
 	if is_road(a.x, a.y) and is_highway(b.x, b.y):
 		# въезд на магистраль: уступаем тем, кто уже едет
@@ -803,6 +840,25 @@ func _must_stop(car: Dictionary) -> bool:
 			if not is_same(o, car) and o.get("hw", false) and Vector2(o.bx, o.by).distance_to(bc) < 20.0:
 				return true
 	return false
+
+
+func _tile_of(car: Dictionary) -> int:
+	return int(car.by / T) * W + int(car.bx / T)
+
+
+## Стоит ли машина в начале клетки за перекрёстком (тогда въезжать некуда).
+func _exit_blocked(car: Dictionary, t: Vector2i, dv: Vector2i):
+	var ti := t.y * W + t.x
+	var v := Vector2(dv)
+	var entry := Vector2(t.x * T + 8.0, t.y * T + 8.0) - v * 8.0
+	for o in cars:
+		if is_same(o, car) or not o.get("stopped", false) or _tile_of(o) != ti:
+			continue
+		if (DIR_VEC[o.dir] as Vector2).dot(v) < -0.5:
+			continue
+		if (Vector2(o.bx, o.by) - entry).dot(v) < 12.0:
+			return o
+	return null
 
 
 func _next_to(b: int, t: String) -> bool:
@@ -1320,41 +1376,75 @@ func goals_around(b: int) -> Dictionary:
 	return g
 
 
-## Путь по дорогам (поиск в ширину).
-func road_route(starts: Array, goals: Dictionary):
+## Направление односторонней дороги (индекс в DIRS) или -1. На перекрёстках движение всегда двустороннее.
+func ow_at(i: int) -> int:
+	var o = objs[i]
+	if o == null or o.t != "road" or junctions.has(i):
+		return -1
+	return int(o.get("ow", -1))
+
+
+## Сколько «стоит» въехать на клетку: магистраль быстрее, светофоры и пробки — дольше.
+func _step_cost(n: int) -> int:
+	var o = objs[n]
+	var c := 2 if o.t == "highway" else (6 if o.t == "crossing" else 4)
+	if junctions.has(n):
+		c += 3
+	return c + mini(3, _cong.get(n, 0)) * 5
+
+
+## Путь по дорогам: самый быстрый с учётом магистралей, светофоров, пробок и одностороннего движения.
+func road_route(starts: Array, goals: Dictionary, avoid: Dictionary = {}):
 	if starts.is_empty() or goals.is_empty():
 		return null
+	var dist := PackedInt32Array()
+	dist.resize(W * H)
+	dist.fill(1 << 30)
 	var prev := PackedInt32Array()
 	prev.resize(W * H)
 	prev.fill(-2)
-	var q := []
-	for s in starts:
-		prev[s] = -1
-		q.append(s)
-	var head := 0
-	while head < q.size():
-		var u: int = q[head]
-		head += 1
-		if goals.has(u):
-			var out := []
-			var k := u
-			while k != -1:
-				out.append(Vector2i(k % W, k / W))
-				k = prev[k]
-			out.reverse()
-			return out
-		var ux := u % W
-		var uy := u / W
-		for dv in DIRS:
-			var nx: int = ux + dv.x
-			var ny: int = uy + dv.y
-			if not is_drivable(nx, ny):
+	var buckets: Array = [[]]
+	for s0 in starts:
+		dist[s0] = 0
+		prev[s0] = -1
+		buckets[0].append(s0)
+	var c := 0
+	while c < buckets.size():
+		var bk: Array = buckets[c]
+		var j := 0
+		while j < bk.size():
+			var u: int = bk[j]
+			j += 1
+			if dist[u] != c:
 				continue
-			var n := ny * W + nx
-			if prev[n] != -2:
-				continue
-			prev[n] = u
-			q.append(n)
+			if goals.has(u):
+				var out := []
+				var k := u
+				while k != -1:
+					out.append(Vector2i(k % W, k / W))
+					k = prev[k]
+				out.reverse()
+				return out
+			var ux := u % W
+			var uy := u / W
+			var ow_u := ow_at(u)
+			for di in 4:
+				var dv: Vector2i = DIRS[di]
+				var nx: int = ux + dv.x
+				var ny: int = uy + dv.y
+				if not is_drivable(nx, ny):
+					continue
+				var n := ny * W + nx
+				if avoid.has(n) or ow_u == (di ^ 1) or ow_at(n) == (di ^ 1):
+					continue
+				var nd := c + _step_cost(n)
+				if nd < dist[n]:
+					dist[n] = nd
+					prev[n] = u
+					while buckets.size() <= nd:
+						buckets.append([])
+					buckets[nd].append(n)
+		c += 1
 	return null
 
 
@@ -1831,38 +1921,69 @@ const LANE := {"r": Vector2(0, 3), "l": Vector2(0, -3), "d": Vector2(-3, 0), "u"
 const DIR_VEC := {"r": Vector2(1, 0), "l": Vector2(-1, 0), "d": Vector2(0, 1), "u": Vector2(0, -1)}
 
 
-## Впереди машина в том же направлении (стоим) или припаркованная на дороге (объезжаем медленно)?
+## Что впереди: 0 — свободно, 1 — объезжаем припаркованную машину, 2 — стоим за другой машиной.
+## Встречные машины не мешают; поперечные внутри одного перекрёстка друг друга пропускают.
 func _traffic(car: Dictionary) -> int:
+	car["blk"] = null
 	var fwd_v: Vector2 = DIR_VEC[car.dir]
+	var side_v := Vector2(fwd_v.y, fwd_v.x)
 	var me := Vector2(car.bx, car.by)
 	var hw: bool = car.get("hw", false)
+	var multi: bool = hw or car.get("ow", false)
 	var my_p := Vector2(car.px, car.py)
+	var my_t := _tile_of(car)
+	var in_box := junctions.has(my_t)
 	for o in cars:
 		if is_same(o, car):
 			continue
-		# на магистрали мешает только машина в своей полосе
-		if hw and o.get("hw", false) and o.get("lane", 0) != car.get("lane", 0):
-			continue
-		# любая машина прямо впереди в моей полосе (в том числе поворачивающая) — ждём
+		var odot := (DIR_VEC[o.dir] as Vector2).dot(fwd_v)
 		var rel := Vector2(o.px, o.py) - my_p
 		var fwd := rel.dot(fwd_v)
-		var side := absf(rel.dot(Vector2(fwd_v.y, fwd_v.x)))
+		var side := absf(rel.dot(side_v))
+		if odot < -0.5:
+			# встречная машина мешает, только если она объезжает и уже в моей полосе
+			if o.get("passing", false) and fwd > 0.5 and fwd < 12.0 and side < 3.5:
+				car["blk"] = o
+				return 2
+			continue
+		# на многополосной дороге мешает только машина в своей полосе
+		if multi and (o.get("hw", false) or o.get("ow", false)) and o.get("lane", 0) != car.get("lane", 0):
+			continue
 		if fwd > 0.5 and fwd < 11.0 and side < 3.5:
-			if hw and _lane_free(car, 1 - int(car.get("lane", 0))):
+			if odot < 0.5 and in_box and _tile_of(o) == my_t:
+				continue
+			if multi and _lane_free(car, 1 - int(car.get("lane", 0))):
 				car["lane"] = 1 - int(car.get("lane", 0))
 				return 0
+			car["blk"] = o
 			return 2
 	for c in street_parked:
 		var pp := Vector2(c.car_tile % W * T + 8.0, c.car_tile / W * T + 8.0)
 		var rel := pp - me
 		var fwd := rel.dot(fwd_v)
-		var side := absf(rel.dot(Vector2(fwd_v.y, fwd_v.x)))
+		var side := absf(rel.dot(side_v))
 		if fwd > -8.0 and fwd < 14.0 and side < 4.0:
+			# прежде чем выехать на встречку, пропускаем встречных (кто уже объезжает — едет дальше)
+			if not car.get("passing", false) and not car.get("ow", false) and _oncoming(car, 18.0) != null:
+				car["blk"] = _oncoming(car, 18.0)
+				return 2
 			return 1
 	return 0
 
 
-## Свободна ли соседняя полоса магистрали для обгона.
+func _oncoming(car: Dictionary, dist: float):
+	var fwd_v: Vector2 = DIR_VEC[car.dir]
+	var me := Vector2(car.bx, car.by)
+	for o in cars:
+		if is_same(o, car) or (DIR_VEC[o.dir] as Vector2).dot(fwd_v) > -0.5:
+			continue
+		var rel := Vector2(o.bx, o.by) - me
+		if rel.dot(fwd_v) > -4.0 and rel.dot(fwd_v) < dist and absf(rel.dot(Vector2(fwd_v.y, fwd_v.x))) < 4.0:
+			return o
+	return null
+
+
+## Свободна ли соседняя полоса (магистраль или одностороннее движение) для перестроения.
 func _lane_free(car: Dictionary, lane: int) -> bool:
 	var fwd_v: Vector2 = DIR_VEC[car.dir]
 	var me := Vector2(car.bx, car.by)
@@ -1898,19 +2019,65 @@ func _car_pos(car: Dictionary) -> void:
 		car.dir = "u"
 	var off: Vector2 = LANE[car.dir]
 	var hw := is_highway(a.x, a.y) or is_highway(b.x, b.y)
+	var ow := ow_at(a.y * W + a.x) >= 0 and (ow_at(b.y * W + b.x) >= 0 or junctions.has(b.y * W + b.x) or a == b)
 	car["hw"] = hw
+	car["ow"] = ow and not hw
 	if hw:
 		# магистраль: ближняя полоса — 2 px от разделительной, дальняя — 5 px
 		off = off / 3.0 * (2.0 if car.get("lane", 0) == 0 else 5.0)
+	elif ow:
+		# одностороннее движение: обе полосы попутные
+		off = off if car.get("lane", 0) == 0 else -off
 	elif car.get("passing", false):
 		off = -off
 	car["bx"] = (a.x + dx * car.prog) * T + 8.0
 	car["by"] = (a.y + dy * car.prog) * T + 8.0
-	car.px = car.bx + off.x
-	car.py = car.by + off.y
+	# смещение по полосе меняется плавно: повороты и перестроения без рывков
+	if not car.has("ox"):
+		car["ox"] = off.x
+		car["oy"] = off.y
+	else:
+		car.ox = move_toward(car.ox, off.x, 0.6)
+		car.oy = move_toward(car.oy, off.y, 0.6)
+	car.px = car.bx + car.ox
+	car.py = car.by + car.oy
+
+
+## Взаимная блокировка: цепочка «кто кого ждёт» замкнулась.
+func _in_cycle(car: Dictionary) -> bool:
+	var x = car.get("blk")
+	for k in 16:
+		if x == null:
+			return false
+		if is_same(x, car):
+			return true
+		x = x.get("blk")
+	return false
+
+
+## Застрявшая машина ищет объезд, не заезжая на клетку, где стоит пробка.
+func _reroute(car: Dictionary) -> bool:
+	var route: Array = car.route
+	if car.k + 2 >= route.size():
+		return false
+	var cur: Vector2i = route[car.k]
+	var nxt: Vector2i = route[car.k + 1]
+	var e: Vector2i = route[route.size() - 1]
+	var nr = road_route([cur.y * W + cur.x], {e.y * W + e.x: true}, {nxt.y * W + nxt.x: true})
+	if nr == null or nr.size() < 2 or nr.size() > (route.size() - car.k) * 2 + 8:
+		return false
+	car.route = nr
+	car.k = 0
+	car.prog = 0.0
+	return true
 
 
 func _update_cars(dt: float) -> void:
+	_cong = {}
+	for car in cars:
+		if car.get("stopped", false):
+			var ti := _tile_of(car)
+			_cong[ti] = _cong.get(ti, 0) + 1
 	var n := cars.size()
 	while n > 0:
 		n -= 1
@@ -1926,22 +2093,55 @@ func _update_cars(dt: float) -> void:
 			_finish_car(car, true)
 			cars.remove_at(n)
 			continue
-		if _must_stop(car):
+		car["stopped"] = true
+		var ghost: float = car.get("ghost", 0.0)
+		if ghost > 0.0:
+			# аварийный выход из взаимной блокировки: аккуратно проезжаем
+			car["ghost"] = ghost - dt
+			car["blk"] = null
+		elif _must_stop(car):
 			car["red"] = true
+			car["hold"] = car.get("hold", 0.0) + dt
+			if car.get("blk") != null and car.hold > 3.0 and _in_cycle(car):
+				car["ghost"] = 1.2
+				car["hold"] = 0.0
 			_car_pos(car)
 			continue
 		car["red"] = false
-		var tr := _traffic(car)
+		var tr := 0 if ghost > 0.0 else _traffic(car)
 		car["passing"] = tr == 1
-		# ждём, пока впереди освободится (сквозь машины не проезжаем; 30 с — аварийный выход из затора)
-		if tr == 2 and car.get("wait", 0.0) < 30.0:
+		# ждём, пока впереди освободится (сквозь машины не проезжаем)
+		if tr == 2:
 			car["wait"] = car.get("wait", 0.0) + dt
-			if car.wait > 4.0 and randf() < dt * 0.25:
+			var w: float = car.wait
+			if w > 3.0 and _in_cycle(car):
+				car["ghost"] = 1.2
+				car["wait"] = 0.0
+			elif w > 7.0 and car.get("rr", 0.0) <= 0.0:
+				car["rr"] = 12.0
+				if _reroute(car):
+					car["wait"] = 0.0
+			elif w > 45.0:
+				car["ghost"] = 1.2
+				car["wait"] = 0.0
+			if w > 4.0 and randf() < dt * 0.25:
 				float_text(Vector2(car.px, car.py - 10), tr("Би-бип!"), Color("6a6478"))
+			car["rr"] = car.get("rr", 0.0) - dt
 			_car_pos(car)
 			continue
+		car["blk"] = null
+		car["stopped"] = false
 		car["wait"] = 0.0
+		car["hold"] = 0.0
+		car["rr"] = car.get("rr", 0.0) - dt
+		var p0: float = car.prog
 		car.prog += car.speed * dt * (0.3 if tr == 1 else (1.9 if car.get("hw", false) else 1.0))
+		# перед перекрёстком и переездом всегда притормаживаем у стоп-линии, чтобы проверить светофор
+		if ghost <= 0.0 and p0 < 0.45 and car.prog > 0.45 and car.k + 1 < route.size():
+			var bi: int = b.y * W + b.x
+			var ai: int = a.y * W + a.x
+			if (junctions.has(bi) and not junctions.has(ai)) or (crossings.has(bi) and not crossings.has(ai)):
+				car.prog = 0.45
 		while car.prog >= 1.0 and car.k < route.size() - 1:
 			car.prog -= 1.0
 			car.k += 1
@@ -2153,6 +2353,9 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if tool == "bulldoze":
 		_bulldoze(x, y, first)
 		return
+	if tool == "oneway":
+		_oneway_tool(x, y, first)
+		return
 	var here = objs[y * W + x]
 	if here != null and ((tool == "rail" and here.t == "road") or (tool == "road" and here.t == "rail")):
 		_make_crossing(x, y)
@@ -2176,6 +2379,42 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if r.cost > 0:
 		float_text(Vector2(x * T + 8 * w, y * T), "-%d" % r.cost, Color("8a5a3b"))
 	recalc()
+
+
+## «Одностороннее движение»: ведём по дороге — стрелки ложатся по ходу; нажатие — смена направления по кругу.
+func _oneway_tool(x: int, y: int, first: bool) -> void:
+	var i := y * W + x
+	var o = objs[i]
+	if o == null or o.t != "road":
+		if first and Time.get_ticks_msec() - _last_reason_ms > 400:
+			_last_reason_ms = Time.get_ticks_msec()
+			float_text(Vector2(x * T + 8, y * T), tr("Проведите по обычной дороге"), Color("c24a5a"))
+		_ow_prev = -1
+		return
+	if first or _ow_prev < 0:
+		const ORDER := [-1, 0, 2, 1, 3]
+		var cur := int(o.get("ow", -1))
+		_set_ow(i, ORDER[(ORDER.find(cur) + 1) % ORDER.size()])
+		_ow_prev = i
+	else:
+		var dv := Vector2i(x - _ow_prev % W, y - _ow_prev / W)
+		var di := DIRS.find(dv)
+		if di >= 0:
+			if objs[_ow_prev] != null and objs[_ow_prev].t == "road":
+				_set_ow(_ow_prev, di)
+			_set_ow(i, di)
+		_ow_prev = i
+	sound.play("pop", 1.2)
+	recalc()
+
+
+func _set_ow(i: int, di: int) -> void:
+	var o = objs[i]
+	if di < 0:
+		o.erase("ow")
+	else:
+		o["ow"] = di
+	mark_dirty(i % W, i / W, 1)
 
 
 ## Рельсы через дорогу (или дорога через рельсы) — переезд со шлагбаумом.
@@ -2955,6 +3194,10 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if not lf: _r(px, py, 1, 1, 1, 14, curb)
 		if not rt: _r(px, py, 14, 1, 1, 14, curb)
 	var n := int(up) + int(dn) + int(lf) + int(rt)
+	var ow := ow_at(y * W + x)
+	if ow >= 0 and n <= 2 and not is_crosswalk(x, y):
+		_draw_oneway_arrow(px, py, ow)
+		return
 	if not water and is_crosswalk(x, y):
 		# «зебра» поперёк дороги
 		if (lf or rt) and not (up or dn):
@@ -2980,6 +3223,20 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if dn: _r(px, py, 7, 11, 1, 4, line)
 		if lf: _r(px, py, 1, 7, 4, 1, line)
 		if rt: _r(px, py, 11, 7, 4, 1, line)
+
+
+## Белая стрелка односторонней дороги и пунктир между двумя попутными полосами.
+func _draw_oneway_arrow(px: int, py: int, di: int) -> void:
+	var w := "f4f4f8"
+	match di:
+		0:
+			_r(px, py, 3, 7, 7, 2, w); _r(px, py, 10, 5, 1, 6, w); _r(px, py, 11, 6, 1, 4, w); _r(px, py, 12, 7, 1, 2, w)
+		1:
+			_r(px, py, 6, 7, 7, 2, w); _r(px, py, 5, 5, 1, 6, w); _r(px, py, 4, 6, 1, 4, w); _r(px, py, 3, 7, 1, 2, w)
+		2:
+			_r(px, py, 7, 3, 2, 7, w); _r(px, py, 5, 10, 6, 1, w); _r(px, py, 6, 11, 4, 1, w); _r(px, py, 7, 12, 2, 1, w)
+		3:
+			_r(px, py, 7, 6, 2, 7, w); _r(px, py, 5, 5, 6, 1, w); _r(px, py, 6, 4, 4, 1, w); _r(px, py, 7, 3, 2, 1, w)
 
 
 func _draw_rail(px: int, py: int, x: int, y: int, water: bool, on_road: bool) -> void:
