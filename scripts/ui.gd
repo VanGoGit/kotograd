@@ -466,6 +466,14 @@ func _tooltip(t: String) -> String:
 		extra.append(tr("Приносит монетки"))
 	if d.has("vehicle"):
 		extra.append(tr("Служебная машина (нужна дорога)"))
+	if D.MAKES.has(t):
+		var mk: Array = D.MAKES[t]
+		if (mk[1] as Array).is_empty():
+			extra.append(tr("Производит: %s") % tr(D.GOODS[mk[0]].name).to_lower())
+		else:
+			extra.append(tr("Перерабатывает: %s → %s") % [_goods_list(mk[1]), tr(D.GOODS[mk[0]].name).to_lower()])
+	if D.USES.has(t):
+		extra.append(tr("Ждёт товары: %s") % _goods_list(D.USES[t]))
 	if d.has("build"):
 		extra.append(tr("Стройка: %d с") % int(d.build))
 	if not D.ups(t).is_empty():
@@ -712,6 +720,8 @@ func _render_info() -> void:
 				lines.append(tr("  Ждём сотрудников — нужны новые жители."))
 			if d.has("vehicle") and world.roads_around(i).is_empty():
 				lines.append(tr("Подведите дорогу, чтобы выезжала служебная машина."))
+		if o.build <= 0.0:
+			lines.append_array(_chain_lines(o))
 		if d.has("parking") and o.build <= 0.0:
 			lines.append("")
 			lines.append(tr("Машин: %d/%d") % [world.lot_count.get(i, 0), int(world.stat(o, "parking"))])
@@ -733,6 +743,76 @@ func _render_info() -> void:
 			info_up.disabled = world.coins < uc and not world.unlimited
 	info_body.text = "\n".join(lines)
 	info_panel.visible = true
+
+
+func _goods_list(gs: Array) -> String:
+	var names: Array = []
+	for g in gs:
+		names.append(tr(D.GOODS[g].name).to_lower())
+	return ", ".join(names)
+
+
+## Кто производит товар (для подсказок «откуда привезти»).
+func _maker_of(g: String) -> String:
+	for t in D.MAKES:
+		if D.MAKES[t][0] == g:
+			return tr(D.DEFS[t].name)
+	return "—"
+
+
+## Строки о производстве, сырье и поставках в карточке здания.
+func _chain_lines(o: Dictionary) -> Array:
+	var out: Array = []
+	var d := D.def(o.t)
+	if D.MAKES.has(o.t):
+		var mk: Array = D.MAKES[o.t]
+		out.append("")
+		out.append(tr("Производит: %s — готово к отправке %d из %d") % [tr(D.GOODS[mk[0]].name).to_lower(), int(o.get("out", 0.0)), int(world.OUT_CAP)])
+		var waiting: Array = []
+		for g in mk[1]:
+			var v: float = world.stock_of(o, g)
+			out.append(tr("  Сырьё: %s — %d") % [tr(D.GOODS[g].name).to_lower(), int(v)])
+			if v < 0.5:
+				waiting.append(g)
+		if not waiting.is_empty():
+			for g in waiting:
+				out.append(tr("  Ждёт сырьё: %s привезут грузовики от «%s»") % [tr(D.GOODS[g].name).to_lower(), _maker_of(g)])
+		elif not (mk[1] as Array).is_empty() and o.get("busy", false):
+			out.append(tr("  Работает на полную: доход +50%"))
+		if world.workers.get(o.i, []).is_empty():
+			out.append(tr("  Без работников производство стоит."))
+		elif world.access_roads(o.i).is_empty():
+			out.append(tr("  Подведите дорогу — грузовикам не выехать."))
+	var uses: Array = D.USES.get(o.t, [])
+	if not uses.is_empty():
+		out.append("")
+		var parts: Array = []
+		var have := 0
+		var missing: Array = []
+		for g in uses:
+			var v: float = world.stock_of(o, g)
+			if v > 0.0:
+				have += 1
+				parts.append("%s ✓ %d" % [tr(D.GOODS[g].name), ceili(v)])
+			else:
+				parts.append("%s —" % tr(D.GOODS[g].name))
+				missing.append(g)
+		out.append(tr("Товары: %s") % "  ·  ".join(parts))
+		if have > 0:
+			out.append(tr("  С товарами доход выше: +%d%%") % int(60.0 * have / uses.size()))
+		for g in missing:
+			out.append(tr("  Нужно: %s — от «%s»") % [tr(D.GOODS[g].name).to_lower(), _maker_of(g)])
+	if d.get("depot", false):
+		out.append("")
+		var parts: Array = []
+		for g in o.get("stock", {}):
+			if o.stock[g] >= 1.0:
+				parts.append("%s %d" % [tr(D.GOODS[g].name), int(o.stock[g])])
+		out.append(tr("На складе: %s") % (", ".join(parts) if not parts.is_empty() else tr("пусто")))
+	if d.get("export", false):
+		out.append("")
+		out.append(tr("Продано на экспорт: %d") % world.exported)
+	return out
 
 
 func _mood(v: float) -> String:

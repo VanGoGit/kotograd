@@ -5,6 +5,7 @@ const D = preload("res://scripts/defs.gd")
 const Goals = preload("res://scripts/goals.gd")
 const Events = preload("res://scripts/events.gd")
 const Transit = preload("res://scripts/transit.gd")
+const Boats = preload("res://scripts/boats.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const W := D.W
 const H := D.H
@@ -49,9 +50,12 @@ var used_names: Array = []
 var city_name := "Котоград"
 var pets_total := 0
 var events_seen := 0
+var deliveries := 0              # сколько раз грузовики привезли товар
+var exported := 0                # сколько товара продано через грузовой порт
 var goals
 var events
 var transit
+var boats
 var _goal_t := 0.0
 var _amb_t := 0.0
 # сенсорное управление: два пальца — двигать и масштабировать карту
@@ -67,7 +71,7 @@ var pairs := {}              # объединённые соседние зда�
 var ramps: Array = []
 var _light_clock := 0.0
 const LIGHT_CYCLE := 9.0
-const FLAT := ["parking", "tennis", "volleyball", "skatepark", "helipad"]
+const FLAT := ["boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
 
 # --- производное / временное ---
 var stats := {}
@@ -98,6 +102,7 @@ var zoom := 3
 
 var _job_t := 0.0
 var _service_t := 0.0
+var _freight_t := 0.0
 var _ambient_t := 0.0
 var _save_t := 0.0
 var _had_goals := false
@@ -128,6 +133,7 @@ func setup(sprites, snd, user_interface, camera: Camera2D) -> bool:
 	goals = Goals.new(self)
 	events = Events.new(self)
 	transit = Transit.new(self)
+	boats = Boats.new(self)
 	var loaded := load_game()
 	if not loaded:
 		new_game()
@@ -156,6 +162,8 @@ func new_game() -> void:
 	info_target = null
 	pets_total = 0
 	events_seen = 0
+	deliveries = 0
+	exported = 0
 	goals.done = {}
 	events.active = null
 	events.visitors = []
@@ -186,7 +194,13 @@ func serialize() -> String:
 	for i in W * H:
 		var o = objs[i]
 		if o != null and o.i == i:
-			mains.append([i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), int(o.get("ow", -1))])
+			var m := [i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), int(o.get("ow", -1))]
+			if o.has("stock") or o.has("out"):
+				var st := {}
+				for g in o.get("stock", {}):
+					st[g] = snappedf(o.stock[g], 0.1)
+				m.append({"s": st, "o": snappedf(o.get("out", 0.0), 0.1)})
+			mains.append(m)
 	var cat_list := []
 	for c in cats:
 		var k: Dictionary = c.duplicate()
@@ -214,6 +228,7 @@ func serialize() -> String:
 		"time": time, "day": day, "cats": cat_list, "max_cats": max_cats, "next_id": next_id, "speed": speed,
 		"used_names": used_names, "cam": [cam.position.x, cam.position.y, zoom],
 		"name": city_name, "goals": goals.done.keys(), "pets": pets_total, "events": events_seen, "rides": transit.rides,
+		"deliveries": deliveries, "exported": exported,
 	}
 	return JSON.stringify(data)
 
@@ -296,6 +311,12 @@ func deserialize(text: String) -> bool:
 			o["lvl"] = int(m[4])
 		if m.size() > 5 and int(m[5]) >= 0:
 			o["ow"] = int(m[5])
+		if m.size() > 6 and typeof(m[6]) == TYPE_DICTIONARY:
+			var st := {}
+			for g in m[6].get("s", {}):
+				st[g] = float(m[6].s[g])
+			o["stock"] = st
+			o["out"] = float(m[6].get("o", 0.0))
 	coins = float(d.coins)
 	food = float(d.food)
 	time = float(d.time)
@@ -307,6 +328,8 @@ func deserialize(text: String) -> bool:
 	city_name = str(d.get("name", "Котоград"))
 	pets_total = int(d.get("pets", 0))
 	events_seen = int(d.get("events", 0))
+	deliveries = int(d.get("deliveries", 0))
+	exported = int(d.get("exported", 0))
 	transit.rides = int(d.get("rides", 0))
 	transit.trains = []
 	transit.planes = []
@@ -648,7 +671,7 @@ func recalc() -> void:
 	var st := {
 		"cap": 0, "jobs": 0, "houses": [], "workplaces": [], "leisure": [], "strolls": [], "vehicle_bases": [],
 		"constructing": [], "builder_yards": [], "house_happy": {}, "food_prod": stats.get("food_prod", 0.0), "wonders": [], "lots": [], "tourists": [], "hubs": [],
-		"coin_cap": 3000.0, "food_cap": 150.0,
+		"coin_cap": 3000.0, "food_cap": 150.0, "sinks": {}, "depots": [], "ports": [],
 	}
 	var decor := []
 	var services := []
@@ -688,6 +711,14 @@ func recalc() -> void:
 			services.append(i)
 		if d.has("hub"):
 			st.hubs.append(i)
+		for g in needs_of(o.t):
+			if not st.sinks.has(g):
+				st.sinks[g] = []
+			st.sinks[g].append(i)
+		if d.get("depot", false):
+			st.depots.append(i)
+		if d.get("export", false):
+			st.ports.append(i)
 	for h in st.houses:
 		var c := center_of(h)
 		var v := 30.0
@@ -978,10 +1009,14 @@ func _update_economy(dt: float) -> void:
 		var d := D.def(o.t)
 		var nw: int = workers.get(b, []).size()
 		employed += nw
+		var boost := _produce(o, nw, dt)
 		if d.has("food"):
-			fp += float(stat(o, "food")) + float(stat(o, "food_per", 0.0)) * nw
+			fp += (float(stat(o, "food")) + float(stat(o, "food_per", 0.0)) * nw) * (1.0 + (boost - 1.0) * 0.8)
 		if d.has("shop") and nw > 0:
-			shop_income += float(stat(o, "shop")) * (0.6 + 0.4 * nw / float(stat(o, "jobs")))
+			shop_income += float(stat(o, "shop")) * (0.6 + 0.4 * nw / float(stat(o, "jobs"))) * boost
+		elif boost > 1.0 and nw > 0:
+			# стройконтора, архитекторы и другие без магазина: материалы — это премия работникам
+			shop_income += nw * 0.3 * (boost - 1.0)
 	stats.food_prod = fp
 	eat_rate = n * 0.04
 	food = clampf(food + (fp - eat_rate) * dt, 0.0, maxf(stats.food_cap, food))
@@ -997,6 +1032,215 @@ func _update_economy(dt: float) -> void:
 		if spawn_t >= 11.0:
 			spawn_t = 0.0
 			spawn_cat()
+
+
+# =====================================================================
+#  Производственные цепочки и грузовики
+# =====================================================================
+
+const OUT_CAP := 16.0
+const IN_CAP := 16.0
+const USE_CAP := 10.0
+const DEPOT_CAP := 40.0
+const MAKE_RATE := 0.1           # единиц товара в секунду при полном штате
+const USE_RATE := 0.02           # сколько товара расходует магазин или кафе в секунду
+const TRUCK_LOAD := 8
+
+
+## Какие товары здание принимает: сырьё для переработки или товары для продажи.
+func needs_of(t: String) -> Array:
+	var out: Array = D.USES.get(t, []).duplicate()
+	if D.MAKES.has(t):
+		for g in D.MAKES[t][1]:
+			if not out.has(g):
+				out.append(g)
+	return out
+
+
+func stock_of(o, g: String) -> float:
+	return float(o.get("stock", {}).get(g, 0.0))
+
+
+func _cap_for(o, g: String) -> float:
+	var d := D.def(o.t)
+	if d.get("depot", false):
+		return DEPOT_CAP * (1.0 + 0.5 * (int(o.get("lvl", 1)) - 1))
+	if D.MAKES.has(o.t) and D.MAKES[o.t][1].has(g):
+		return IN_CAP
+	return USE_CAP
+
+
+## Производство и расход товаров у одного здания. Возвращает множитель дохода (1 — как обычно).
+func _produce(o: Dictionary, nw: int, dt: float) -> float:
+	if nw <= 0:
+		o.erase("busy")
+		return 1.0
+	var boost := 1.0
+	var mk = D.MAKES.get(o.t)
+	if mk != null:
+		var f := float(nw) / float(stat(o, "jobs")) * (1.0 + 0.35 * (int(o.get("lvl", 1)) - 1))
+		var r := MAKE_RATE * f * dt
+		var out: float = o.get("out", 0.0)
+		var busy := false
+		if out < OUT_CAP:
+			var ok := true
+			for g in mk[1]:
+				if stock_of(o, g) < r:
+					ok = false
+			if ok:
+				for g in mk[1]:
+					o.stock[g] = stock_of(o, g) - r
+				o["out"] = minf(OUT_CAP, out + r)
+				busy = true
+		else:
+			busy = not (mk[1] as Array).is_empty()
+		if busy:
+			o["busy"] = true
+		else:
+			o.erase("busy")
+		if busy and not (mk[1] as Array).is_empty():
+			boost = 1.5
+	var uses: Array = D.USES.get(o.t, [])
+	if not uses.is_empty():
+		if not o.has("stock"):
+			o["stock"] = {}
+		var have := 0
+		for g in uses:
+			var v := stock_of(o, g)
+			if v > 0.0:
+				have += 1
+				o.stock[g] = maxf(0.0, v - USE_RATE * dt)
+		boost *= 1.0 + 0.6 * have / float(uses.size())
+	return boost
+
+
+func _truck_limit(b: int) -> int:
+	var o = objs[b]
+	return (2 if D.def(o.t).get("depot", false) else 1) + int(o.get("lvl", 1)) - 1
+
+
+## Раз в секунду грузовики развозят готовые товары: сначала тем, кому они нужны, потом на склад или в порт.
+func _update_freight(dt: float) -> void:
+	_freight_t -= dt
+	if _freight_t > 0.0:
+		return
+	_freight_t = 1.0
+	var inc := {}
+	var trucks := {}
+	for car in cars:
+		if not car.has("cargo"):
+			continue
+		trucks[car.base] = trucks.get(car.base, 0) + 1
+		if not car.get("dropped", false):
+			if not inc.has(car.target):
+				inc[car.target] = {}
+			inc[car.target][car.cargo] = inc[car.target].get(car.cargo, 0) + int(car.n)
+	var sources: Array = []
+	for b in stats.workplaces:
+		var o = objs[b]
+		if o == null or workers.get(b, []).is_empty() or trucks.get(b, 0) >= _truck_limit(b):
+			continue
+		if float(o.get("out", 0.0)) >= 4.0:
+			sources.append(b)
+		elif D.def(o.t).get("depot", false):
+			for g in o.get("stock", {}):
+				if o.stock[g] >= 4.0:
+					sources.append(b)
+					break
+	sources.shuffle()
+	var tries := 0
+	for b in sources:
+		if tries >= 3:
+			break
+		tries += 1
+		_dispatch(b, inc)
+
+
+func _dispatch(b: int, inc: Dictionary) -> void:
+	var o = objs[b]
+	var depot: bool = D.def(o.t).get("depot", false)
+	var offers: Array = []
+	if depot:
+		for g in o.get("stock", {}):
+			if o.stock[g] >= 4.0:
+				offers.append([g, o.stock[g]])
+		offers.shuffle()
+	else:
+		offers.append([D.MAKES[o.t][0], float(o.get("out", 0.0))])
+	var starts := access_roads(b)
+	if starts.is_empty():
+		return
+	var bc := center_of(b)
+	for of in offers:
+		var g: String = of[0]
+		var have: float = of[1]
+		var cands: Array = []
+		for s in stats.sinks.get(g, []):
+			if s == b or not is_ready(s):
+				continue
+			var space: float = _cap_for(objs[s], g) - stock_of(objs[s], g) - inc.get(s, {}).get(g, 0)
+			if space >= 3.0:
+				var sc := center_of(s)
+				cands.append([absf(sc.x - bc.x) + absf(sc.y - bc.y), s, space])
+		# лишнее — на склад, а если и он полон или его нет — в порт на экспорт (когда своё хранилище почти полно)
+		if not depot and have >= OUT_CAP - 4.0:
+			for s in stats.depots:
+				var space: float = _cap_for(objs[s], g) - stock_of(objs[s], g) - inc.get(s, {}).get(g, 0)
+				if is_ready(s) and space >= 3.0:
+					var sc := center_of(s)
+					cands.append([1000.0 + absf(sc.x - bc.x) + absf(sc.y - bc.y), s, space])
+			for s in stats.ports:
+				if is_ready(s):
+					var sc := center_of(s)
+					cands.append([2000.0 + absf(sc.x - bc.x) + absf(sc.y - bc.y), s, 99.0])
+		cands.sort_custom(func(x, y): return x[0] < y[0])
+		for k in mini(3, cands.size()):
+			var s: int = cands[k][1]
+			var route = road_route(starts, _to_set(access_roads(s)))
+			if route == null:
+				continue
+			var n := mini(TRUCK_LOAD, int(minf(have, cands[k][2])))
+			if n < 3:
+				continue
+			if depot:
+				o.stock[g] -= n
+			else:
+				o.out = float(o.out) - n
+			if route.size() < 2:
+				# соседи у одной дороги — товар просто переносят через улицу
+				_deliver({"target": s, "cargo": g, "n": n})
+				return
+			var car := _make_car("cargo", D.GOODS[g].col, route, null, s, b)
+			car.base = b
+			car["cargo"] = g
+			car["n"] = n
+			cars.append(car)
+			if not inc.has(s):
+				inc[s] = {}
+			inc[s][g] = inc[s].get(g, 0) + n
+			return
+
+
+## Грузовик доехал: товар — в здание, а в порту — монетки за экспорт.
+func _deliver(car: Dictionary) -> void:
+	car["dropped"] = true
+	var s: int = car.target
+	if not is_ready(s):
+		return
+	var o = objs[s]
+	var g: String = car.cargo
+	deliveries += 1
+	if D.def(o.t).get("export", false):
+		var price := 2 if D.GOODS[g].get("raw", false) else 5
+		var got: int = car.n * price
+		if coins < stats.coin_cap:
+			coins = minf(stats.coin_cap, coins + got)
+		exported += int(car.n)
+		float_text(center_of(s) * T + Vector2(8, -10), "+%d" % got, Color("c08a1a"))
+		return
+	if not o.has("stock"):
+		o["stock"] = {}
+	o.stock[g] = minf(_cap_for(o, g), stock_of(o, g) + car.n)
 
 
 func _assign_jobs() -> void:
@@ -2148,9 +2392,11 @@ func _update_cars(dt: float) -> void:
 		if car.k >= route.size() - 1:
 			car.k = route.size() - 1
 			car.prog = 0.0
+			if car.has("cargo") and not car.get("dropped", false):
+				_deliver(car)
 			if car.return_to >= 0 and is_ready(car.return_to):
 				var e: Vector2i = route[route.size() - 1]
-				var back = road_route([e.y * W + e.x], _to_set(roads_around(car.return_to)))
+				var back = road_route([e.y * W + e.x], _to_set(access_roads(car.return_to)))
 				car.return_to = -1
 				if back != null and back.size() >= 2:
 					car.route = back
@@ -2301,7 +2547,7 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 				high += 1
 	if d.get("need_high", false) and high < w * w:
 		return {"ok": false, "reason": tr("Строится только на холмах и в горах")}
-	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false)):
+	if mount > 0 and not (d.has("cap") or t in ["road", "highway", "path", "parking", "rail"] or (d.has("happy") and not d.has("jobs")) or d.get("wonder", false) or d.get("mine", false)):
 		return {"ok": false, "reason": tr("Слишком круто: в горах — только жильё и дороги")}
 	if water > 0:
 		if t == "road":
@@ -2683,8 +2929,10 @@ func _step(gdt: float) -> void:
 		if car.get("wait", 0.0) > 4.0 or car.get("passing", false):
 			jammed += 1
 	_spawn_service_vehicles(gdt)
+	_update_freight(gdt)
 	events.update(gdt)
 	transit.update(gdt)
+	boats.update(gdt)
 	_light_clock += gdt
 
 
@@ -3411,6 +3659,7 @@ func _draw() -> void:
 	for vis in events.visitors:
 		list.append([vis.y * T + 14.0, 3, vis])
 	transit.draw_items(list)
+	boats.draw_items(list)
 	for c in street_parked:
 		var tx: int = c.car_tile % W
 		var ty: int = c.car_tile / W
@@ -3436,6 +3685,8 @@ func _draw() -> void:
 				transit.draw_segment(it[2])
 			5:
 				_draw_scene(it[2])
+			6:
+				boats.draw_boat(it[2])
 
 	_draw_bunting()
 	_draw_traffic_lights(v)
@@ -3467,6 +3718,16 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	var sx: int = x * T + (span * T - tx.get_width()) / 2
 	var sy: int = (y + o.w) * T - tx.get_height()
 	draw_texture(tx, Vector2(sx, sy))
+	var mk = D.MAKES.get(o.t)
+	if mk != null and float(o.get("out", 0.0)) >= 4.0:
+		# готовые ящики с товаром у здания
+		var gc := Color(D.GOODS[mk[0]].col)
+		var by: int = (y + o.w) * T - 4
+		for k in mini(4, int(o.out / 4.0)):
+			var bx: int = x * T + o.w * T - 7 - (k % 2) * 5
+			var yy: int = by - (k / 2) * 3
+			draw_rect(Rect2(bx, yy, 5, 4), Color("5a3c30"))
+			draw_rect(Rect2(bx + 1, yy + 1, 3, 2), gc)
 	if o.t == "parking" or o.t == "garage":
 		var slots: Array = spr.PARKING_SLOTS if o.t == "parking" else spr.GARAGE_SLOTS
 		var cols: Array = lot_colors.get(o.i, [])

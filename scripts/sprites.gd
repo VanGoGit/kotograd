@@ -363,6 +363,17 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 						p.P(x, 6, "2b2b3a")
 				else:
 					p.R(4, 1, 4, 1, "2b2b3a")
+			"cargo":
+				# грузовик: белая кабина и кузов цвета груза
+				if view == "side":
+					p.R(1, 1, 10, 8, col); p.R(1, 4, 10, 1, col.lightened(0.35)); p.R(10, 1, 1, 8, sh)
+					p.R(11, 3, 4, 6, "f4f6fb"); p.R(12, 4, 2, 2, glass); p.P(14, 7, "fff6c2")
+					p.R(1, 8, 14, 1, sh)
+				elif view == "back":
+					p.R(1, 1, 10, 8, col); p.R(6, 2, 1, 6, sh); p.R(1, 1, 10, 1, col.lightened(0.35))
+					p.P(2, 7, "ff6b6b"); p.P(9, 7, "ff6b6b")
+				else:
+					p.R(1, 0, 10, 2, col)
 			"bus":
 				if view == "side":
 					p.R(1, 6, 14, 1, dark)
@@ -430,7 +441,7 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 				p.P(2, 7, "fff6c2")
 				p.P(9, 7, "fff6c2")
 				p.R(4, 7, 4, 1, dark)
-			deco.call(p, "fb")
+			deco.call(p, "back" if back else "fb")
 			p.R(1, 10, 2, 2, wheel)
 			p.R(9, 10, 2, 2, wheel)
 	var side := drawn(16, 12 if van else 10, side_fn)

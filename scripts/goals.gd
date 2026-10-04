@@ -15,10 +15,12 @@ const QUESTS := [
 	{"id": "decor", "name": "Зелёный район", "desc": "Поставьте 10 украшений: пальмы, клумбы, скамейки, фонтаны…", "m": "decor", "n": 10, "r": 150},
 	{"id": "parking", "name": "Где припарковаться?", "desc": "Постройте парковку или паркинг", "m": "lots", "n": 1, "r": 100},
 	{"id": "services", "name": "Городские службы", "desc": "Постройте 2 городские службы: школу, больницу, полицию…", "m": "services", "n": 2, "r": 200},
+	{"id": "delivery", "name": "Первая поставка", "desc": "Грузовик должен привезти товар: поставьте у дороги причал или ферму и суши-бар, рынок или фреш-бар", "m": "deliveries", "n": 1, "r": 150},
 	{"id": "happy", "name": "Счастливый город", "desc": "Поднимите счастье города до 65%", "m": "happy", "n": 65, "r": 250},
 	{"id": "cats30", "name": "Городок", "desc": "Поселите 30 котиков", "m": "cats", "n": 30, "r": 300},
 	{"id": "lvl2", "name": "Капремонт", "desc": "Улучшите любое здание: нажмите на него и выберите «Улучшить»", "m": "lvl2", "n": 1, "r": 200},
 	{"id": "hill", "name": "Дом с видом", "desc": "Постройте жильё на холме или в горах", "m": "hill_home", "n": 1, "r": 200},
+	{"id": "chain", "name": "Производственная цепочка", "desc": "Запустите переработку: например, Мукомольня мелет урожай с фермы в муку", "m": "chains", "n": 1, "r": 300},
 	{"id": "jobs", "name": "Деловой квартал", "desc": "Создайте 60 рабочих мест", "m": "jobs", "n": 60, "r": 400},
 	{"id": "highway", "name": "Фривей", "desc": "Проложите 15 клеток магистрали", "m": "highway", "n": 15, "r": 300},
 	{"id": "wonder", "name": "Чудо света", "desc": "Постройте первое чудо из вкладки «Чудеса»", "m": "wonders", "n": 1, "r": 500},
@@ -45,6 +47,9 @@ const ACHIEVEMENTS := [
 	{"id": "train", "name": "Чух-чух!", "desc": "Соедините рельсами две станции, чтобы пошёл поезд", "m": "rail_links", "n": 1},
 	{"id": "fly", "name": "Рейс по расписанию", "desc": "Постройте два аэропорта", "m": "airports", "n": 2},
 	{"id": "rides50", "name": "Час пик", "desc": "Котики совершили 50 поездок на поезде и самолёте", "m": "rides", "n": 50},
+	{"id": "trucks100", "name": "Логистика", "desc": "Грузовики сделали 100 поставок", "m": "deliveries", "n": 100},
+	{"id": "export", "name": "Сделано в Котограде", "desc": "Продайте 100 товаров через грузовой порт", "m": "exported", "n": 100},
+	{"id": "allchains", "name": "Полный цикл", "desc": "Запустите все 5 перерабатывающих производств", "m": "chains", "n": 5},
 	{"id": "cats200", "name": "Котополис", "desc": "Поселите 200 котиков", "m": "cats", "n": 200},
 ]
 const DECOR := ["palm", "flowers", "jacaranda", "statue", "umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "billboard", "watertower"]
@@ -77,6 +82,7 @@ func metrics() -> Dictionary:
 		"lots": st.lots.size(), "happy": int(world.happy), "jobs": st.jobs, "wonders": st.wonders.size(),
 		"tourism": int(world.tourism), "pets": world.pets_total, "day": world.day, "coins": int(world.coins),
 		"jam": world.jammed, "events": world.events_seen, "rides": world.transit.rides,
+		"deliveries": world.deliveries, "exported": world.exported, "chains": 0,
 		"rail_links": 0, "airports": world.transit.airports().size(),
 		"roads": 0, "highway": 0, "shops": 0, "decor": 0, "services": 0, "lvl2": 0, "lvl3": 0, "hill_home": 0, "land": 0, "kinds": 0,
 	}
@@ -93,6 +99,9 @@ func metrics() -> Dictionary:
 		if o.t == "highway":
 			m.highway += 1
 			continue
+		if o.get("busy", false) and D.MAKES.has(o.t) and not (D.MAKES[o.t][1] as Array).is_empty() and not kinds.has("chain_" + o.t):
+			kinds["chain_" + o.t] = true
+			m.chains += 1
 		if o.build > 0.0 or o.t == "path" or NATURAL.has(o.t):
 			continue
 		var d := D.def(o.t)
@@ -110,7 +119,7 @@ func metrics() -> Dictionary:
 			m.lvl3 += 1
 		if d.has("cap") and world.terrain[i] >= 3 and world.terrain[i] <= 4:
 			m.hill_home += 1
-	m.kinds = kinds.size()
+	m.kinds = kinds.size() - m.chains
 	var nets := {}
 	for b in world.transit.hubs:
 		var hb: Dictionary = world.transit.hubs[b]
