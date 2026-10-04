@@ -753,7 +753,7 @@ func _assign_homes() -> void:
 		c.home = fh[0]
 		rebuild_maps()
 		hearts_at(cat_pos(c) + Vector2(0, -12), 3)
-		ui.toast("%s нашёл новый дом!" % c.name)
+		ui.toast("%s нашёл новый дом!" % c.name, false, true)
 
 
 func employed_count() -> int:
@@ -896,7 +896,7 @@ func spawn_cat() -> void:
 	var hc := center_of(h) * T + Vector2(8, 8)
 	for k in 8:
 		add_p({"type": "sparkle", "x": hc.x + randf_range(-8, 8), "y": hc.y + randf_range(-8, 4), "vx": randf_range(-6, 6), "vy": randf_range(-20, -8), "life": randf_range(0.6, 1.2)})
-	ui.toast("%s переезжает в Котоград!" % c.name)
+	ui.toast("%s переезжает в %s!" % [c.name, city_name], false, true)
 	sound.play("mew", randf_range(0.9, 1.25))
 	var opened := []
 	for t in D.DEFS:
@@ -904,7 +904,7 @@ func spawn_cat() -> void:
 		if u > prev and u <= max_cats:
 			opened.append(D.DEFS[t].name)
 	if opened.size() > 0:
-		ui.toast("Открыто: %s!" % ", ".join(opened), true)
+		ui.toast("Открыто: %s!" % ", ".join(opened), true, true)
 		sound.play("chime")
 	ui.refresh_tools()
 
@@ -2018,7 +2018,7 @@ func _release_building(b: int, o: Dictionary) -> void:
 			c["ay"] = float(y0)
 			if c.plan != null and c.plan.kind == "home":
 				c.plan = null
-			ui.toast("%s остался без дома и ждёт новый" % c.name)
+			ui.toast("%s остался без дома и ждёт новый" % c.name, false, true)
 	rebuild_maps()
 
 
@@ -2042,7 +2042,7 @@ func _update_construction(dt: float) -> void:
 			float_text(cp + Vector2(0, -10), "%s — готово!" % D.def(o.t).name, Color("4f8a4f"))
 			sound.play("pop")
 			if D.def(o.t).get("wonder", false):
-				ui.toast("Чудо света построено: %s! Туристы уже едут." % D.def(o.t).name, true)
+				ui.toast("Чудо света построено: %s! Туристы уже едут." % D.def(o.t).name, true, true)
 				sound.play("chime")
 				for k in 30:
 					add_p({"type": "sparkle", "x": cp.x + randf_range(-20, 20), "y": cp.y + randf_range(-30, 6), "vx": randf_range(-30, 30), "vy": randf_range(-45, -10), "life": randf_range(1.0, 2.0)})
@@ -2196,7 +2196,7 @@ func _step(gdt: float) -> void:
 	if time >= 1.0:
 		time -= 1.0
 		day += 1
-		ui.toast("Доброе утро! Начинается день %d" % day)
+		ui.toast("Доброе утро! Начинается день %d" % day, false, true)
 	if was_night != is_night():
 		sound.night = is_night()
 	rebuild_maps()
@@ -2421,6 +2421,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_zoom(zoom + 1)
 			KEY_MINUS, KEY_KP_SUBTRACT:
 				set_zoom(zoom - 1)
+			KEY_Z:
+				ui.set_zen(not ui.zen)
 			KEY_SPACE:
 				cycle_speed()
 			_:

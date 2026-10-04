@@ -77,6 +77,9 @@ const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1280, 800), Vector2i(1440, 9
 const UI_SCALES := [0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 var new_game_btn: Button
 var _confirm_new := false
+var zen := false             # режим «Дзен»: без целей, подсказок и новостей
+var btn_zen: Button
+var chk_zen: CheckButton
 var _web := OS.has_feature("web")
 var _js_import_cb  # колбэк JavaScript должен жить, пока открыт выбор файла
 var _hud_t := 0.0
@@ -114,6 +117,7 @@ func build(w, sprites, snd) -> void:
 	_apply_display()
 	_apply_ui_scale()
 	world.unlimited = unlimited
+	set_zen(zen, false)
 
 
 # ---------- тема ----------
@@ -263,6 +267,9 @@ func _build_top() -> void:
 	top.add_child(btn_music)
 	_update_music_btn()
 	top.add_child(_btn("Цели", _open_goals, "Задания и достижения"))
+	btn_zen = _btn("Дзен", func(): set_zen(not zen), "Режим «Дзен»: спрятать цели, подсказки и новости (Z)")
+	btn_zen.toggle_mode = true
+	top.add_child(btn_zen)
 	top.add_child(_btn(" ? ", func(): open_modal(help_modal), "Как играть"))
 	top.add_child(_btn("Меню", func(): open_modal(menu_modal)))
 
@@ -683,8 +690,9 @@ func _build_toasts() -> void:
 	root.add_child(toasts_box)
 
 
-func toast(msg: String, gold := false) -> void:
-	if toasts_box == null:
+## news — городские новости и цели: в режиме «Дзен» их не показываем.
+func toast(msg: String, gold := false, news := false) -> void:
+	if toasts_box == null or (news and zen):
 		return
 	var p := PanelContainer.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -785,7 +793,7 @@ func _build_help() -> void:
 		"ЛКМ — строить (дороги можно вести мышью) · ПКМ / перетаскивание — двигать карту\n" +
 		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка\n" +
 		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой\n" +
-		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Esc — отмена\n" +
+		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · Esc — отмена\n" +
 		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб", 13))
 	vb.add_child(keys)
 	var start := _btn("Мяу, начинаем!", func(): close_modals())
@@ -876,6 +884,13 @@ func _build_settings() -> void:
 	chk_unlim.button_pressed = unlimited
 	chk_unlim.toggled.connect(_on_unlim)
 	_setting_row(grid, "Режим игры", chk_unlim)
+	chk_zen = CheckButton.new()
+	chk_zen.focus_mode = Control.FOCUS_NONE
+	chk_zen.text = "Режим «Дзен»"
+	chk_zen.tooltip_text = "Только город, музыка и стройка: без целей, подсказок и новостей. Цели всё равно засчитываются тихо."
+	chk_zen.button_pressed = zen
+	chk_zen.toggled.connect(set_zen)
+	_setting_row(grid, "", chk_zen)
 	var hint_lbl := _label("Масштаб карты меняется колёсиком мыши или кнопками − и +.", 13, false)
 	hint_lbl.add_theme_color_override("font_color", Color(INK, 0.7))
 	vb.add_child(hint_lbl)
@@ -1052,6 +1067,7 @@ func _load_settings() -> void:
 		fullscreen = bool(cfg.get_value("display", "fullscreen", false))
 		ui_scale = float(cfg.get_value("display", "ui_scale", ui_scale))
 		unlimited = bool(cfg.get_value("game", "unlimited", false))
+		zen = bool(cfg.get_value("game", "zen", false))
 		if not UI_SCALES.has(ui_scale):
 			ui_scale = 1.0
 
@@ -1074,6 +1090,7 @@ func _save_settings() -> void:
 	cfg.set_value("display", "fullscreen", fullscreen)
 	cfg.set_value("display", "ui_scale", ui_scale)
 	cfg.set_value("game", "unlimited", unlimited)
+	cfg.set_value("game", "zen", zen)
 	cfg.save("user://settings.cfg")
 
 
@@ -1196,7 +1213,8 @@ func hide_title() -> void:
 func set_hud(v: bool) -> void:
 	top_bar.visible = v
 	bottom_box.visible = v
-	left_col.visible = v
+	left_col.visible = v and not zen
+	hint.visible = not zen
 	toasts_box.visible = v
 	if not v:
 		info_panel.visible = false
@@ -1301,13 +1319,16 @@ func goals_done(list: Array) -> void:
 		return
 	var reward := 0
 	for g in list:
-		reward += int(g.get("r", 0))
 		if g.id == "legend":
 			goal_done(g)
+		else:
+			reward += int(g.get("r", 0))
 	if reward > 0 and not world.unlimited:
 		world.coins += reward
+	if zen:
+		return
 	sound.play("fanfare", 1.0, -6.0)
-	toast("Выполнено целей и достижений: %d!%s" % [list.size(), ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true)
+	toast("Выполнено целей и достижений: %d!%s" % [list.size(), ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true, true)
 	_confetti(40)
 
 
@@ -1316,11 +1337,13 @@ func goal_done(g: Dictionary) -> void:
 	var is_quest := g.has("r")
 	if reward > 0 and not world.unlimited:
 		world.coins += reward
+	if zen and g.id != "legend":
+		return
 	sound.play("fanfare", 1.0, -6.0)
 	if is_quest:
-		toast("Цель выполнена: «%s»%s" % [g.name, ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true)
+		toast("Цель выполнена: «%s»%s" % [g.name, ("  +%d мон." % reward) if reward > 0 and not world.unlimited else ""], true, true)
 	else:
-		toast("Достижение: «%s» — %s" % [g.name, g.desc], true)
+		toast("Достижение: «%s» — %s" % [g.name, g.desc], true, true)
 	_confetti(40 if is_quest else 24)
 	if g.id == "legend":
 		open_modal(celebrate_modal)
@@ -1441,8 +1464,23 @@ func _build_celebrate() -> void:
 
 func event_started(ev: Dictionary, desc: String) -> void:
 	_ev_pos = ev.pos
-	toast("%s! %s" % [ev.name, desc], true)
+	toast("%s! %s" % [ev.name, desc], true, true)
 
 
 func event_finished(ev: Dictionary) -> void:
-	toast("%s закончился — котики довольны!" % ev.name if ev.kind == "game" or ev.kind == "fireworks" else "Праздник «%s» закончился — котики довольны!" % ev.name)
+	toast("%s закончился — котики довольны!" % ev.name if ev.kind == "game" or ev.kind == "fireworks" else "Праздник «%s» закончился — котики довольны!" % ev.name, false, true)
+
+
+# ---------- режим «Дзен» ----------
+
+func set_zen(on: bool, announce := true) -> void:
+	zen = on
+	btn_zen.set_pressed_no_signal(on)
+	if chk_zen:
+		chk_zen.set_pressed_no_signal(on)
+	if not title_open():
+		left_col.visible = not on
+	hint.visible = not on
+	if announce:
+		_save_settings()
+		toast("Режим «Дзен»: только город, музыка и стройка" if on else "Режим «Дзен» выключен: цели и подсказки снова на месте", true)
