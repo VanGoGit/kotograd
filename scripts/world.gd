@@ -164,7 +164,8 @@ func new_game() -> void:
 	_gen_map(map_seed)
 	zoom = 3
 	_apply_zoom()
-	center_cam(W / 2.0, H / 2.0)
+	var st := start_spot()
+	center_cam(st.x, st.y)
 	recalc()
 	rebuild_maps()
 	if terrain_tex:
@@ -341,6 +342,39 @@ static func hashf(x: int, y: int, s: int = 0) -> float:
 	return float(h) / 4294967296.0
 
 
+## Контур острова — как карта Сан-Андреаса из GTA V (x, y в долях рамки; север сверху).
+const SA_SHAPE := [
+	Vector2(0.40, 0.00), Vector2(0.52, 0.03), Vector2(0.64, 0.08), Vector2(0.77, 0.12), Vector2(0.89, 0.20),
+	Vector2(0.96, 0.30), Vector2(0.98, 0.40), Vector2(0.93, 0.48), Vector2(0.86, 0.55), Vector2(0.81, 0.62),
+	Vector2(0.84, 0.70), Vector2(0.80, 0.80), Vector2(0.73, 0.90), Vector2(0.63, 0.97), Vector2(0.50, 1.00),
+	Vector2(0.38, 0.98), Vector2(0.27, 0.93), Vector2(0.18, 0.88), Vector2(0.10, 0.84), Vector2(0.07, 0.77),
+	Vector2(0.15, 0.70), Vector2(0.22, 0.62), Vector2(0.19, 0.55), Vector2(0.11, 0.48), Vector2(0.04, 0.40),
+	Vector2(0.02, 0.30), Vector2(0.08, 0.20), Vector2(0.18, 0.12), Vector2(0.28, 0.05),
+]
+# рамка острова на карте (в клетках)
+const SA_X0 := 37
+const SA_Y0 := 6
+const SA_W := 52
+const SA_H := 78
+
+
+static func _in_poly(p: Vector2, poly: Array) -> bool:
+	var inside := false
+	var j := poly.size() - 1
+	for i in poly.size():
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[j]
+		if (a.y > p.y) != (b.y > p.y) and p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x:
+			inside = not inside
+		j = i
+	return inside
+
+
+## Клетка-центр Лос-Сантоса — отсюда начинается город.
+func start_spot() -> Vector2:
+	return Vector2(SA_X0 + SA_W * 0.5, SA_Y0 + SA_H * 0.84)
+
+
 func _gen_map(s: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = s
@@ -350,33 +384,80 @@ func _gen_map(s: int) -> void:
 	objs = []
 	objs.resize(W * H)
 	var sm := s % 100000
-	var cx := W / 2.0
-	var cy := H / 2.0
-	# маленький островок посреди океана — дальше остров расширяет сам игрок
+	# остров в форме Сан-Андреаса: север — Палето-Бей и гора Чилиад, середина — пустыня и озеро Аламо,
+	# восток — горы, юг — Лос-Сантос с холмами Вайнвуда и пляжами Веспуччи
 	for y in H:
 		for x in W:
-			var d := pow((x + 0.5 - cx) / 28.0, 2.0) + pow((y + 0.5 - cy) / 19.0, 2.0)
-			d += (hashf(x, y, sm) - 0.5) * 0.25
-			if d < 1.0:
-				terrain[y * W + x] = SAND if d > 0.7 else GRASS
-				var hd := pow((x + 0.5 - cx - 13.0) / 7.0, 2.0) + pow((y + 0.5 - cy + 5.5) / 5.0, 2.0)
-				if hd < 1.0 and d < 0.5:
-					terrain[y * W + x] = HILL
+			var u := (x + 0.5 - SA_X0) / SA_W
+			var v := (y + 0.5 - SA_Y0) / SA_H
+			if u < -0.05 or u > 1.05 or v < -0.05 or v > 1.05:
+				continue
+			var jit := Vector2(hashf(x, y, sm) - 0.5, hashf(x, y, sm + 7) - 0.5) * 0.025
+			var p := Vector2(u, v) + jit
+			if not _in_poly(p, SA_SHAPE):
+				continue
+			var i := y * W + x
+			terrain[i] = GRASS
+			# пляж по краю
+			var edge := false
+			for d in [Vector2(0.03, 0), Vector2(-0.03, 0), Vector2(0, 0.02), Vector2(0, -0.02)]:
+				if not _in_poly(p + d, SA_SHAPE):
+					edge = true
+			if edge:
+				terrain[i] = SAND
+				continue
+			var n := hashf(x / 3, y / 3, sm + 3)
+			# гора Чилиад на северо-западе
+			var chil := Vector2((u - 0.28) / 0.13, (v - 0.17) / 0.09).length()
+			if chil < 0.6:
+				terrain[i] = MOUNTAIN
+			elif chil < 1.0:
+				terrain[i] = HILL
+			# леса Палето на севере
+			elif v < 0.22 and n < 0.55:
+				terrain[i] = MEADOW
+			# горы Татавиам на востоке
+			elif Vector2((u - 0.83) / 0.11, (v - 0.57) / 0.15).length() + (n - 0.5) * 0.4 < 1.0:
+				terrain[i] = MOUNTAIN if Vector2((u - 0.84) / 0.07, (v - 0.57) / 0.1).length() < 1.0 else HILL
+			# гора Гордо на северо-востоке
+			elif Vector2((u - 0.86) / 0.08, (v - 0.27) / 0.07).length() < 1.0:
+				terrain[i] = HILL
+			# пустыня Гранд-Сенора в середине
+			elif Vector2((u - 0.57) / 0.25, (v - 0.45) / 0.16).length() + (n - 0.5) * 0.45 < 1.0:
+				terrain[i] = DRY
+			# холмы Вайнвуда над городом
+			elif Vector2((u - 0.52) / 0.2, (v - 0.665) / 0.04).length() + (n - 0.5) * 0.5 < 1.0:
+				terrain[i] = HILL
+			# озеро Аламо-Си
+			if Vector2((u - 0.56) / 0.13, (v - 0.40) / 0.045).length() < 1.0:
+				terrain[i] = WATER
+	# природа: пальмы у Лос-Сантоса и на пляжах, агавы в пустыне, камни в горах
 	var spots := []
+	var center := start_spot()
 	for y in H:
 		for x in W:
-			if terrain[y * W + x] != WATER and Vector2(x + 0.5 - cx, y + 0.5 - cy).length() > 8.0:
+			var t: int = terrain[y * W + x]
+			if t != WATER and Vector2(x, y).distance_to(center) > 7.0:
 				spots.append(Vector2i(x, y))
 	spots.shuffle()
-	var n := 0
+	var placed := 0
 	for p in spots:
-		if n >= 80:
+		if placed >= 120:
 			break
-		var t := "wildpalm" if n < 54 else ("agave" if n < 70 else "rock")
-		if t == "rock" and terrain[p.y * W + p.x] != SAND:
-			continue
-		place_obj(p.y * W + p.x, t, rng.randi() % 3, 0.0)
-		n += 1
+		var t: int = terrain[p.y * W + p.x]
+		var kind := ""
+		match t:
+			DRY:
+				kind = "agave" if rng.randf() < 0.7 else "rock"
+			MOUNTAIN, HILL:
+				kind = "rock" if rng.randf() < 0.5 else "wildpalm"
+			SAND:
+				kind = "wildpalm" if rng.randf() < 0.6 else "rock"
+			_:
+				kind = "wildpalm"
+		if rng.randf() < 0.6:
+			place_obj(p.y * W + p.x, kind, rng.randi() % 3, 0.0)
+			placed += 1
 
 
 # =====================================================================
@@ -1460,6 +1541,14 @@ func _go_to(c: Dictionary, d: Dictionary, allow_car := true) -> void:
 		return
 	if can_car and (not _car_at_home(c) or c.near_car) and _try_drive(c, d):
 		return
+	# далеко идти, а машина у дома (и дом ближе) — сначала к машине, потом поехать
+	if can_car and _car_at_home(c) and not c.near_car and c.home >= 0 and is_ready(c.home) and kind != "home":
+		var cp := Vector2(c.x, c.y)
+		var to_goal := cp.distance_to(center_of(d.b))
+		if to_goal > 14.0 and cp.distance_to(center_of(c.home)) < to_goal * 0.6:
+			var acc := access_roads(c.home)
+			if not acc.is_empty() and _walk_to_car(c, d, _to_set(acc)):
+				return
 	var sx := roundi(c.x)
 	var sy := roundi(c.y)
 	var path = null

@@ -454,6 +454,7 @@ func vehicle(kind: String, col_hex: String) -> Dictionary:
 func _init() -> void:
 	scaffold[1] = _make_scaffold(16, 20)
 	scaffold[2] = _make_scaffold(32, 34)
+	scaffold[3] = _make_scaffold(48, 46)
 	_make_nature()
 	_make_homes()
 	_make_work()
@@ -473,7 +474,7 @@ func _make_scaffold(w: int, h: int) -> ImageTexture:
 		for y in range(7, h - 3, 2):
 			for x in range(3 + (1 if y % 4 == 1 else 0), w - 3, 2):
 				p.P(x, y, "a0d8b0")
-		var poles := [2, 13] if w == 16 else [2, 15, 29]
+		var poles := [2, 13] if w == 16 else ([2, 15, 29] if w == 32 else [2, 17, 31, 45])
 		for x in poles:
 			p.R(x, 3, 1, h - 6, "8a5a3b")
 		var y2 := h - 6
