@@ -25,6 +25,12 @@ const INK := Color("3b2a3a")
 
 ## Файл сохранения. Переменная окружения KOTO_SAVE позволяет тестам не трогать город игрока.
 var SAVE_PATH: String = OS.get_environment("KOTO_SAVE") if OS.has_environment("KOTO_SAVE") else "user://kotograd_save.json"
+## Версия формата сохранения. Старые версии доводятся до неё через UPGRADES.
+const SAVE_V := 5
+var save_error := ""             # почему не прочиталось последнее сохранение: "broken" или "newer"
+var save_notice := ""            # что случилось с сохранением при запуске — показывается на титульном экране
+var save_blocked := false        # файл из более новой версии игры: не перезаписываем его
+var save_aside := ""             # имя, под которым отложен испорченный файл
 var spr
 var sound
 var ui
@@ -200,10 +206,40 @@ func new_game() -> void:
 		refresh_terrain()
 
 
-func save_game() -> void:
+## Запись через временный файл: сначала .tmp, потом прежнее сохранение становится .bak,
+## а .tmp — основным файлом. Оборванная запись не портит город.
+func save_game() -> bool:
+	if save_blocked:
+		return false
+	var text := serialize()
+	var tmp := SAVE_PATH + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		return _write_direct(text)
+	var ok := f.store_string(text)
+	f.close()
+	if not ok or FileAccess.get_size(tmp) <= 0:
+		DirAccess.remove_absolute(tmp)
+		return false
+	if FileAccess.file_exists(SAVE_PATH):
+		var bak := SAVE_PATH + ".bak"
+		if FileAccess.file_exists(bak):
+			DirAccess.remove_absolute(bak)
+		DirAccess.rename_absolute(SAVE_PATH, bak)
+	if DirAccess.rename_absolute(tmp, SAVE_PATH) != OK:
+		# переименование не удалось (на всякий случай для веба) — пишем по-старому, прямо в файл
+		DirAccess.remove_absolute(tmp)
+		return _write_direct(text)
+	return true
+
+
+func _write_direct(text: String) -> bool:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(serialize())
+	if f == null:
+		return false
+	var ok := f.store_string(text)
+	f.close()
+	return ok
 
 
 func serialize() -> String:
@@ -241,7 +277,7 @@ func serialize() -> String:
 			k["y"] = roundf(c.y)
 		cat_list.append(k)
 	var data := {
-		"v": 5, "seed": map_seed, "island": island, "terrain": Array(terrain), "objs": mains, "coins": coins, "food": food,
+		"v": SAVE_V, "seed": map_seed, "island": island, "terrain": Array(terrain), "objs": mains, "coins": coins, "food": food,
 		"time": time, "day": day, "cats": cat_list, "max_cats": max_cats, "next_id": next_id, "speed": speed,
 		"used_names": used_names, "cam": [cam.position.x, cam.position.y, zoom],
 		"name": city_name, "goals": goals.done.keys(), "pets": pets_total, "events": events_seen, "rides": transit.rides,
@@ -250,19 +286,70 @@ func serialize() -> String:
 	return JSON.stringify(data)
 
 
+## Загрузка при запуске. Испорченный файл не затирается: город берётся из .bak,
+## а сам файл откладывается в сторону (.broken-<время>). Файл из более новой версии игры
+## не трогаем вовсе и не сохраняемся поверх него, пока игрок сам не начнёт другой город.
 func load_game() -> bool:
-	if not FileAccess.file_exists(SAVE_PATH):
+	save_notice = ""
+	save_aside = ""
+	save_blocked = false
+	var bak := SAVE_PATH + ".bak"
+	var has_main := FileAccess.file_exists(SAVE_PATH)
+	if has_main:
+		if deserialize(FileAccess.get_file_as_string(SAVE_PATH)):
+			return true
+		if save_error == "newer":
+			save_blocked = true
+			save_notice = "newer"
+			return false
+	if not FileAccess.file_exists(bak):
+		if has_main:
+			save_aside = _set_aside(SAVE_PATH, "broken")
+			save_notice = "broken"
 		return false
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
+	if deserialize(FileAccess.get_file_as_string(bak)):
+		# основного файла нет — запись оборвалась между переименованиями, это не поломка
+		if has_main:
+			save_aside = _set_aside(SAVE_PATH, "broken")
+			save_notice = "restored"
+		return true
+	if save_error == "newer":
+		save_blocked = true
+		save_notice = "newer"
 		return false
-	return deserialize(f.get_as_text())
+	save_aside = _set_aside(SAVE_PATH, "broken") if has_main else _set_aside(bak, "broken")
+	if has_main:
+		_set_aside(bak, "broken")
+	save_notice = "broken"
+	return false
+
+
+## Откладывает файл сохранения в сторону рядом с ним; возвращает новое имя файла.
+func _set_aside(path: String, tag: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var to := "%s.%s-%s" % [path, tag, Time.get_datetime_string_from_system().replace(":", "-")]
+	if DirAccess.rename_absolute(path, to) != OK:
+		DirAccess.copy_absolute(path, to)
+		DirAccess.remove_absolute(path)
+	return to.get_file()
+
+
+## Игрок сам выбрал другой город (новый или импорт): файл из более новой версии игры
+## откладываем в сторону и снова сохраняемся как обычно.
+func release_save() -> void:
+	if save_blocked:
+		save_blocked = false
+		_set_aside(SAVE_PATH, "newer")
+		_set_aside(SAVE_PATH + ".bak", "newer")
+	save_notice = ""
 
 
 ## Импорт сохранения из файла (меню настроек).
 func import_save(text: String) -> bool:
 	if not deserialize(text):
 		return false
+	release_save()
 	cars = []
 	info_target = null
 	_render_terrain_full()
@@ -306,16 +393,85 @@ func _migrate_small(d: Dictionary) -> void:
 		d.cam = [float(d.cam[0]) + ox * T, float(d.cam[1]) + oy * T, d.cam[2]]
 
 
+## Обновления формата: версия -> функция, которая поднимает сохранение на версию выше.
+## Чтобы поменять формат: увеличить SAVE_V и добавить сюда переход с прежней версии.
+## Сохранения старше самой ранней версии отсюда игра не читает.
+const UPGRADES := {}
+
+
+## Разбирает сохранение. Состояние мира меняется, только если файл целиком прошёл проверку;
+## иначе save_error говорит, что не так: "broken" (испорчен) или "newer" (из новой версии игры).
 func deserialize(text: String) -> bool:
-	var d = JSON.parse_string(text)
-	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != 5:
+	save_error = "broken"
+	var json := JSON.new()  # не JSON.parse_string: тот пишет испорченный файл в журнал ошибок
+	if json.parse(text) != OK:
 		return false
-	if not d.has("terrain"):
+	var d = json.data
+	if typeof(d) != TYPE_DICTIONARY or not _is_num(d.get("v")):
 		return false
+	var v := int(d.v)
+	if v > SAVE_V:
+		save_error = "newer"
+		return false
+	while v < SAVE_V:
+		if not UPGRADES.has(v):
+			return false
+		call(UPGRADES[v], d)
+		v += 1
+	if not _check_save(d):
+		return false
+	save_error = ""
+	_apply_save(d)
+	return true
+
+
+static func _is_num(x) -> bool:
+	return typeof(x) == TYPE_INT or typeof(x) == TYPE_FLOAT
+
+
+## Проверка всех полей, которые читает _apply_save, — до того, как трогать город.
+func _check_save(d: Dictionary) -> bool:
+	for k in ["seed", "coins", "food", "time", "day", "max_cats", "next_id", "speed"]:
+		if not _is_num(d.get(k)):
+			return false
+	for k in ["terrain", "objs", "cats", "used_names"]:
+		if typeof(d.get(k)) != TYPE_ARRAY:
+			return false
+	if d.has("goals") and typeof(d.goals) != TYPE_ARRAY:
+		return false
+	if d.has("cam") and (typeof(d.cam) != TYPE_ARRAY or d.cam.size() < 3 or not d.cam.slice(0, 3).all(_is_num)):
+		return false
+	for m in d.objs:
+		if typeof(m) != TYPE_ARRAY or m.size() < 4 or not (_is_num(m[0]) and _is_num(m[2]) and _is_num(m[3])):
+			return false
+		if m.size() > 4 and not _is_num(m[4]):
+			return false
+	for c in d.cats:
+		if typeof(c) != TYPE_DICTIONARY or typeof(c.get("name")) != TYPE_STRING or typeof(c.get("color")) != TYPE_STRING:
+			return false
+		if typeof(c.get("state")) != TYPE_STRING or not _is_num(c.get("x")) or not _is_num(c.get("y")) or not _is_num(c.get("home")):
+			return false
+	# сохранение с прежней маленькой карты: город переезжает в центр большой
 	if d.terrain.size() == D.OLD_W * D.OLD_H:
 		_migrate_small(d)
-	if d.terrain.size() != W * H:
+	if d.terrain.size() != W * H or not d.terrain.all(func(t): return _is_num(t) and t >= GRASS and t <= MEADOW):
 		return false
+	for m in d.objs:
+		var i := int(m[0])
+		if i < 0 or i >= W * H:
+			return false
+		if D.DEFS.has(str(m[1])):
+			var w := D.size_of(str(m[1]))
+			if i % W + w > W or i / W + w > H:
+				return false
+	for c in d.cats:
+		for k in ["home", "job", "at"]:
+			if c.has(k) and (not _is_num(c[k]) or int(c[k]) < -1 or int(c[k]) >= W * H):
+				return false
+	return true
+
+
+func _apply_save(d: Dictionary) -> void:
 	map_seed = int(d.seed)
 	island = str(d.get("island", "sa"))
 	terrain = PackedByteArray(d.terrain)
@@ -375,7 +531,6 @@ func deserialize(text: String) -> bool:
 	_apply_zoom()
 	cam.position = Vector2(cm[0], cm[1])
 	recalc()
-	return true
 
 
 # =====================================================================

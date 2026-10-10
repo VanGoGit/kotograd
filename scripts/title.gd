@@ -14,6 +14,8 @@ var _name_box: VBoxContainer
 var _btn_continue: Button
 var _name_edit: LineEdit
 var _warn: Label
+var _notice: PanelContainer
+var _notice_lbl: Label
 var _island := "sa"
 var _isl_btns := {}
 var _isl_desc: Label
@@ -66,6 +68,19 @@ func setup(user_interface, w, spr) -> void:
 		row.add_child(holder)
 		_cats.append(r)
 	vb.add_child(row)
+
+	# что случилось с сохранением при запуске (повреждено, восстановлено, из новой версии)
+	_notice = PanelContainer.new()
+	_notice.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_notice.visible = false
+	vb.add_child(_notice)
+	_notice_lbl = Label.new()
+	_notice_lbl.add_theme_color_override("font_color", Color("c24a5a"))
+	_notice_lbl.add_theme_font_size_override("font_size", 15)
+	_notice_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_notice_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_notice_lbl.custom_minimum_size = Vector2(440, 0)
+	_notice.add_child(_notice_lbl)
 
 	_menu_box = VBoxContainer.new()
 	_menu_box.add_theme_constant_override("separation", 10)
@@ -210,7 +225,20 @@ func open(has_city: bool) -> void:
 	visible = true
 	_btn_continue.visible = has_city
 	_btn_continue.text = tr("Продолжить: %s") % tr(world.city_name)
+	_notice_lbl.text = _save_notice_text()
+	_notice.visible = _notice_lbl.text != ""
 	_show_menu()
+
+
+func _save_notice_text() -> String:
+	match world.save_notice:
+		"restored":
+			return tr("Файл сохранения был повреждён — город восстановлен из резервной копии.")
+		"broken":
+			return tr("Файл сохранения не читается, поэтому начнётся новый город. Старый файл не удалён: %s") % world.save_aside
+		"newer":
+			return tr("Город сохранён более новой версией игры. Обновите игру (в браузере — перезагрузите страницу), чтобы продолжить его. До тех пор он не будет перезаписан.")
+	return ""
 
 
 func _show_menu() -> void:
@@ -254,7 +282,9 @@ func _on_new() -> void:
 	_name_box.visible = true
 	_name_edit.text = _random_name()
 	_warn.text = (tr("Город «%s» будет заменён новым островом.") % tr(world.city_name)) if _btn_continue.visible else ""
-	_warn.visible = _btn_continue.visible
+	if world.save_blocked:
+		_warn.text = tr("Город из более новой версии игры не удалится — его файл будет отложен в сторону.")
+	_warn.visible = _warn.text != ""
 	_name_edit.grab_focus()
 
 
@@ -262,6 +292,8 @@ func _on_found() -> void:
 	var n := _name_edit.text.strip_edges()
 	if n == "":
 		n = "Котоград"
+	world.release_save()
+	_notice.visible = false
 	world.island = _island
 	world.new_game()
 	world.city_name = n

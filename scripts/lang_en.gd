@@ -909,4 +909,9 @@ const EN := {
 	"Готово! Скоро в домик переедет первый котик…": "Done! The first cat will move in soon…",
 	"Пропустить подсказки": "Skip hints",
 	"Улучшить до уровня %d": "Upgrade to level %d",
+	"Файл сохранения был повреждён — город восстановлен из резервной копии.": "The save file was damaged — your city was restored from the backup copy.",
+	"Файл сохранения не читается, поэтому начнётся новый город. Старый файл не удалён: %s": "The save file can't be read, so a new city will start. The old file was kept: %s",
+	"Город сохранён более новой версией игры. Обновите игру (в браузере — перезагрузите страницу), чтобы продолжить его. До тех пор он не будет перезаписан.": "Your city was saved by a newer version of the game. Update the game (in a browser, reload the page) to continue it. Until then it won't be overwritten.",
+	"Город из более новой версии игры не удалится — его файл будет отложен в сторону.": "The city from the newer version won't be deleted — its file will be set aside.",
+	"Этот город сохранён более новой версией игры — сначала обновите игру": "This city was saved by a newer version of the game — update the game first",
 }

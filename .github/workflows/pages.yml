@@ -50,10 +50,15 @@ jobs:
           mkdir -p "$dir"
           cp ~/godot/templates/* "$dir"/
 
+      - name: Импорт ресурсов
+        run: ~/godot/godot --headless --path . --import || true
+
+      - name: Проверить сохранения
+        run: timeout 300 ~/godot/godot --headless --path . -s res://tests/save_test.gd
+
       - name: Собрать веб-версию
         run: |
           mkdir -p build/web
-          ~/godot/godot --headless --path . --import || true
           ~/godot/godot --headless --path . --export-release "Web" build/web/index.html
           test -f build/web/index.wasm
 

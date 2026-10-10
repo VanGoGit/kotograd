@@ -1451,7 +1451,10 @@ func _import_from(path: String) -> void:
 
 func _import_text(text: String, fname: String) -> void:
 	if text == "" or not world.import_save(text):
-		toast(tr("Этот файл не похож на сохранение Котограда"))
+		if world.save_error == "newer":
+			toast(tr("Этот город сохранён более новой версией игры — сначала обновите игру"))
+		else:
+			toast(tr("Этот файл не похож на сохранение Котограда"))
 		return
 	close_modals()
 	refresh_tools()
