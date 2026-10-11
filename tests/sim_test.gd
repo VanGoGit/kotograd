@@ -65,7 +65,7 @@ func _run() -> void:
 	_check(w.day - day0 >= DAYS, "прошло %d игровых дня" % DAYS)
 	_check(max_cats >= 10, "в город переехали котики")
 	_check(w.cats.size() >= max_cats / 2, "котики не пропадают")
-	_check(w.employed_count() > 0, "котики ходят на работу")
+	_check(w.economy.employed_count() > 0, "котики ходят на работу")
 	_check(_sane(w), "монетки, еда и координаты — обычные числа")
 
 	var text: String = w.saves.serialize()

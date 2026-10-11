@@ -9,6 +9,7 @@ const Transit = preload("res://scripts/transit.gd")
 const Boats = preload("res://scripts/boats.gd")
 const Saves = preload("res://scripts/saves.gd")
 const Mapgen = preload("res://scripts/mapgen.gd")
+const Economy = preload("res://scripts/economy.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const W := D.W
 const H := D.H
@@ -60,6 +61,7 @@ var transit
 var boats
 var saves = Saves.new(self)
 var mapgen = Mapgen.new(self)
+var economy = Economy.new(self)
 var _goal_t := 0.0
 var _amb_t := 0.0
 # сенсорное управление: два пальца — двигать и масштабировать карту
@@ -87,10 +89,6 @@ var lot_colors := {}
 var street_parked: Array = []
 var jammed := 0
 var happy := 50.0
-var hungry := false
-var income := 0.0
-var tourism := 0.0
-var eat_rate := 0.0
 var tool := "hand"
 var terrain_img: Image
 var terrain_tex: Array = []     # земля кусками по 16×16 клеток: при стройке обновляем только свой кусок
@@ -109,7 +107,6 @@ var zoom := 3
 
 var _job_t := 0.0
 var _service_t := 0.0
-var _freight_t := 0.0
 var _ambient_t := 0.0
 var _save_t := 0.0
 var _maps_t := 0.0
@@ -448,7 +445,7 @@ func recalc() -> void:
 			services.append(i)
 		if d.has("hub"):
 			st.hubs.append(i)
-		for g in needs_of(o.t):
+		for g in economy.needs_of(o.t):
 			if not st.sinks.has(g):
 				st.sinks[g] = []
 			st.sinks[g].append(i)
@@ -673,32 +670,6 @@ func rebuild_maps() -> void:
 			lot_count[car.lot] = lot_count.get(car.lot, 0) + 1
 
 
-func town_happiness() -> float:
-	var sum := 0.0
-	var w := 0.0
-	for h in stats.houses:
-		var n: int = residents.get(h, []).size()
-		var ww := float(n) if n > 0 else 0.3
-		sum += stats.house_happy[h] * ww
-		w += ww
-	var v := sum / w if w > 0.0 else 50.0
-	v -= minf(20.0, homeless_count() * 3.0)
-	v -= minf(10.0, street_parked.size() * 0.5 + jammed * 0.5)
-	if hungry:
-		v -= 25.0
-	v += pet_bonus
-	v += events.happy_bonus()
-	return clampf(v, 0.0, 100.0)
-
-
-func homeless_count() -> int:
-	var n := 0
-	for c in cats:
-		if c.home < 0:
-			n += 1
-	return n
-
-
 ## Точка, вокруг которой гуляет котик: его дом или место, где он ждёт новый дом.
 func anchor_of(c: Dictionary) -> Vector2:
 	if c.home >= 0 and objs[c.home] != null:
@@ -727,259 +698,9 @@ func _assign_homes() -> void:
 		ui.toast(tr("%s нашёл новый дом!") % I18n.cat(c.name), false, true)
 
 
-func employed_count() -> int:
-	var n := 0
-	for c in cats:
-		if c.job >= 0:
-			n += 1
-	return n
-
-
-func _update_economy(dt: float) -> void:
-	var n := cats.size()
-	var fp := 0.0
-	var shop_income := 0.0
-	var employed := 0
-	tourism = 0.0
-	for b in stats.tourists:
-		tourism += float(stat(objs[b], "tourism"))
-	for b in stats.workplaces:
-		var o = objs[b]
-		var d := D.def(o.t)
-		var nw: int = workers.get(b, []).size()
-		employed += nw
-		var boost := _produce(o, nw, dt)
-		if d.has("food"):
-			fp += (float(stat(o, "food")) + float(stat(o, "food_per", 0.0)) * nw) * (1.0 + (boost - 1.0) * 0.8)
-		if d.has("shop") and nw > 0:
-			shop_income += float(stat(o, "shop")) * (0.6 + 0.4 * nw / float(stat(o, "jobs"))) * boost
-		elif boost > 1.0 and nw > 0:
-			# стройконтора, архитекторы и другие без магазина: материалы — это премия работникам
-			shop_income += nw * 0.3 * (boost - 1.0)
-	stats.food_prod = fp
-	eat_rate = n * 0.04
-	food = clampf(food + (fp - eat_rate) * dt, 0.0, maxf(stats.food_cap, food))
-	hungry = food <= 0.01 and eat_rate > fp
-	pet_bonus = maxf(0.0, pet_bonus - dt * 0.05)
-	happy = town_happiness()
-	var mult: float = (0.5 + happy / 100.0) * 0.75 * (1.0 + events.income_bonus())
-	income = (employed * 0.35 + (n - employed) * 0.08 + shop_income + tourism) * mult
-	if coins < stats.coin_cap:
-		coins = minf(stats.coin_cap, coins + income * dt)
-	if n < stats.cap and happy >= 20.0:
-		spawn_t += dt * (0.4 + happy / 100.0)
-		if spawn_t >= 11.0:
-			spawn_t = 0.0
-			spawn_cat()
-
-
 # =====================================================================
 #  Производственные цепочки и грузовики
 # =====================================================================
-
-const OUT_CAP := 16.0
-const IN_CAP := 16.0
-const USE_CAP := 10.0
-const DEPOT_CAP := 40.0
-const MAKE_RATE := 0.1           # единиц товара в секунду при полном штате
-const USE_RATE := 0.02           # сколько товара расходует магазин или кафе в секунду
-const TRUCK_LOAD := 8
-
-
-## Какие товары здание принимает: сырьё для переработки или товары для продажи.
-func needs_of(t: String) -> Array:
-	var out: Array = D.USES.get(t, []).duplicate()
-	if D.MAKES.has(t):
-		for g in D.MAKES[t][1]:
-			if not out.has(g):
-				out.append(g)
-	return out
-
-
-func stock_of(o, g: String) -> float:
-	return float(o.get("stock", {}).get(g, 0.0))
-
-
-func _cap_for(o, g: String) -> float:
-	var d := D.def(o.t)
-	if d.get("depot", false):
-		return DEPOT_CAP * (1.0 + 0.5 * (int(o.get("lvl", 1)) - 1))
-	if D.MAKES.has(o.t) and D.MAKES[o.t][1].has(g):
-		return IN_CAP
-	return USE_CAP
-
-
-## Производство и расход товаров у одного здания. Возвращает множитель дохода (1 — как обычно).
-func _produce(o: Dictionary, nw: int, dt: float) -> float:
-	if nw <= 0:
-		o.erase("busy")
-		return 1.0
-	var boost := 1.0
-	var mk = D.MAKES.get(o.t)
-	if mk != null:
-		var f := float(nw) / float(stat(o, "jobs")) * (1.0 + 0.35 * (int(o.get("lvl", 1)) - 1))
-		var r := MAKE_RATE * f * dt
-		var out: float = o.get("out", 0.0)
-		var busy := false
-		if out < OUT_CAP:
-			var ok := true
-			for g in mk[1]:
-				if stock_of(o, g) < r:
-					ok = false
-			if ok:
-				for g in mk[1]:
-					o.stock[g] = stock_of(o, g) - r
-				o["out"] = minf(OUT_CAP, out + r)
-				busy = true
-		else:
-			busy = not (mk[1] as Array).is_empty()
-		if busy:
-			o["busy"] = true
-		else:
-			o.erase("busy")
-		if busy and not (mk[1] as Array).is_empty():
-			boost = 1.5
-	var uses: Array = D.USES.get(o.t, [])
-	if not uses.is_empty():
-		if not o.has("stock"):
-			o["stock"] = {}
-		var have := 0
-		for g in uses:
-			var v := stock_of(o, g)
-			if v > 0.0:
-				have += 1
-				o.stock[g] = maxf(0.0, v - USE_RATE * dt)
-		boost *= 1.0 + 0.6 * have / float(uses.size())
-	return boost
-
-
-func _truck_limit(b: int) -> int:
-	var o = objs[b]
-	return (2 if D.def(o.t).get("depot", false) else 1) + int(o.get("lvl", 1)) - 1
-
-
-## Раз в секунду грузовики развозят готовые товары: сначала тем, кому они нужны, потом на склад или в порт.
-func _update_freight(dt: float) -> void:
-	_freight_t -= dt
-	if _freight_t > 0.0:
-		return
-	_freight_t = 1.0
-	var inc := {}
-	var trucks := {}
-	for car in cars:
-		if not car.has("cargo"):
-			continue
-		trucks[car.base] = trucks.get(car.base, 0) + 1
-		if not car.get("dropped", false):
-			if not inc.has(car.target):
-				inc[car.target] = {}
-			inc[car.target][car.cargo] = inc[car.target].get(car.cargo, 0) + int(car.n)
-	var sources: Array = []
-	for b in stats.workplaces:
-		var o = objs[b]
-		if o == null or workers.get(b, []).is_empty() or trucks.get(b, 0) >= _truck_limit(b):
-			continue
-		if float(o.get("out", 0.0)) >= 4.0:
-			sources.append(b)
-		elif D.def(o.t).get("depot", false):
-			for g in o.get("stock", {}):
-				if o.stock[g] >= 4.0:
-					sources.append(b)
-					break
-	sources.shuffle()
-	var tries := 0
-	for b in sources:
-		if tries >= 3:
-			break
-		tries += 1
-		_dispatch(b, inc)
-
-
-func _dispatch(b: int, inc: Dictionary) -> void:
-	var o = objs[b]
-	var depot: bool = D.def(o.t).get("depot", false)
-	var offers: Array = []
-	if depot:
-		for g in o.get("stock", {}):
-			if o.stock[g] >= 4.0:
-				offers.append([g, o.stock[g]])
-		offers.shuffle()
-	else:
-		offers.append([D.MAKES[o.t][0], float(o.get("out", 0.0))])
-	var starts := access_roads(b)
-	if starts.is_empty():
-		return
-	var bc := center_of(b)
-	for of in offers:
-		var g: String = of[0]
-		var have: float = of[1]
-		var cands: Array = []
-		for s in stats.sinks.get(g, []):
-			if s == b or not is_ready(s):
-				continue
-			var space: float = _cap_for(objs[s], g) - stock_of(objs[s], g) - inc.get(s, {}).get(g, 0)
-			if space >= 3.0:
-				var sc := center_of(s)
-				cands.append([absf(sc.x - bc.x) + absf(sc.y - bc.y), s, space])
-		# лишнее — на склад, а если и он полон или его нет — в порт на экспорт (когда своё хранилище почти полно)
-		if not depot and have >= OUT_CAP - 4.0:
-			for s in stats.depots:
-				var space: float = _cap_for(objs[s], g) - stock_of(objs[s], g) - inc.get(s, {}).get(g, 0)
-				if is_ready(s) and space >= 3.0:
-					var sc := center_of(s)
-					cands.append([1000.0 + absf(sc.x - bc.x) + absf(sc.y - bc.y), s, space])
-			for s in stats.ports:
-				if is_ready(s):
-					var sc := center_of(s)
-					cands.append([2000.0 + absf(sc.x - bc.x) + absf(sc.y - bc.y), s, 99.0])
-		cands.sort_custom(func(x, y): return x[0] < y[0])
-		for k in mini(3, cands.size()):
-			var s: int = cands[k][1]
-			var route = road_route(starts, _to_set(access_roads(s)))
-			if route == null:
-				continue
-			var n := mini(TRUCK_LOAD, int(minf(have, cands[k][2])))
-			if n < 3:
-				continue
-			if depot:
-				o.stock[g] -= n
-			else:
-				o.out = float(o.out) - n
-			if route.size() < 2:
-				# соседи у одной дороги — товар просто переносят через улицу
-				_deliver({"target": s, "cargo": g, "n": n})
-				return
-			var car := _make_car("cargo", D.GOODS[g].col, route, null, s, b)
-			car.base = b
-			car["cargo"] = g
-			car["n"] = n
-			cars.append(car)
-			if not inc.has(s):
-				inc[s] = {}
-			inc[s][g] = inc[s].get(g, 0) + n
-			return
-
-
-## Грузовик доехал: товар — в здание, а в порту — монетки за экспорт.
-func _deliver(car: Dictionary) -> void:
-	car["dropped"] = true
-	var s: int = car.target
-	if not is_ready(s):
-		return
-	var o = objs[s]
-	var g: String = car.cargo
-	deliveries += 1
-	if D.def(o.t).get("export", false):
-		var price := 2 if D.GOODS[g].get("raw", false) else 5
-		var got: int = car.n * price
-		if coins < stats.coin_cap:
-			coins = minf(stats.coin_cap, coins + got)
-		exported += int(car.n)
-		float_text(center_of(s) * T + Vector2(8, -10), "+%d" % got, Color("c08a1a"))
-		return
-	if not o.has("stock"):
-		o["stock"] = {}
-	o.stock[g] = minf(_cap_for(o, g), stock_of(o, g) + car.n)
 
 
 func _assign_jobs() -> void:
@@ -1056,7 +777,7 @@ func free_houses() -> Array:
 
 
 func spawn_cat() -> void:
-	if homeless_count() > 0:
+	if economy.homeless_count() > 0:
 		return
 	var houses := free_houses()
 	if houses.is_empty():
@@ -2124,7 +1845,7 @@ func _update_cars(dt: float) -> void:
 			car.k = route.size() - 1
 			car.prog = 0.0
 			if car.has("cargo") and not car.get("dropped", false):
-				_deliver(car)
+				economy._deliver(car)
 			if car.return_to >= 0 and is_ready(car.return_to):
 				var e: Vector2i = route[route.size() - 1]
 				var back = road_route([e.y * W + e.x], _to_set(access_roads(car.return_to)))
@@ -2634,7 +2355,7 @@ func _step(gdt: float) -> void:
 	if _maps_t <= 0.0 or _job_t <= 0.0:
 		_maps_t = 0.25
 		rebuild_maps()
-		_update_economy(_econ_dt)
+		economy._update_economy(_econ_dt)
 		_econ_dt = 0.0
 	if _job_t <= 0.0:
 		_job_t = 1.0
@@ -2649,7 +2370,7 @@ func _step(gdt: float) -> void:
 		if car.get("wait", 0.0) > 4.0 or car.get("passing", false):
 			jammed += 1
 	_spawn_service_vehicles(gdt)
-	_update_freight(gdt)
+	economy._update_freight(gdt)
 	events.update(gdt)
 	transit.update(gdt)
 	boats.update(gdt)

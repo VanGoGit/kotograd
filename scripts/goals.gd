@@ -88,10 +88,10 @@ func metrics() -> Dictionary:
 func _metrics() -> Dictionary:
 	var st: Dictionary = world.stats
 	var m := {
-		"houses": st.houses.size(), "cats": world.cats.size(), "employed": world.employed_count(),
-		"food_ok": 1 if world.cats.size() > 0 and st.food_prod > world.eat_rate else 0,
+		"houses": st.houses.size(), "cats": world.cats.size(), "employed": world.economy.employed_count(),
+		"food_ok": 1 if world.cats.size() > 0 and st.food_prod > world.economy.eat_rate else 0,
 		"lots": st.lots.size(), "happy": int(world.happy), "jobs": st.jobs, "wonders": st.wonders.size(),
-		"tourism": int(world.tourism), "pets": world.pets_total, "day": world.day, "coins": int(world.coins),
+		"tourism": int(world.economy.tourism), "pets": world.pets_total, "day": world.day, "coins": int(world.coins),
 		"jam": world.jammed, "events": world.events_seen, "rides": world.transit.rides,
 		"deliveries": world.deliveries, "exported": world.exported,
 		"rail_links": 0, "airports": world.transit.airports().size(),

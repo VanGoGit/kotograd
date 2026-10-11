@@ -785,7 +785,7 @@ func _short_lines(o: Dictionary, d: Dictionary) -> Array:
 		var parts: Array = []
 		var have := 0
 		for g in uses:
-			var v: float = world.stock_of(o, g)
+			var v: float = world.economy.stock_of(o, g)
 			if v > 0.0:
 				have += 1
 				parts.append("%s %d" % [tr(D.GOODS[g].name), ceili(v)])
@@ -855,9 +855,9 @@ func _render_info() -> void:
 			else:
 				car_txt = tr("в гараже дома")
 		lines.append(tr("Машина: ") + car_txt)
-		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.hungry else 0.0)
+		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.economy.hungry else 0.0)
 		lines.append(tr("Настроение: ") + _mood(hv))
-		if world.hungry:
+		if world.economy.hungry:
 			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
 		info_pet.visible = true
 		info_up.visible = false
@@ -958,10 +958,10 @@ func _chain_lines(o: Dictionary) -> Array:
 	if D.MAKES.has(o.t):
 		var mk: Array = D.MAKES[o.t]
 		out.append("")
-		out.append(tr("Производит: %s — готово к отправке %d из %d") % [tr(D.GOODS[mk[0]].name).to_lower(), int(o.get("out", 0.0)), int(world.OUT_CAP)])
+		out.append(tr("Производит: %s — готово к отправке %d из %d") % [tr(D.GOODS[mk[0]].name).to_lower(), int(o.get("out", 0.0)), int(world.economy.OUT_CAP)])
 		var waiting: Array = []
 		for g in mk[1]:
-			var v: float = world.stock_of(o, g)
+			var v: float = world.economy.stock_of(o, g)
 			out.append(tr("  Сырьё: %s — %d") % [tr(D.GOODS[g].name).to_lower(), int(v)])
 			if v < 0.5:
 				waiting.append(g)
@@ -981,7 +981,7 @@ func _chain_lines(o: Dictionary) -> Array:
 		var have := 0
 		var missing: Array = []
 		for g in uses:
-			var v: float = world.stock_of(o, g)
+			var v: float = world.economy.stock_of(o, g)
 			if v > 0.0:
 				have += 1
 				parts.append("%s %d" % [tr(D.GOODS[g].name), ceili(v)])
@@ -1636,14 +1636,14 @@ func _fmt(n: float) -> String:
 func _update_hud() -> void:
 	lbl_coins.text = tr("без лимита") if world.unlimited else "%s/%s" % [_fmt(world.coins), _fmt(world.stats.coin_cap)]
 	lbl_coins.add_theme_color_override("font_color", Color("c08a1a") if world.coins >= world.stats.coin_cap - 0.5 else INK)
-	lbl_coin_rate.text = tr("+%.1f/с") % world.income
+	lbl_coin_rate.text = tr("+%.1f/с") % world.economy.income
 	lbl_food.text = "%s/%s" % [_fmt(world.food), _fmt(world.stats.food_cap)]
 	lbl_food.add_theme_color_override("font_color", Color("c08a1a") if world.food >= world.stats.food_cap - 0.5 else INK)
-	var net: float = world.stats.food_prod - world.eat_rate
+	var net: float = world.stats.food_prod - world.economy.eat_rate
 	lbl_food_rate.text = tr("%s%.1f/с") % ["+" if net >= 0.0 else "", net]
 	lbl_food_rate.add_theme_color_override("font_color", Color("c24a5a") if net < 0.0 else Color("4f8a4f"))
 	lbl_cats.text = "%d/%d" % [world.cats.size(), world.stats.cap]
-	lbl_jobs.text = "%d/%d" % [world.employed_count(), world.stats.jobs]
+	lbl_jobs.text = "%d/%d" % [world.economy.employed_count(), world.stats.jobs]
 	happy_bar.value = world.happy
 	lbl_happy.text = "%d%%" % int(world.happy)
 	var h: float = world.hour()
@@ -1673,12 +1673,12 @@ func _hint_text() -> String:
 		return tr("Начнём! Во вкладке «Жильё» постройте Домик, а во вкладке «Рельеф» можно бесплатно расширять остров.")
 	if world.cats.is_empty():
 		return tr("Котик уже собирает чемодан и скоро приедет…")
-	var homeless: int = world.homeless_count()
+	var homeless: int = world.economy.homeless_count()
 	if homeless > 0:
 		return tr("Котиков без дома: %d. Постройте жильё — они сразу переедут!") % homeless
 	if st.workplaces.is_empty():
 		return tr("Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Еда»).")
-	if world.hungry:
+	if world.economy.hungry:
 		return tr("Еда закончилась! Нужен ещё один рыбный причал или пекарня.")
 	var roads := 0
 	for o in world.objs:
@@ -1690,12 +1690,12 @@ func _hint_text() -> String:
 		return tr("Подсказка: проложите Дорогу мимо домов и работы — котики поедут на машинах!")
 	if world.cats.size() >= st.cap:
 		return tr("Все дома заняты — постройте ещё жильё, чтобы приехали новые котики.")
-	var employed: int = world.employed_count()
+	var employed: int = world.economy.employed_count()
 	if employed < world.cats.size() and st.jobs <= employed:
 		return tr("Не всем хватает работы — постройте магазин, пекарню или городские службы.")
 	if world.coins >= st.coin_cap - 0.5 and not world.unlimited:
 		return tr("Хранилище монет заполнено! Потратьте монетки или постройте Банк (вкладка «Бизнес»).")
-	if world.food >= st.food_cap - 0.5 and world.stats.food_prod > world.eat_rate:
+	if world.food >= st.food_cap - 0.5 and world.stats.food_prod > world.economy.eat_rate:
 		return tr("Склады еды полны — постройте Склад или Супермаркет, чтобы запасать больше.")
 	if world.street_parked.size() >= 3:
 		return tr("Машины стоят прямо на дорогах — бывают пробки! Постройте Парковку рядом с работой и магазинами.")
