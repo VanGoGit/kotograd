@@ -1066,7 +1066,7 @@ func start_tutorial() -> void:
 func finish_tutorial() -> void:
 	tut_step = -1
 	tutorial_done = true
-	world.tut_cat = null
+	world.drawer.tut_cat = null
 	tut_panel.visible = false
 	hint.visible = not zen
 	for b in tab_buttons:
@@ -1101,7 +1101,7 @@ func _update_tutorial(delta: float) -> void:
 				_tut_next()
 		2:
 			if not world.cats.is_empty():
-				world.tut_cat = world.cats[0]
+				world.drawer.tut_cat = world.cats[0]
 				_tut_pets = world.pets_total
 				_tut_next()
 		3:

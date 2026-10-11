@@ -275,7 +275,7 @@ func _draw_yacht(p: Vector2, side: bool, s: float, bt: Dictionary) -> void:
 		if bt.cat:
 			_cat_on(Vector2(p.x - 1, p.y + (2 if nose > 0 else -6)), bt)
 	if w.dark > 0.1:
-		w.lights.append(Vector3(p.x, p.y - 21, 6))
+		w.drawer.lights.append(Vector3(p.x, p.y - 21, 6))
 
 
 func _draw_motorboat(p: Vector2, side: bool, s: float, bt: Dictionary) -> void:
@@ -311,4 +311,4 @@ func _draw_motorboat(p: Vector2, side: bool, s: float, bt: Dictionary) -> void:
 		if bt.cat:
 			_cat_on(Vector2(p.x - 1, p.y - 3 * nose - 1), bt)
 	if w.dark > 0.1 and bt.state != "dock":
-		w.lights.append(Vector3(p.x, p.y - 2, 8))
+		w.drawer.lights.append(Vector3(p.x, p.y - 2, 8))

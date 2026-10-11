@@ -10,23 +10,22 @@ const Boats = preload("res://scripts/boats.gd")
 const Saves = preload("res://scripts/saves.gd")
 const Mapgen = preload("res://scripts/mapgen.gd")
 const Economy = preload("res://scripts/economy.gd")
+const Ground = preload("res://scripts/ground.gd")
+const Drawer = preload("res://scripts/drawer.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const W := D.W
 const H := D.H
 const T := D.T
 const GRASS := D.GRASS
 const WATER := D.WATER
-const SAND := D.SAND
 const HILL := D.HILL
 const MOUNTAIN := D.MOUNTAIN
-const DRY := D.DRY
 const MEADOW := D.MEADOW
 const DAY_LEN := D.DAY_LEN
 # массив своим литералом: константа-массив из другого скрипта (D.DIRS) в горячих циклах в 5 раз медленнее
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const ZOOM_MIN := 1
 const ZOOM_MAX := 6
-const INK := Color("3b2a3a")
 
 var spr
 var sound
@@ -62,6 +61,8 @@ var boats
 var saves = Saves.new(self)
 var mapgen = Mapgen.new(self)
 var economy = Economy.new(self)
+var ground = Ground.new(self)
+var drawer = Drawer.new(self)
 var _goal_t := 0.0
 var _amb_t := 0.0
 # сенсорное управление: два пальца — двигать и масштабировать карту
@@ -77,7 +78,6 @@ var pairs := {}              # объединённые соседние зда�
 var ramps: Array = []
 var _light_clock := 0.0
 const LIGHT_CYCLE := 9.0
-const FLAT := ["pawtile", "boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
 
 # --- производное / временное ---
 var stats := {}
@@ -94,14 +94,14 @@ var terrain_img: Image
 var terrain_tex: Array = []     # земля кусками по 16×16 клеток: при стройке обновляем только свой кусок
 const CHUNK := 16
 const CW := (W + CHUNK - 1) / CHUNK
-const CH := (H + CHUNK - 1) / CHUNK
 var dirty_tiles := {}
+## Растёт при любой стройке и сносе — по нему отрисовка понимает, что кэш построек устарел.
+var objs_version := 0
 var cars: Array = []
 var parts: Array = []
 var floats: Array = []
 var info_target = null
 var anim_time := 0.0
-var lights: Array = []
 var dark := 0.0
 var zoom := 3
 
@@ -111,11 +111,9 @@ var _ambient_t := 0.0
 var _save_t := 0.0
 var _maps_t := 0.0
 var _econ_dt := 0.0
-var tut_cat = null
 var wind := 0.0                  # лёгкий бриз: -1…1 (влево/вправо), 0 — штиль
 var _wind_to := 0.0
 var _wind_t := 8.0
-const WINDY := ["palm", "wildpalm"]               # котик, на которого показывает обучение
 var mobile := false              # телефон или планшет в браузере: 30 кадров и реже тяжёлые расчёты
 var _had_goals := false
 var _pan_active := false
@@ -152,8 +150,8 @@ func setup(sprites, snd, user_interface, camera: Camera2D) -> bool:
 	var loaded := saves.load_game()
 	if not loaded:
 		new_game()
-	_render_terrain_full()
-	refresh_terrain()
+	ground._render_terrain_full()
+	ground.refresh_terrain()
 	rebuild_maps()
 	if loaded and not _had_goals:
 		goals.sync_silently()
@@ -196,8 +194,8 @@ func new_game() -> void:
 	recalc()
 	rebuild_maps()
 	if not terrain_tex.is_empty():
-		_render_terrain_full()
-		refresh_terrain()
+		ground._render_terrain_full()
+		ground.refresh_terrain()
 
 
 # =====================================================================
@@ -234,6 +232,7 @@ func obj_at(x: int, y: int):
 
 
 func place_obj(i: int, t: String, v: int, build: float) -> Dictionary:
+	objs_version += 1
 	var w := D.size_of(t)
 	var o := {"t": t, "v": v, "i": i, "w": w, "build": build, "lvl": 1}
 	var x0 := i % W
@@ -241,17 +240,18 @@ func place_obj(i: int, t: String, v: int, build: float) -> Dictionary:
 	for y in range(y0, y0 + w):
 		for x in range(x0, x0 + w):
 			objs[y * W + x] = o
-	mark_dirty(x0, y0, w)
+	ground.mark_dirty(x0, y0, w)
 	return o
 
 
 func remove_obj(o: Dictionary) -> void:
+	objs_version += 1
 	var x0: int = o.i % W
 	var y0: int = o.i / W
 	for y in range(y0, y0 + o.w):
 		for x in range(x0, x0 + o.w):
 			objs[y * W + x] = null
-	mark_dirty(x0, y0, o.w)
+	ground.mark_dirty(x0, y0, o.w)
 
 
 ## Клетки вокруг постройки (сначала снизу — там «дверь»).
@@ -366,7 +366,7 @@ func upgrade(b: int) -> bool:
 	o["lvl"] = int(o.get("lvl", 1)) + 1
 	if mate >= 0 and objs[mate] != null:
 		objs[mate]["lvl"] = o.lvl
-		mark_dirty(mate % W, mate / W, 1)
+		ground.mark_dirty(mate % W, mate / W, 1)
 	var cp := center_of(b) * T + Vector2(8, 0)
 	for k in 16:
 		add_p({"type": "sparkle", "x": cp.x + randf_range(-12, 12), "y": cp.y + randf_range(-16, 8), "vx": randf_range(-25, 25), "vy": randf_range(-40, -10), "life": randf_range(0.7, 1.4)})
@@ -402,6 +402,7 @@ func bname(b: int) -> String:
 # =====================================================================
 
 func recalc() -> void:
+	objs_version += 1
 	var st := {
 		"cap": 0, "jobs": 0, "houses": [], "workplaces": [], "leisure": [], "strolls": [], "vehicle_bases": [],
 		"constructing": [], "builder_yards": [], "house_happy": {}, "food_prod": stats.get("food_prod", 0.0), "wonders": [], "lots": [], "tourists": [], "hubs": [],
@@ -2044,8 +2045,8 @@ func wonder_built(t: String) -> bool:
 
 func _terraform(x: int, y: int, kind: int) -> void:
 	terrain[y * W + x] = kind
-	mark_dirty(x, y, 1)
-	compute_shore()
+	ground.mark_dirty(x, y, 1)
+	ground.compute_shore()
 	if randf() < 0.5:
 		_dust(x, y)
 	if Time.get_ticks_msec() - _last_reason_ms > 90:
@@ -2311,10 +2312,10 @@ func _process(delta: float) -> void:
 	if not dirty_tiles.is_empty():
 		var chunks := {}
 		for key in dirty_tiles:
-			_draw_tile(key % W, key / W)
+			ground._draw_tile(key % W, key / W)
 			chunks[(key / W) / CHUNK * CW + (key % W) / CHUNK] = true
 		dirty_tiles.clear()
-		refresh_terrain(chunks.keys())
+		ground.refresh_terrain(chunks.keys())
 	_goal_t += dt
 	if _goal_t > 3.0:
 		_goal_t = 0.0
@@ -2655,611 +2656,13 @@ func cycle_speed() -> void:
 #  Отрисовка земли (в картинку, обновляется по клеткам)
 # =====================================================================
 
-func mark_dirty(x0: int, y0: int, w: int) -> void:
-	for y in range(y0 - 2, y0 + w + 2):
-		for x in range(x0 - 2, x0 + w + 2):
-			if in_map(x, y):
-				dirty_tiles[y * W + x] = true
-
 
 var shore: Array = []
-
-
-func _render_terrain_full() -> void:
-	for y in H:
-		for x in W:
-			_draw_tile(x, y)
-	dirty_tiles.clear()
-	compute_shore()
-
-
-func compute_shore() -> void:
-	shore = []
-	for y in H:
-		for x in W:
-			if terrain[y * W + x] != WATER:
-				continue
-			for dv in DIRS:
-				var nx: int = x + dv.x
-				var ny: int = y + dv.y
-				if in_map(nx, ny) and terrain[ny * W + nx] != WATER:
-					shore.append([x, y, dv])
-
-
-func _is_land(x: int, y: int) -> bool:
-	return in_map(x, y) and terrain[y * W + x] != WATER
-
-
-## Загрузить нарисованную землю в текстуры: все куски или только перечисленные.
-func refresh_terrain(only = null) -> void:
-	if terrain_tex.size() != CW * CH:
-		terrain_tex = []
-		for k in CW * CH:
-			terrain_tex.append(ImageTexture.create_from_image(terrain_img.get_region(_chunk_rect(k))))
-		return
-	var list: Array = only if only != null else range(CW * CH)
-	for k in list:
-		(terrain_tex[k] as ImageTexture).update(terrain_img.get_region(_chunk_rect(k)))
-
-
-func _chunk_rect(k: int) -> Rect2i:
-	var cx := k % CW * CHUNK * T
-	var cy := k / CW * CHUNK * T
-	return Rect2i(cx, cy, mini(CHUNK * T, W * T - cx), mini(CHUNK * T, H * T - cy))
-
-
-func _r(px: int, py: int, a: int, b: int, w: int, h: int, col: String) -> void:
-	terrain_img.fill_rect(Rect2i(px + a, py + b, w, h), Color(col))
-
-
-func _draw_tile(x: int, y: int) -> void:
-	var px := x * T
-	var py := y * T
-	var i := y * W + x
-	var t := terrain[i]
-	var hs := func(k: int) -> float: return hashf(x, y, k)
-	if t == WATER:
-		_r(px, py, 0, 0, 16, 16, "6cc1e0")
-		for k in 2:
-			if hs.call(k) < 0.5:
-				_r(px, py, int(hs.call(k + 5) * 12), int(hs.call(k + 9) * 14), 3, 1, "86cfe9")
-		if _is_land(x, y - 1):
-			_r(px, py, 0, 0, 16, 1, "e3f7fc"); _r(px, py, 0, 1, 16, 1, "a3dcef")
-		if _is_land(x, y + 1):
-			_r(px, py, 0, 15, 16, 1, "e3f7fc"); _r(px, py, 0, 14, 16, 1, "a3dcef")
-		if _is_land(x - 1, y):
-			_r(px, py, 0, 0, 1, 16, "e3f7fc"); _r(px, py, 1, 0, 1, 16, "a3dcef")
-		if _is_land(x + 1, y):
-			_r(px, py, 15, 0, 1, 16, "e3f7fc"); _r(px, py, 14, 0, 1, 16, "a3dcef")
-	elif t == SAND:
-		_r(px, py, 0, 0, 16, 16, "f1dfa6")
-		for k in 6:
-			_r(px, py, int(hs.call(k) * 16), int(hs.call(k + 20) * 16), 1, 1, "e4cc8c" if k % 2 else "f8ecc4")
-	elif t == HILL:
-		_r(px, py, 0, 0, 16, 16, "b0de8c")
-		for k in 6:
-			_r(px, py, int(hs.call(k) * 16), int(hs.call(k + 20) * 16), 1, 1, "c4eaa4" if k % 2 else "98cc78")
-		# склоны: тень снизу и справа, свет сверху
-		if not _is_high_at(x, y + 1):
-			_r(px, py, 0, 13, 16, 3, "88c070"); _r(px, py, 0, 15, 16, 1, "70a85c")
-		if not _is_high_at(x + 1, y):
-			_r(px, py, 14, 0, 2, 16, "98cc78")
-		if not _is_high_at(x, y - 1):
-			_r(px, py, 0, 0, 16, 1, "d0f0b4")
-	elif t == MOUNTAIN:
-		# горная цепь: на каждой клетке пик со светлым и тёмным склоном
-		_r(px, py, 0, 0, 16, 16, "a89a80")
-		for k in 5:
-			_r(px, py, int(hs.call(k) * 15), int(hs.call(k + 20) * 15), 1, 1, "968870")
-		var n_m := int(terrain_at(x, y - 1) == MOUNTAIN) + int(terrain_at(x - 1, y) == MOUNTAIN) + int(terrain_at(x + 1, y) == MOUNTAIN) + int(terrain_at(x, y + 1) == MOUNTAIN)
-		var apex := 1 + int(hs.call(93) * 3)
-		var ax := 6 + int(hs.call(94) * 4)
-		for r in range(0, 15 - apex):
-			var yy := apex + r
-			var hw := int(r * 0.75) + 1
-			_r(px, py, ax - hw, yy, hw, 1, "cbbfa6")
-			_r(px, py, ax, yy, hw, 1, "8f816a")
-		# снег на вершинах в глубине массива
-		if n_m >= 3:
-			var sh := 3 if n_m == 4 else 2
-			for r in sh:
-				var hw2 := int(r * 0.75) + 1
-				_r(px, py, ax - hw2, apex + r, hw2 * 2, 1, "ffffff" if r < sh - 1 else "e8eef6")
-		if terrain_at(x, y + 1) != MOUNTAIN:
-			_r(px, py, 0, 13, 16, 3, "7a6c56")
-			for k in range(1, 16, 4):
-				_r(px, py, k, 13, 1, 3, "65584a")
-	elif t == DRY:
-		_r(px, py, 0, 0, 16, 16, "d4c88a")
-		for k in 7:
-			_r(px, py, int(hs.call(k) * 16), int(hs.call(k + 20) * 16), 1, 1, "c0b070" if k % 2 else "e4dca4")
-		if hs.call(60) < 0.4:
-			var bx := 3 + int(hs.call(61) * 9)
-			var by := 4 + int(hs.call(62) * 8)
-			_r(px, py, bx, by, 3, 2, "8a9a58"); _r(px, py, bx + 1, by - 1, 1, 1, "8a9a58")
-	elif t == MEADOW:
-		_r(px, py, 0, 0, 16, 16, "9bd67f")
-		for k in 5:
-			_r(px, py, int(hs.call(k) * 16), int(hs.call(k + 20) * 16), 1, 1, "8bc871")
-		for k in 4:
-			var fx := 1 + int(hs.call(k + 40) * 14)
-			var fy := 1 + int(hs.call(k + 50) * 14)
-			_r(px, py, fx, fy, 1, 1, ["ff6b3a", "ff9f43", "ffffff", "c8a8ff"][k])
-	else:
-		_r(px, py, 0, 0, 16, 16, "9bd67f")
-		for k in 7:
-			_r(px, py, int(hs.call(k) * 16), int(hs.call(k + 20) * 16), 1, 1, "8bc871" if k % 3 else "b0e294")
-		for k in 2:
-			_r(px, py, int(hs.call(k + 40) * 15), int(hs.call(k + 50) * 14), 1, 2, "7fbf68")
-		if hs.call(77) < 0.13:
-			var fx := 2 + int(hs.call(78) * 11)
-			var fy := 2 + int(hs.call(79) * 11)
-			var col: String = ["ffffff", "ffd1e0", "fff3a0", "c8b6ff"][int(hs.call(80) * 4)]
-			_r(px, py, fx - 1, fy, 3, 1, col); _r(px, py, fx, fy - 1, 1, 3, col); _r(px, py, fx, fy, 1, 1, "ffd75e")
-	var o = objs[i]
-	if o == null:
-		return
-	if o.t == "road":
-		_draw_road(px, py, x, y, t == WATER)
-	elif o.t == "highway":
-		_draw_highway(px, py, x, y, t == WATER)
-	elif o.t == "path":
-		_draw_path(px, py, x, y, t == WATER, hs)
-	elif o.t == "blvd":
-		if t == WATER:
-			_draw_path(px, py, x, y, true, hs)
-		else:
-			_draw_blvd(px, py, x, y)
-	elif o.t == "rail":
-		_draw_rail(px, py, x, y, t == WATER, false)
-	elif o.t == "crossing":
-		_draw_road(px, py, x, y, t == WATER)
-		_draw_rail(px, py, x, y, t == WATER, true)
-	elif o.w == 2 and (D.def(o.t).has("cap") or D.def(o.t).has("jobs")) and not D.def(o.t).get("nopad", false):
-		_r(px, py, 0, 0, 16, 16, "d8d0c4")
-		if hs.call(3) < 0.5:
-			_r(px, py, int(hs.call(4) * 14), int(hs.call(5) * 14), 2, 1, "cbc2b4")
-
-
-func terrain_at(x: int, y: int) -> int:
-	return terrain[y * W + x] if in_map(x, y) else WATER
-
-
-func _is_high_at(x: int, y: int) -> bool:
-	return in_map(x, y) and is_high(y * W + x)
-
-
-## Магистраль: 2 полосы в каждую сторону, двойная жёлтая посередине.
-func _draw_highway(px: int, py: int, x: int, y: int, water: bool) -> void:
-	var up := is_highway(x, y - 1)
-	var dn := is_highway(x, y + 1)
-	var lf := is_highway(x - 1, y)
-	var rt := is_highway(x + 1, y)
-	var asph := "5d5b6a"
-	_r(px, py, 0, 0, 16, 16, asph)
-	var horiz := (lf or rt) and not (up or dn)
-	var vert := (up or dn) and not (lf or rt)
-	if not horiz and not vert and (lf or rt) and (up or dn):
-		# развязка
-		for k in range(2, 14, 3):
-			_r(px, py, k, 0, 1, 1, "e6e6ee"); _r(px, py, k, 15, 1, 1, "e6e6ee")
-		return
-	var edge := "c9c4d6" if not water else "c08f5f"
-	if horiz or not vert:
-		_r(px, py, 0, 7, 16, 1, "ffd23f"); _r(px, py, 0, 8, 16, 1, "ffd23f")
-		_r(px, py, 1, 4, 5, 1, "ffffff"); _r(px, py, 9, 4, 5, 1, "ffffff")
-		_r(px, py, 1, 11, 5, 1, "ffffff"); _r(px, py, 9, 11, 5, 1, "ffffff")
-		# там, где подходит обычная дорога, — съезд: разрыв обочины и пунктир слияния
-		_hw_edge(px, py, is_road(x, y - 1), 0, true, edge)
-		_hw_edge(px, py, is_road(x, y + 1), 15, true, edge)
-	else:
-		_r(px, py, 7, 0, 1, 16, "ffd23f"); _r(px, py, 8, 0, 1, 16, "ffd23f")
-		_r(px, py, 4, 1, 1, 5, "ffffff"); _r(px, py, 4, 9, 1, 5, "ffffff")
-		_r(px, py, 11, 1, 1, 5, "ffffff"); _r(px, py, 11, 9, 1, 5, "ffffff")
-		_hw_edge(px, py, is_road(x - 1, y), 0, false, edge)
-		_hw_edge(px, py, is_road(x + 1, y), 15, false, edge)
-
-
-func _hw_edge(px: int, py: int, ramp: bool, at: int, horiz: bool, edge: String) -> void:
-	if not ramp:
-		if horiz:
-			_r(px, py, 0, at, 16, 1, edge)
-		else:
-			_r(px, py, at, 0, 1, 16, edge)
-		return
-	var inner := 1 if at == 0 else 14
-	for k in range(0, 16, 4):
-		if horiz:
-			_r(px, py, k, inner, 2, 1, "ffffff")
-		else:
-			_r(px, py, inner, k, 1, 2, "ffffff")
-
-
-func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
-	# разметка — по соседним обычным дорогам; съезд на магистраль — по направлению движения
-	var up := is_road(x, y - 1) or (is_highway(x, y - 1) and not is_road(x - 1, y) and not is_road(x + 1, y))
-	var dn := is_road(x, y + 1) or (is_highway(x, y + 1) and not is_road(x - 1, y) and not is_road(x + 1, y))
-	var lf := is_road(x - 1, y) or (is_highway(x - 1, y) and not is_road(x, y - 1) and not is_road(x, y + 1))
-	var rt := is_road(x + 1, y) or (is_highway(x + 1, y) and not is_road(x, y - 1) and not is_road(x, y + 1))
-	var asph := "7a7888"
-	var curb := "b8b6c4"
-	var line := "f4ecd0"
-	if water:
-		_r(px, py, 0, 0, 16, 16, "6cc1e0")
-	_r(px, py, 1, 1, 14, 14, asph)
-	if up: _r(px, py, 1, 0, 14, 1, asph)
-	if dn: _r(px, py, 1, 15, 14, 1, asph)
-	if lf: _r(px, py, 0, 1, 1, 14, asph)
-	if rt: _r(px, py, 15, 1, 1, 14, asph)
-	if water:
-		if not up: _r(px, py, 0, 0, 16, 2, "c08f5f")
-		if not dn: _r(px, py, 0, 14, 16, 2, "c08f5f")
-		if not lf: _r(px, py, 0, 0, 2, 16, "c08f5f")
-		if not rt: _r(px, py, 14, 0, 2, 16, "c08f5f")
-	else:
-		if up and lf: _r(px, py, 0, 0, 1, 1, asph)
-		if up and rt: _r(px, py, 15, 0, 1, 1, asph)
-		if dn and lf: _r(px, py, 0, 15, 1, 1, asph)
-		if dn and rt: _r(px, py, 15, 15, 1, 1, asph)
-		if not up: _r(px, py, 1, 1, 14, 1, curb)
-		if not dn: _r(px, py, 1, 14, 14, 1, curb)
-		if not lf: _r(px, py, 1, 1, 1, 14, curb)
-		if not rt: _r(px, py, 14, 1, 1, 14, curb)
-	var n := int(up) + int(dn) + int(lf) + int(rt)
-	if not water and is_crosswalk(x, y):
-		# «зебра» поперёк дороги
-		if (lf or rt) and not (up or dn):
-			for k in range(3, 14, 2):
-				_r(px, py, 6, k, 4, 1, "f4f4f8")
-			return
-		if (up or dn) and not (lf or rt):
-			for k in range(3, 14, 2):
-				_r(px, py, k, 6, 1, 4, "f4f4f8")
-			return
-	if n >= 3:
-		for k in range(3, 13, 2):
-			if up: _r(px, py, k, 1, 1, 2, "e6e6ee")
-			if dn: _r(px, py, k, 13, 1, 2, "e6e6ee")
-			if lf: _r(px, py, 1, k, 2, 1, "e6e6ee")
-			if rt: _r(px, py, 13, k, 2, 1, "e6e6ee")
-	elif (lf or rt) and not (up or dn):
-		_r(px, py, 2, 7, 4, 1, line); _r(px, py, 10, 7, 4, 1, line)
-	elif (up or dn) and not (lf or rt):
-		_r(px, py, 7, 2, 1, 4, line); _r(px, py, 7, 10, 1, 4, line)
-	else:
-		if up: _r(px, py, 7, 1, 1, 4, line)
-		if dn: _r(px, py, 7, 11, 1, 4, line)
-		if lf: _r(px, py, 1, 7, 4, 1, line)
-		if rt: _r(px, py, 11, 7, 4, 1, line)
-
-
-func _draw_rail(px: int, py: int, x: int, y: int, water: bool, on_road: bool) -> void:
-	var lf := is_rail(x - 1, y)
-	var rt := is_rail(x + 1, y)
-	var up := is_rail(x, y - 1)
-	var dn := is_rail(x, y + 1)
-	var horiz := lf or rt or not (up or dn)
-	var vert := up or dn
-	var steel := "8a8fa0"
-	var shine := "c8ccd8"
-	if water and not on_road:
-		_r(px, py, 0, 0, 16, 16, "6cc1e0")
-		if horiz:
-			_r(px, py, 0, 2, 16, 12, "a07850"); _r(px, py, 0, 2, 16, 1, "7a5a3b"); _r(px, py, 0, 13, 16, 1, "7a5a3b")
-		if vert:
-			_r(px, py, 2, 0, 12, 16, "a07850"); _r(px, py, 2, 0, 1, 16, "7a5a3b"); _r(px, py, 13, 0, 1, 16, "7a5a3b")
-	if horiz:
-		if not on_road and not water:
-			_r(px, py, 0, 3, 16, 10, "b8ad9a")
-		if not on_road:
-			for k in range(1, 16, 4):
-				_r(px, py, k, 3, 2, 10, "7a5a3b")
-		_r(px, py, 0, 5, 16, 1, steel); _r(px, py, 0, 4, 16, 1, shine)
-		_r(px, py, 0, 10, 16, 1, steel); _r(px, py, 0, 9, 16, 1, shine)
-	if vert:
-		if not on_road and not water:
-			_r(px, py, 3, 0, 10, 16, "b8ad9a")
-		if not on_road:
-			for k in range(1, 16, 4):
-				_r(px, py, 3, k, 10, 2, "7a5a3b")
-		_r(px, py, 5, 0, 1, 16, steel); _r(px, py, 4, 0, 1, 16, shine)
-		_r(px, py, 10, 0, 1, 16, steel); _r(px, py, 9, 0, 1, 16, shine)
-
-
-## Шлагбаумы на переездах: закрыты, пока рядом поезд.
-func _draw_crossings(v: Array) -> void:
-	for i in crossings:
-		var x: int = i % W
-		var y: int = i / W
-		if x < v[0] or x > v[2] or y < v[1] or y > v[3]:
-			continue
-		var shut: bool = transit.closed.has(i)
-		var rail_h := is_rail(x - 1, y) or is_rail(x + 1, y)
-		var px := x * T
-		var py := y * T
-		var blink := int(anim_time * 4.0) % 2 == 0
-		for k in 2:
-			var post: Vector2
-			if rail_h:
-				post = Vector2(px + (1 if k == 0 else 14), py + (1 if k == 0 else 14))
-			else:
-				post = Vector2(px + (14 if k == 0 else 1), py + (1 if k == 0 else 14))
-			draw_rect(Rect2(post.x, post.y - 6, 1, 7), Color("4a4458"))
-			draw_rect(Rect2(post.x - 1, post.y - 7, 3, 2), Color("e0483a") if shut and (blink == (k == 0)) else Color("5a3a3a"))
-			if shut and blink == (k == 0) and dark > 0.1:
-				lights.append(Vector3(post.x + 0.5, post.y - 6, 6))
-			if shut:
-				# опущенная стрела поперёк дороги, красно-белая
-				for s in 7:
-					var col := Color("e0483a") if s % 2 == 0 else Color("f4f4f8")
-					if rail_h:
-						draw_rect(Rect2(post.x + (1 + s if k == 0 else -1 - s), post.y - 4, 1, 1), col)
-					else:
-						draw_rect(Rect2(post.x - 4, post.y + (1 + s if k == 0 else -1 - s) - 4, 1, 1), col)
-			else:
-				for s in 5:
-					draw_rect(Rect2(post.x + 1, post.y - 7 - s, 1, 1), Color("e0483a") if s % 2 == 0 else Color("f4f4f8"))
-
-
-func _path_conn(x: int, y: int) -> bool:
-	var n = obj_at(x, y)
-	if n == null:
-		return false
-	if n.t == "path" or n.t == "blvd" or n.t == "road":
-		return true
-	var d := D.def(n.t)
-	return not d.get("natural", false) and not d.get("walk", false)
-
-
-func _draw_path(px: int, py: int, x: int, y: int, water: bool, hs: Callable) -> void:
-	var up := _path_conn(x, y - 1)
-	var dn := _path_conn(x, y + 1)
-	var lf := _path_conn(x - 1, y)
-	var rt := _path_conn(x + 1, y)
-	if water:
-		if (lf or rt) and not (up or dn):
-			_r(px, py, 0, 2, 16, 12, "c08f5f")
-			for k in range(0, 16, 3):
-				_r(px, py, k, 2, 1, 12, "9a6c45")
-			_r(px, py, 0, 2, 16, 1, "7a5236"); _r(px, py, 0, 13, 16, 1, "7a5236")
-		else:
-			_r(px, py, 2, 0, 12, 16, "c08f5f")
-			for k in range(0, 16, 3):
-				_r(px, py, 2, k, 12, 1, "9a6c45")
-			_r(px, py, 2, 0, 1, 16, "7a5236"); _r(px, py, 13, 0, 1, 16, "7a5236")
-		return
-	# плитка во всю клетку
-	var fill := "e9dccd"
-	var seam := "d6c4b0"
-	_r(px, py, 0, 0, 16, 16, fill)
-	for row in 4:
-		_r(px, py, 0, row * 4, 16, 1, seam)
-		var shift := 4 if row % 2 == 1 else 0
-		for sx in range(shift, 16, 8):
-			_r(px, py, sx, row * 4, 1, 4, seam)
-	for k in 3:
-		_r(px, py, 1 + int(hs.call(k + 60) * 14), 1 + int(hs.call(k + 70) * 14), 2, 1, "f4ebe0")
-	var curb := "b8a48e"
-	if not up: _r(px, py, 0, 0, 16, 1, curb)
-	if not dn: _r(px, py, 0, 15, 16, 1, curb)
-	if not lf: _r(px, py, 0, 0, 1, 16, curb)
-	if not rt: _r(px, py, 15, 0, 1, 16, curb)
-
-
-## Голливудский бульвар: тёмная плитка аллеи славы с розовой звездой в каждой клетке.
-func _draw_blvd(px: int, py: int, x: int, y: int) -> void:
-	var up := _path_conn(x, y - 1)
-	var dn := _path_conn(x, y + 1)
-	var lf := _path_conn(x - 1, y)
-	var rt := _path_conn(x + 1, y)
-	_r(px, py, 0, 0, 16, 16, "5a4c5e")
-	_r(px, py, 0, 0, 16, 1, "4a3e4e"); _r(px, py, 0, 0, 1, 16, "4a3e4e")
-	for k in 6:
-		_r(px, py, (k * 7 + x * 3) % 15 + 1, (k * 5 + y * 7) % 15 + 1, 1, 1, "6e5e72")
-	# звёзды через клетку, как на настоящей аллее славы
-	var curb := "c9b8a0"
-	if (x + y) % 2 == 1:
-		_r(px, py, 3, 3, 10, 10, "625468"); _r(px, py, 7, 7, 2, 2, "e8c870")
-		if not up: _r(px, py, 0, 0, 16, 1, curb)
-		if not dn: _r(px, py, 0, 15, 16, 1, curb)
-		if not lf: _r(px, py, 0, 0, 1, 16, curb)
-		if not rt: _r(px, py, 15, 0, 1, 16, curb)
-		return
-	var star := ["...x...", "..xxx..", "xxxxxxx", ".xxxxx.", "..xxx..", ".xx.xx.", "x.....x"]
-	for r in 7:
-		for c in 7:
-			if star[r][c] == "x":
-				_r(px, py, 4 + c, 2 + r, 1, 1, "f59ab2")
-	_r(px, py, 7, 5, 1, 1, "e8c870")
-	_r(px, py, 5, 11, 6, 1, "e8c870"); _r(px, py, 6, 12, 4, 1, "c8a850")
-	if not up: _r(px, py, 0, 0, 16, 1, curb)
-	if not dn: _r(px, py, 0, 15, 16, 1, curb)
-	if not lf: _r(px, py, 0, 0, 1, 16, curb)
-	if not rt: _r(px, py, 15, 0, 1, 16, curb)
 
 
 # =====================================================================
 #  Отрисовка мира
 # =====================================================================
-
-func _draw() -> void:
-	if terrain_tex.is_empty():
-		return
-	var v := visible_range()
-	for cy in range(v[1] / CHUNK, v[3] / CHUNK + 1):
-		for cx in range(v[0] / CHUNK, v[2] / CHUNK + 1):
-			if cx < CW and cy < CH:
-				draw_texture(terrain_tex[cy * CW + cx], Vector2(cx * CHUNK * T, cy * CHUNK * T))
-	var tick := int(anim_time * 1.5)
-	var sparkle := Color("d6f2fa")
-	for y in (range(v[1], v[3] + 1) if zoom >= 2 else []):
-		for x in range(v[0], v[2] + 1):
-			if terrain[y * W + x] != WATER or objs[y * W + x] != null:
-				continue
-			if hashf(x, y, tick) < 0.18:
-				draw_rect(Rect2(x * T + int(hashf(x, y, tick + 3) * 12) + 2, y * T + int(hashf(x, y, tick + 7) * 12) + 2, 2, 1), sparkle)
-
-	var foam := Color(1, 1, 1, 0.75)
-	for sh in shore:
-		var x: int = sh[0]
-		var y: int = sh[1]
-		if x < v[0] or x > v[2] or y < v[1] or y > v[3] or objs[y * W + x] != null:
-			continue
-		var dv: Vector2i = sh[2]
-		var off := 2 + roundi((sin(anim_time * 1.6 + x * 0.7 + y * 0.5) + 1.0) * 1.5)
-		match dv:
-			Vector2i(0, -1):
-				draw_rect(Rect2(x * T, y * T + off, T, 1), foam)
-			Vector2i(0, 1):
-				draw_rect(Rect2(x * T, y * T + T - 1 - off, T, 1), foam)
-			Vector2i(-1, 0):
-				draw_rect(Rect2(x * T + off, y * T, 1, T), foam)
-			Vector2i(1, 0):
-				draw_rect(Rect2(x * T + T - 1 - off, y * T, 1, T), foam)
-
-	var h := hour()
-	lights = []
-	var list := []
-	for y in range(v[1], v[3] + 1):
-		for x in range(v[0], v[2] + 1):
-			var i := y * W + x
-			var o = objs[i]
-			if o != null and o.i == i and o.t != "path" and o.t != "blvd" and o.t != "road" and pairs.get(i, "") != "R":
-				# плоские постройки (парковки, корты) — часть земли: котики и машины поверх них
-				list.append([(y * T - 8.0) if FLAT.has(o.t) else float((y + o.w) * T), 0, o, x, y])
-				if SCENES.has(o.t) and _scene_on(o, h):
-					list.append([float((y + o.w) * T) + 2.0, 5, o])
-	for c in cats:
-		if c.state == "in" or c.state == "drive" or c.state == "ride":
-			continue
-		if c.x < v[0] - 1 or c.x > v[2] + 1 or c.y < v[1] - 1 or c.y > v[3] + 1:
-			continue
-		list.append([c.y * T + 14.0, 1, c])
-	for car in cars:
-		list.append([car.py + 4.0, 2, car])
-	for vis in events.visitors:
-		list.append([vis.y * T + 14.0, 3, vis])
-	transit.draw_items(list)
-	boats.draw_items(list)
-	for c in street_parked:
-		var tx: int = c.car_tile % W
-		var ty: int = c.car_tile / W
-		if tx < v[0] or tx > v[2] or ty < v[1] or ty > v[3]:
-			continue
-		var off: Vector2 = LANE.get(c.car_dir, Vector2.ZERO)
-		var pc := {"kind": car_model(c), "color": c.car, "px": tx * T + 8.0 + off.x, "py": ty * T + 8.0 + off.y, "dir": c.car_dir, "cat": null, "parked": true}
-		list.append([pc.py + 4.0, 2, pc])
-	list.sort_custom(func(a, b): return a[0] < b[0])
-	_draw_driveways(v)
-
-	for it in list:
-		match it[1]:
-			0:
-				_draw_obj(it[2], it[3], it[4], h)
-			1:
-				_draw_cat(it[2])
-			2:
-				_draw_car(it[2])
-			3:
-				_draw_visitor(it[2])
-			4:
-				transit.draw_segment(it[2])
-			5:
-				_draw_scene(it[2])
-			6:
-				boats.draw_boat(it[2])
-			7:
-				transit.draw_heli(it[2])
-
-	_draw_bunting()
-	_draw_traffic_lights(v)
-	_draw_crossings(v)
-	_draw_ramp_signs(v)
-	_draw_ghost()
-	_draw_tut_arrow()
-	_draw_particles()
-	transit.draw_planes()
-
-
-func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
-	if o.build > 0.0:
-		_draw_construction(o, x, y)
-		return
-	var paired: bool = pairs.get(o.i, "") == "L"
-	var tx: Texture2D
-	var wins: Array
-	if paired:
-		var pv: Array = spr.pair_variant(o)
-		tx = pv[0]
-		wins = pv[1]
-	else:
-		tx = spr.obj_texture(o)
-		if tx != null:
-			wins = spr.windows_for(o)
-	if tx == null:
-		return
-	var span: int = 2 if paired else o.w
-	var sx: int = x * T + (span * T - tx.get_width()) / 2
-	var sy: int = (y + o.w) * T - tx.get_height()
-	if WINDY.has(o.t) and absf(wind) > 0.02:
-		# пальма чуть покачивается на ветру: верхушка смещается, корни на месте
-		var ph := hashf(x, y, 31) * TAU
-		var sway := wind * (0.035 + 0.02 * sin(anim_time * 1.7 + ph))
-		var base := float(sy + tx.get_height())
-		draw_set_transform_matrix(Transform2D(Vector2(1, 0), Vector2(-sway, 1), Vector2(0, base)))
-		draw_texture(tx, Vector2(sx, -tx.get_height()))
-		draw_set_transform_matrix(Transform2D.IDENTITY)
-		return
-	draw_texture(tx, Vector2(sx, sy))
-	var mk = D.MAKES.get(o.t)
-	if mk != null and float(o.get("out", 0.0)) >= 4.0:
-		# готовые ящики с товаром у здания
-		var gc := Color(D.GOODS[mk[0]].col)
-		var by: int = (y + o.w) * T - 4
-		for k in mini(4, int(o.out / 4.0)):
-			var bx: int = x * T + o.w * T - 7 - (k % 2) * 5
-			var yy: int = by - (k / 2) * 3
-			draw_rect(Rect2(bx, yy, 5, 4), Color("5a3c30"))
-			draw_rect(Rect2(bx + 1, yy + 1, 3, 2), gc)
-	if o.t == "parking" or o.t == "garage":
-		var slots: Array = spr.PARKING_SLOTS if o.t == "parking" else spr.GARAGE_SLOTS
-		var cols: Array = lot_colors.get(o.i, [])
-		for k in mini(cols.size(), slots.size()):
-			var sl: Vector2i = slots[k]
-			var big: bool = o.t == "parking"
-			draw_rect(Rect2(sx + sl.x, sy + sl.y, 5 if big else 4, 3 if big else 2), Color(cols[k]))
-			draw_rect(Rect2(sx + sl.x + 1, sy + sl.y, 2, 1), Color("bfe6f7"))
-	if wins.size() > 0 and dark > 0.08:
-		var d := D.def(o.t)
-		var lit: bool
-		if o.t == "lantern":
-			lit = true
-		elif d.get("leisure", false) or d.get("wonder", false):
-			lit = (h >= 17.0 and h < 23.5) or inside_count.get(o.i, 0) > 0
-		else:
-			lit = inside_count.get(o.i, 0) > 0 or (paired and inside_count.get(o.i + 1, 0) > 0)
-		if lit:
-			# горят не все окна — у каждого здания свой рисунок света
-			var few: bool = wins.size() <= 2 or o.t == "lantern"
-			for k in wins.size():
-				if not few and hashf(o.i, k, 77) > 0.6:
-					continue
-				var wr: Rect2i = wins[k]
-				var glow := Color("ffd36e") if hashf(o.i, k, 78) < 0.7 else Color("ffe9a8")
-				draw_rect(Rect2(sx + wr.position.x, sy + wr.position.y, wr.size.x, wr.size.y), glow)
-			var r := 48.0 if o.t == "lantern" else (34.0 if o.w == 2 or paired else 18.0)
-			var mid: Rect2i = wins[wins.size() / 2]
-			lights.append(Vector3(sx + mid.position.x + 2, sy + mid.position.y + 2, r))
-
-
-## Обучение: розовая стрелочка над первым котиком.
-func _draw_tut_arrow() -> void:
-	if tut_cat == null or not cats.has(tut_cat) or tut_cat.state == "in" or tut_cat.state == "drive" or tut_cat.state == "ride":
-		return
-	var p := cat_pos(tut_cat) + Vector2(0, -24 + roundf(sin(anim_time * 5.0) * 2.0))
-	var tri := PackedVector2Array([p + Vector2(-5, -6), p + Vector2(5, -6), p])
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -7), p + Vector2(7, -7), p + Vector2(0, 2)]), INK)
-	draw_colored_polygon(tri, Color("ff8fb1"))
 
 
 ## Бриз сам меняется: то слабый ветерок в одну сторону, то в другую, то штиль.
@@ -3271,330 +2674,7 @@ func _update_wind(dt: float) -> void:
 	wind = move_toward(wind, _wind_to, dt * 0.08)
 
 
-func _draw_construction(o: Dictionary, x: int, y: int) -> void:
-	var tx: Texture2D = spr.scaffold[o.w]
-	var sx: int = x * T + (o.w * T - tx.get_width()) / 2
-	var sy: int = (y + o.w) * T - tx.get_height()
-	draw_texture(tx, Vector2(sx, sy))
-	var total: float = D.def(o.t).get("build", 1.0)
-	var k := clampf(1.0 - o.build / total, 0.0, 1.0)
-	draw_rect(Rect2(sx + 2, sy - 4, tx.get_width() - 4, 3), INK)
-	draw_rect(Rect2(sx + 3, sy - 3, roundi((tx.get_width() - 6) * k), 1), Color("7fd38f"))
-	# строитель в каске стучит молотком
-	var fs: Dictionary = spr.cat_set(["ginger", "gray", "tabby", "cream"][int(o.v) % 4], "builder")
-	var up := int(anim_time * 4.0) % 2 == 1
-	var frame: Texture2D = fs.walkA[1] if up else fs.stand[1]
-	var bx := sx + tx.get_width() - 7
-	var by: int = (y + o.w) * T - 15
-	draw_texture(frame, Vector2(bx, by))
-	draw_rect(Rect2(bx - 1, by + (8 if up else 10), 2, 1), Color("6a6478"))
-	draw_rect(Rect2(bx, by + (9 if up else 11), 1, 2), Color("8a5a3b"))
-
-
-func _cat_texture(c: Dictionary) -> Texture2D:
-	var fs: Dictionary = spr.cat_set(c.color, outfit_key(c))
-	var f := 1 if c.dir < 0 else 0
-	match c.state:
-		"sleep":
-			return fs.sleep[f]
-		"walk":
-			return fs.walkB[f] if int(c.anim * 6.0) % 2 == 1 else fs.walkA[f]
-	return fs.stand[f]
-
-
-func _draw_cat(c: Dictionary) -> void:
-	var tx := _cat_texture(c)
-	var sx := roundi(c.x * T + 3)
-	var sy := roundi(c.y * T - 1) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
-	draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
-	draw_texture(tx, Vector2(sx, sy))
-	if info_target != null and info_target.has("cat") and info_target.cat == c:
-		var bob := roundi(sin(anim_time * 5.0) * 1.5)
-		draw_texture(spr.small.heart, Vector2(sx + 3, sy - 4 + bob))
-
-
-## Гость события: котик в праздничной одежде, появляется и исчезает плавно.
-func _draw_visitor(v: Dictionary) -> void:
-	var fs: Dictionary = spr.cat_set(v.color, v.outfit)
-	var f := 1 if v.dir < 0 else 0
-	var tx: Texture2D = fs.stand[f]
-	if v.walking:
-		tx = fs.walkB[f] if int(v.anim * 6.0) % 2 == 1 else fs.walkA[f]
-	var sx := roundi(v.x * T + 3)
-	var sy := roundi(v.y * T - 1)
-	if not v.walking and events.active != null and (events.active.kind == "game" or events.active.kind == "beach"):
-		sy -= int(v.anim * 3.0) % 2  # пританцовывают
-	var m := Color(1, 1, 1, clampf(v.fade, 0.0, 1.0))
-	draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2 * m.a))
-	draw_texture(tx, Vector2(sx, sy), m)
-
-
-## Флажки-гирлянда над местом праздника.
-func _draw_bunting() -> void:
-	var ev = events.active
-	if ev == null or not (ev.kind == "beach" or ev.kind == "market" or ev.kind == "tourists"):
-		return
-	var c: Vector2 = ev.pos * T + Vector2(8, -6)
-	var cols := ["ff6b8b", "ffd75e", "7fc4e8", "9ed8c8", "c8a8ff"]
-	var a := c + Vector2(-34, 0)
-	var b := c + Vector2(34, 0)
-	draw_line(a + Vector2(0, -6), a + Vector2(0, 14), INK, 1.0)
-	draw_line(b + Vector2(0, -6), b + Vector2(0, 14), INK, 1.0)
-	for k in 17:
-		var t := k / 16.0
-		var p := a.lerp(b, t) + Vector2(0, -6 + sin(t * PI) * 6.0)
-		if k < 16:
-			var q := a.lerp(b, (k + 1) / 16.0) + Vector2(0, -6 + sin((k + 1) / 16.0 * PI) * 6.0)
-			draw_line(p, q, Color(INK, 0.7), 1.0)
-		if k % 2 == 1:
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-2, 0), p + Vector2(2, 0), p + Vector2(0, 4)]), Color(cols[(k / 2) % cols.size()]))
-
-
-const LIGHT_COLS := [Color("e0483a"), Color("ffd23f"), Color("5fd38f")]
-
-
-## Светофоры на углах перекрёстков: слева сверху — для едущих по горизонтали, справа снизу — по вертикали.
-func _draw_traffic_lights(v: Array) -> void:
-	for i in junctions:
-		var x: int = i % W
-		var y: int = i / W
-		if x < v[0] or x > v[2] or y < v[1] or y > v[3]:
-			continue
-		for k in 2:
-			var horiz := k == 0
-			var bx := x * T + (0 if horiz else 15)
-			var by := y * T + (2 if horiz else 13)
-			var stt := light_state(i, horiz)
-			draw_rect(Rect2(bx, by - 6, 1, 7), Color("4a4458"))
-			draw_rect(Rect2(bx - 1, by - 10, 3, 5), INK)
-			var lc: Color = LIGHT_COLS[stt]
-			draw_rect(Rect2(bx, by - 9 + (2 - stt) * 1, 1, 1), lc)
-			if dark > 0.15:
-				lights.append(Vector3(bx + 0.5, by - 8.5, 5))
-
-
-## Зелёные указатели фривея у въездов на магистраль.
-func _draw_ramp_signs(v: Array) -> void:
-	for r in ramps:
-		var i: int = r[0]
-		var dv: Vector2i = r[1]
-		var x := i % W
-		var y := i / W
-		if x < v[0] or x > v[2] or y < v[1] or y > v[3]:
-			continue
-		var bx := x * T + (14 if dv.x <= 0 else 1)
-		var by := y * T + 13
-		draw_rect(Rect2(bx, by - 8, 1, 9), Color("4a4458"))
-		var sx := bx - 5
-		var sy := by - 15
-		draw_rect(Rect2(sx, sy, 11, 7), Color("f4f4f8"))
-		draw_rect(Rect2(sx + 1, sy + 1, 9, 5), Color("2f8a4f"))
-		# щит шоссе «101» и стрелка
-		draw_rect(Rect2(sx + 2, sy + 2, 3, 3), Color("f4f4f8"))
-		draw_rect(Rect2(sx + 3, sy + 3, 1, 1), Color("3d5a98"))
-		# стрелка к магистрали
-		var ac := Vector2(sx + 7, sy + 3)
-		var f := Vector2(dv)
-		var side := Vector2(-f.y, f.x)
-		# галочка-шеврон «туда»
-		for q in [ac + f, ac + side, ac - side, ac - f + side * 2, ac - f - side * 2]:
-			draw_rect(Rect2(q, Vector2.ONE), Color("f4f4f8"))
-
-
-## Въезды на парковки: опущенный бордюр, светлая полоса, стоп-линия и стрелка внутрь.
-func _draw_driveways(v: Array) -> void:
-	var apron := Color("a9a6b8")
-	var edge := Color("d8d4e4")
-	var arrow := Color("ffd23f")
-	for l in stats.lots:
-		var o = objs[l]
-		if o == null:
-			continue
-		var lx: int = l % W
-		var ly: int = l / W
-		if lx + o.w < v[0] or lx > v[2] or ly + o.w < v[1] or ly > v[3]:
-			continue
-		var made := 0
-		for p in around(l):
-			if made >= (2 if o.w > 1 else 1) or not is_road(p.x, p.y):
-				continue
-			# направление от парковки к дороге
-			var d := Vector2i(0, 0)
-			if p.y >= ly + o.w:
-				d = Vector2i(0, 1)
-			elif p.y < ly:
-				d = Vector2i(0, -1)
-			elif p.x < lx:
-				d = Vector2i(-1, 0)
-			else:
-				d = Vector2i(1, 0)
-			made += 1
-			# c — точка на границе парковки и дороги; съезд в основном лежит на дороге
-			var c := Vector2(p.x * T + 8, p.y * T + 8) - Vector2(d) * 8.0
-			var fd := Vector2(d)
-			var side := Vector2(absf(d.y), absf(d.x))
-			var a0 := c - fd * 2.0 - side * 6.0
-			var a1 := c + fd * 6.0 + side * 6.0
-			var r := Rect2(a0, a1 - a0).abs()
-			draw_rect(r, apron)
-			# бортики по краям съезда
-			draw_rect(Rect2(c - fd * 2.0 - side * 7.0, fd * 8.0 + side).abs(), edge)
-			draw_rect(Rect2(c - fd * 2.0 + side * 6.0, fd * 8.0 + side).abs(), edge)
-			# пунктирная стоп-линия на выезде
-			var sl := c + fd * 5.0
-			for k in range(-5, 6, 2):
-				draw_rect(Rect2(sl + side * k, Vector2.ONE), Color(1, 1, 1, 0.9))
-			# стрелка внутрь парковки
-			var tip := c - fd * 1.0
-			for q in [tip, tip + fd + side, tip + fd - side, tip + fd * 2.0 + side * 2.0, tip + fd * 2.0 - side * 2.0, tip + fd * 2.0, tip + fd * 3.0]:
-				draw_rect(Rect2(q, Vector2.ONE), arrow)
-
-
 # ---------- сценки у построек ----------
-const SCENES := ["tennis", "volleyball", "skatepark", "playground", "umbrella", "fountain", "icecream", "cafe", "boba", "juicebar", "pier", "surf"]
-const SIT_OUTSIDE := ["cafe", "boba", "juicebar"]
-
-
-func _scene_on(o: Dictionary, h: float) -> bool:
-	if o.build > 0.0 or h < 8.0 or h > (21.5 if SIT_OUTSIDE.has(o.t) else 19.5):
-		return false
-	var d := D.def(o.t)
-	return not d.has("jobs") or not workers.get(o.i, []).is_empty()
-
-
-func _free_tile(x: int, y: int) -> bool:
-	return in_map(x, y) and objs[y * W + x] == null and terrain[y * W + x] != WATER
-
-
-func _scene_cat(k: int, i: int, outfit: String, feet: Vector2, face: int, frame := "stand", bob := 0) -> void:
-	var keys: Array = D.CAT_COLORS.keys()
-	var fs: Dictionary = spr.cat_set(keys[(i * 7 + k * 13) % keys.size()], outfit)
-	var tx: Texture2D = fs[frame][1 if face < 0 else 0]
-	var pos := Vector2(roundi(feet.x - tx.get_width() / 2.0), roundi(feet.y - tx.get_height() + bob))
-	draw_rect(Rect2(pos.x + 1, feet.y - 1, tx.get_width() - 2, 1), Color(0.157, 0.118, 0.196, 0.2))
-	draw_texture(tx, pos)
-
-
-func _draw_scene(o: Dictionary) -> void:
-	var bx := float(o.i % W * T)
-	var by := float(o.i / W * T)
-	var t := anim_time + hashf(o.i, 3) * 10.0
-	var i: int = o.i
-	match o.t:
-		"tennis":
-			# двое перекидывают мячик через сетку
-			var cyc := fposmod(t * 0.9, 2.0)
-			var k := fposmod(cyc, 1.0)
-			var lr := int(cyc) == 0
-			var bxp := lerpf(bx + 10.0, bx + 22.0, k if lr else 1.0 - k)
-			var byp := by + 22.0 - sin(k * PI) * 8.0
-			_scene_cat(0, i, "trainer", Vector2(bx + 7, by + 27), 1, "walkA" if lr and k < 0.2 else "stand")
-			_scene_cat(1, i, "trainer", Vector2(bx + 25, by + 27), -1, "walkA" if not lr and k < 0.2 else "stand")
-			draw_rect(Rect2(bx + 11, by + 19, 1, 3), Color("8a5a3b"))
-			draw_rect(Rect2(bx + 20, by + 19, 1, 3), Color("8a5a3b"))
-			draw_rect(Rect2(roundi(bxp), by + 26, 2, 1), Color(0.157, 0.118, 0.196, 0.25))
-			draw_rect(Rect2(roundi(bxp), roundi(byp), 2, 2), Color("f2e060"))
-		"volleyball":
-			# по бокам сетки игроки, мяч летает через сетку, бьющий подпрыгивает
-			var cyc := fposmod(t * 0.7, 2.0)
-			var k := fposmod(cyc, 1.0)
-			var lr := int(cyc) == 0
-			var xl := bx - 3.0
-			var xr := bx + 19.0
-			var bxp := lerpf(xl + 3.0, xr - 3.0, k if lr else 1.0 - k)
-			var byp := by + 6.0 - sin(k * PI) * 12.0
-			_scene_cat(0, i, "surfer", Vector2(xl, by + 15), 1, "stand", -2 if lr and k < 0.15 else 0)
-			_scene_cat(1, i, "casual2", Vector2(xr, by + 15), -1, "stand", -2 if not lr and k < 0.15 else 0)
-			draw_rect(Rect2(roundi(bxp), roundi(byp), 2, 2), Color("fff6e0"))
-			draw_rect(Rect2(roundi(bxp), roundi(byp), 1, 1), Color("ff9f43"))
-		"skatepark":
-			# скейтер катается по рампе туда-сюда
-			var k := sin(t * 1.4)
-			var px := bx + 16.0 + k * 10.0
-			var py := by + 27.0 - k * k * 9.0
-			var face := 1 if cos(t * 1.4) > 0.0 else -1
-			_scene_cat(0, i, "casual4", Vector2(px, py - 1), face)
-			draw_rect(Rect2(roundi(px) - 4, roundi(py) - 1, 8, 1), Color("3b3b4a"))
-			draw_rect(Rect2(roundi(px) - 3, roundi(py), 1, 1), Color("ffd23f"))
-			draw_rect(Rect2(roundi(px) + 2, roundi(py), 1, 1), Color("ffd23f"))
-		"playground":
-			# котёнок качается на качелях
-			var pv := Vector2(bx + 9, by + 12)
-			var ang := sin(t * 2.2) * 0.7
-			var seat := pv + Vector2(sin(ang), cos(ang)) * 9.0
-			draw_rect(Rect2(pv.x - 6, pv.y - 1, 13, 1), Color("8a5a3b"))
-			draw_line(pv + Vector2(-2, 0), seat + Vector2(-2, 0), Color("6a6478"), 1.0)
-			draw_line(pv + Vector2(2, 0), seat + Vector2(2, 0), Color("6a6478"), 1.0)
-			_scene_cat(0, i, "casual1", seat + Vector2(0, 2), 1 if cos(t * 2.2) > 0.0 else -1)
-			draw_rect(Rect2(seat.x - 3, seat.y, 6, 1), Color("e45b6b"))
-		"umbrella":
-			# котик загорает на полотенце
-			if hour() < 9.0 or hour() > 18.0:
-				return
-			draw_rect(Rect2(bx + 1, by + 11, 13, 4), Color("ff8fab"))
-			draw_rect(Rect2(bx + 1, by + 12, 13, 1), Color("ffffff"))
-			_scene_cat(0, i, "surfer", Vector2(bx + 8, by + 15), 1, "sleep")
-		"fountain":
-			_scene_cat(0, i, "casual3", Vector2(bx - 3, by + 15), 1)
-		"icecream":
-			# покупатели едят рожки
-			if not _free_tile(o.i % W, o.i / W + 1):
-				return
-			for k in 2:
-				var fx := bx + 4.0 + k * 9.0
-				var fy := by + 30.0 + k
-				_scene_cat(k, i, "casual%d" % ((i + k) % 6), Vector2(fx, fy), 1 if k == 0 else -1)
-				var lick := int(t * 3.0 + k) % 2
-				var cx := fx + (3.0 if k == 0 else -4.0)
-				draw_rect(Rect2(cx, fy - 9 - lick, 2, 3), Color("d8a060"))
-				draw_rect(Rect2(cx, fy - 11 - lick, 2, 2), Color("ff9fc0") if k == 0 else Color("9ed8c8"))
-		"cafe", "boba", "juicebar":
-			# столик на улице: двое болтают, над чашками пар
-			if not _free_tile(o.i % W, o.i / W + 1):
-				return
-			draw_rect(Rect2(bx + 5, by + 22, 7, 2), Color("f4ead8"))
-			draw_rect(Rect2(bx + 8, by + 24, 1, 5), Color("8a5a3b"))
-			draw_rect(Rect2(bx + 6, by + 20, 1, 2), Color("ffffff"))
-			draw_rect(Rect2(bx + 10, by + 20, 1, 2), Color("ffffff") if o.t == "cafe" else Color("c8a8ff"))
-			if o.t == "cafe":
-				for k in 2:
-					var st := fposmod(t * 0.8 + k * 0.5, 1.0)
-					draw_rect(Rect2(bx + 6 + k * 4 + roundi(sin(st * 6.0)), by + 19 - st * 6.0, 1, 1), Color(1, 1, 1, 0.8 * (1.0 - st)))
-			_scene_cat(0, i, "casual%d" % (i % 6), Vector2(bx + 1, by + 30), 1)
-			_scene_cat(1, i, "casual%d" % ((i + 3) % 6), Vector2(bx + 16, by + 30), -1)
-		"pier":
-			# рыбак с удочкой, поплавок качается на воде
-			var wd := Vector2i(0, 0)
-			for dv in DIRS:
-				var nx: int = o.i % W + dv.x
-				var ny: int = o.i / W + dv.y
-				if in_map(nx, ny) and terrain[ny * W + nx] == WATER:
-					wd = dv
-					break
-			if wd == Vector2i(0, 0):
-				return
-			var feet := Vector2(bx + 8, by + 14) + Vector2(wd) * 5.0
-			_scene_cat(0, i, "fisher", feet, 1 if wd.x >= 0 else -1)
-			var tip := feet + Vector2(wd.x * 6 + (3 if wd.x == 0 else 0), -12)
-			draw_line(feet + Vector2(0, -8), tip, Color("8a5a3b"), 1.0)
-			var bob := feet + Vector2(wd) * 12.0 + Vector2(0, 2 + roundi(sin(t * 3.0)))
-			draw_line(tip, bob, Color(1, 1, 1, 0.6), 1.0)
-			draw_rect(Rect2(bob.x, bob.y, 2, 2), Color("e0483a"))
-		"surf":
-			# серфер качается на волне у берега
-			var wd := Vector2i(0, 0)
-			for dv in DIRS:
-				var nx: int = o.i % W + dv.x
-				var ny: int = o.i / W + dv.y
-				if in_map(nx, ny) and terrain[ny * W + nx] == WATER:
-					wd = dv
-					break
-			if wd == Vector2i(0, 0):
-				return
-			var c := Vector2(bx + 8, by + 13) + Vector2(wd) * 16.0 + Vector2(sin(t * 0.5) * 4.0, sin(t * 2.0) * 1.5)
-			draw_rect(Rect2(roundi(c.x) - 5, roundi(c.y), 10, 2), Color("ffd23f"))
-			draw_rect(Rect2(roundi(c.x) - 6, roundi(c.y) + 2, 12, 1), Color(1, 1, 1, 0.7))
-			_scene_cat(0, i, "surfer", c, 1 if wd.x >= 0 else -1)
 
 
 func on_screen(wp: Vector2) -> bool:
@@ -3638,136 +2718,5 @@ func _update_ambience() -> void:
 		sound.play("honk", randf_range(0.9, 1.15), -16.0)
 
 
-func _draw_car(car: Dictionary) -> void:
-	var v: Dictionary = spr.vehicle(car.kind, car.color)
-	var tx: Texture2D
-	var dpos = null
-	var flip: bool = car.dir == "l"
-	if car.dir == "r" or car.dir == "l":
-		tx = v.side[1 if flip else 0]
-		var ds: Vector2i = v.driver.side
-		dpos = Vector2i(tx.get_width() - ds.x - 2 if flip else ds.x, ds.y)
-	else:
-		tx = v.front if car.dir == "d" else v.back
-		if car.dir == "d":
-			dpos = v.driver.front
-	var sx := roundi(car.px - tx.get_width() / 2.0)
-	var sy := roundi(car.py + 4 - tx.get_height())
-	draw_rect(Rect2(sx + 2, sy + tx.get_height() - 1, tx.get_width() - 4, 1), Color(0.157, 0.118, 0.196, 0.2))
-	draw_texture(tx, Vector2(sx, sy))
-	var fur: Dictionary = D.CAT_COLORS[car.cat.color] if car.cat != null else D.CAT_COLORS[["ginger", "gray", "white", "tabby"][car.kind.length() % 4]]
-	if car.get("parked", false):
-		dpos = null
-	if dpos != null:
-		var fc := Color(fur.a)
-		draw_rect(Rect2(sx + dpos.x, sy + dpos.y, 2, 2), fc)
-		draw_rect(Rect2(sx + dpos.x, sy + dpos.y - 1, 1, 1), fc)
-		draw_rect(Rect2(sx + dpos.x + 1, sy + dpos.y - 1, 1, 1), fc)
-		draw_rect(Rect2(sx + dpos.x + (0 if flip else 1), sy + dpos.y, 1, 1), Color(fur.get("e", "2b2233")))
-	if v.lights != null:
-		var on := int(anim_time * 4.0) % 2
-		var pts: Array = v.lights.side if car.dir == "r" or car.dir == "l" else v.lights.fb
-		for k in pts.size():
-			var lx: int = pts[k][0]
-			var x: int = tx.get_width() - lx - 2 if flip else lx
-			draw_rect(Rect2(sx + x, sy + pts[k][1], 2, 1), Color("ff4d5e") if (k + on) % 2 == 1 else Color("4d8dff"))
-	if dark > 0.1 and not car.get("parked", false):
-		var f: Vector2 = {"r": Vector2(8, 0), "l": Vector2(-8, 0), "d": Vector2(0, 6), "u": Vector2(0, -6)}[car.dir]
-		lights.append(Vector3(car.px + f.x, car.py + f.y, 14))
-	if car.cat != null and info_target != null and info_target.has("cat") and info_target.cat == car.cat:
-		var bob := roundi(sin(anim_time * 5.0) * 1.5)
-		draw_texture(spr.small.heart, Vector2(roundi(car.px) - 2, roundi(car.py) - 16 + bob))
-
-
-func _draw_ghost() -> void:
-	if not mouse_in or tool == "hand" or _pan_active:
-		return
-	var tx := mouse_tile.x
-	var ty := mouse_tile.y
-	if not in_map(tx, ty):
-		return
-	if tool == "bulldoze":
-		var o = obj_at(tx, ty)
-		if o != null:
-			draw_rect(Rect2(o.i % W * T, o.i / W * T, o.w * T, o.w * T), Color(1, 0.35, 0.43, 0.4))
-		else:
-			draw_rect(Rect2(tx * T, ty * T, T, T), Color(1, 1, 1, 0.2))
-		return
-	var d := D.def(tool)
-	var w := D.size_of(tool)
-	var r := can_place(tool, tx, ty)
-	var rad: float = d.get("radius", d.get("sradius", 0))
-	if rad > 0.0:
-		var cx := tx + (w - 1) / 2.0
-		var cy := ty + (w - 1) / 2.0
-		var col := Color(0.7, 0.78, 1, 0.18) if d.has("sradius") else Color(1, 0.75, 0.86, 0.22)
-		for y in range(int(floor(cy - rad)), int(cy + rad) + 1):
-			for x in range(int(floor(cx - rad)), int(cx + rad) + 1):
-				if in_map(x, y) and Vector2(x - cx, y - cy).length() <= rad:
-					draw_rect(Rect2(x * T, y * T, T, T), col)
-	draw_rect(Rect2(tx * T, ty * T, w * T, w * T), Color(0.5, 1, 0.63, 0.35) if r.ok else Color(1, 0.35, 0.43, 0.35))
-	if tool != "path" and tool != "blvd" and tool != "road" and not d.has("terra"):
-		var img: Texture2D = spr.tool_texture(tool)
-		draw_texture(img, Vector2(tx * T + (w * T - img.get_width()) / 2, (ty + w) * T - img.get_height()), Color(1, 1, 1, 0.7))
-
-
-func _draw_particles() -> void:
-	for p in parts:
-		if p.type == "firefly" or p.type == "rocket" or p.type == "spark":
-			continue
-		var a: float = minf(1.0, p.life / p.mx * 2.0)
-		var pos := Vector2(roundi(p.x), roundi(p.y))
-		var m := Color(1, 1, 1, a)
-		match p.type:
-			"heart":
-				draw_texture(spr.small.heart, pos - Vector2(2, 2), m)
-			"z":
-				draw_texture(spr.small.z, pos, m)
-			"sparkle":
-				draw_texture(spr.small.sparkle, pos - Vector2(1, 1), m)
-			"coin":
-				draw_texture(spr.icons.coin, pos - Vector2(4, 4), m)
-			"petal":
-				draw_rect(Rect2(pos, Vector2(2, 1)), Color(0.8, 0.7, 0.96, a))
-			"drop":
-				draw_rect(Rect2(pos, Vector2(1, 2)), Color(0.75, 0.91, 0.96, a))
-			"dust":
-				draw_rect(Rect2(pos, Vector2(2, 2)), Color(0.94, 0.89, 0.81, a))
-			"note":
-				var nc := Color(p.col)
-				nc.a = a
-				draw_rect(Rect2(pos.x, pos.y + 3, 2, 2), nc)
-				draw_rect(Rect2(pos.x + 1, pos.y, 1, 4), nc)
-				draw_rect(Rect2(pos.x + 2, pos.y, 1, 1), nc)
-			"balloon":
-				var bc := Color(p.col)
-				bc.a = a
-				draw_rect(Rect2(pos.x - 1, pos.y - 4, 3, 4), bc)
-				draw_rect(Rect2(pos.x, pos.y - 5, 1, 1), bc)
-				draw_rect(Rect2(pos.x, pos.y, 1, 4), Color(INK, a * 0.6))
-			"confetti":
-				var cc := Color(p.col)
-				cc.a = a
-				draw_rect(Rect2(pos, Vector2(2 if int(p.life * 8.0) % 2 == 0 else 1, 1)), cc)
-			"flash":
-				draw_rect(Rect2(pos.x - 1, pos.y - 1, 3, 3), Color(1, 1, 1, a))
-				draw_rect(Rect2(pos.x - 3, pos.y, 7, 1), Color(1, 1, 1, a * 0.6))
-				draw_rect(Rect2(pos.x, pos.y - 3, 1, 7), Color(1, 1, 1, a * 0.6))
-			"smoke":
-				var r: float = 2.0 + (1.0 - p.life / p.mx) * 3.0
-				draw_rect(Rect2(roundi(pos.x - r), roundi(pos.y - r), roundi(r * 2), roundi(r * 2)), Color(0.91, 0.9, 0.94, a * 0.7))
-			"gull":
-				var up := int(p.life * 5.0 + p.ph) % 2 == 1
-				var gc := Color(1, 1, 1, a)
-				draw_rect(Rect2(pos.x, pos.y, 1, 1), gc)
-				draw_rect(Rect2(pos.x - 1, pos.y - (1 if up else 0), 1, 1), gc)
-				draw_rect(Rect2(pos.x + 1, pos.y - (1 if up else 0), 1, 1), gc)
-				draw_rect(Rect2(pos.x - 2, pos.y - (2 if up else 0), 1, 1), gc)
-				draw_rect(Rect2(pos.x + 2, pos.y - (2 if up else 0), 1, 1), gc)
-			"bfly":
-				var col := Color(p.col)
-				col.a = a
-				var open := int(p.life * 8.0) % 2 == 1
-				draw_rect(Rect2(pos.x - (2 if open else 1), pos.y, 2 if open else 1, 2), col)
-				draw_rect(Rect2(pos.x + 1, pos.y, 2 if open else 1, 2), col)
-				draw_rect(Rect2(pos.x, pos.y, 1, 2), INK)
+func _draw() -> void:
+	drawer.draw_world()

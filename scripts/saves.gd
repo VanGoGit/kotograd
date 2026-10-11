@@ -181,8 +181,8 @@ func import_save(text: String) -> bool:
 	release_save()
 	world.cars = []
 	world.info_target = null
-	world._render_terrain_full()
-	world.refresh_terrain()
+	world.ground._render_terrain_full()
+	world.ground.refresh_terrain()
 	world.rebuild_maps()
 	if not world._had_goals:
 		world.goals.sync_silently()

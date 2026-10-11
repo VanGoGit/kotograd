@@ -688,7 +688,7 @@ func draw_segment(item: Array) -> void:
 		if loco:
 			w.draw_rect(Rect2(r.position.x, r.position.y, 8, 1), Color("ffd23f"))
 	if loco and lit:
-		w.lights.append(Vector3(pos.x, pos.y - 2, 12))
+		w.drawer.lights.append(Vector3(pos.x, pos.y - 2, 12))
 
 
 func draw_heli(hl: Dictionary) -> void:
@@ -710,7 +710,7 @@ func draw_heli(hl: Dictionary) -> void:
 		var v := Vector2(cos(spin + k * PI / 2.0), sin(spin + k * PI / 2.0) * 0.8) * 10.0
 		w.draw_line(lift - v, lift + v, rc, 1.0)
 	if w.dark > 0.1 and int(w.anim_time * 2.0) % 2 == 0:
-		w.lights.append(Vector3(lift.x, lift.y, 7))
+		w.drawer.lights.append(Vector3(lift.x, lift.y, 7))
 
 
 func _heli_shape(body: Color, trim: Color, glass: Color) -> void:
@@ -744,7 +744,7 @@ func draw_planes() -> void:
 		_plane_shape(Color("f4f7fb"), BLUE)
 		w.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		if w.dark > 0.1 and int(w.anim_time * 2.0) % 2 == 0:
-			w.lights.append(Vector3(p.x, p.y - alt * 34.0, 8))
+			w.drawer.lights.append(Vector3(p.x, p.y - alt * 34.0, 8))
 
 
 func _plane_shape(body: Color, stripe: Color) -> void:

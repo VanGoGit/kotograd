@@ -85,9 +85,9 @@ func _process(_delta: float) -> void:
 	var sc: float = ct.get_scale().x
 	var arr := PackedVector3Array()
 	arr.resize(MAX_LIGHTS)
-	var n := mini(world.lights.size(), MAX_LIGHTS)
+	var n := mini(world.drawer.lights.size(), MAX_LIGHTS)
 	for i in n:
-		var l: Vector3 = world.lights[i]
+		var l: Vector3 = world.drawer.lights[i]
 		var s: Vector2 = ct * Vector2(l.x, l.y)
 		arr[i] = Vector3(s.x, s.y, l.z * sc)
 	night_mat.set_shader_parameter("lights", arr)
