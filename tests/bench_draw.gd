@@ -1,7 +1,8 @@
 extends SceneTree
 ## Замер кадра в окне (не headless): тестовый город, ночь и полная карта на экране.
 ##   godot --path . -s res://tests/bench_draw.gd
-## Печатает среднее и 95-й процентиль времени кадра. KOTO_SHOT=файл.png — ещё и снимок экрана.
+## Печатает среднее и 95-й процентиль времени кадра. KOTO_SHOT=файл.png — ещё и снимок экрана
+## (KOTO_SHOT_UI=1 — с интерфейсом, KOTO_ZOOM — масштаб).
 
 const City = preload("res://tests/city.gd")
 const FRAMES := 600
@@ -29,7 +30,7 @@ func _run() -> void:
 		w._process(0.1)
 	w.speed = 1
 	var st: Vector2 = w.mapgen.start_spot()
-	w.set_zoom(2)
+	w.set_zoom(int(OS.get_environment("KOTO_ZOOM")) if OS.has_environment("KOTO_ZOOM") else 2)
 	w.center_cam(st.x, st.y)
 	for k in 60:
 		await process_frame
@@ -46,7 +47,10 @@ func _run() -> void:
 		sum += v
 	print("кадр: среднее %.2f мс, 95%% — %.2f мс, котиков %d" % [sum / times.size(), times[int(times.size() * 0.95)], w.cats.size()])
 	if OS.has_environment("KOTO_SHOT"):
-		main.get_node("UI").visible = OS.get_environment("KOTO_SHOT_UI") != ""
+		var ui = main.get_node("UI")
+		ui.visible = OS.get_environment("KOTO_SHOT_UI") != ""
+		ui.hide_title()
+		ui.finish_tutorial()
 		for k in 3:
 			await process_frame
 		root.get_texture().get_image().save_png(OS.get_environment("KOTO_SHOT"))
