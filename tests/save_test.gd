@@ -108,7 +108,7 @@ func _launch():
 
 ## Маленький город: домик у старта, дорога, котик, свои монетки и название.
 func _build_city(w) -> void:
-	var st: Vector2 = w.start_spot()
+	var st: Vector2 = w.mapgen.start_spot()
 	var x := int(st.x)
 	var y := int(st.y)
 	w.terrain[y * w.W + x] = w.GRASS

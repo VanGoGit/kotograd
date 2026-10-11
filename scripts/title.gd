@@ -256,7 +256,7 @@ func _random_name() -> String:
 ## Маленькая карта острова для карточки выбора.
 func _island_preview(kind: String) -> Texture2D:
 	var cols := [Color("9bd67f"), Color("6cc1e0"), Color("f1dfa6"), Color("b4e294"), Color("b4a48c"), Color("d4c88a"), Color("c8e8a0")]
-	var t: PackedByteArray = world.gen_terrain(kind, 4242)
+	var t: PackedByteArray = world.mapgen.gen_terrain(kind, 4242)
 	var img := Image.create_empty(world.W, world.H, false, Image.FORMAT_RGBA8)
 	for y in world.H:
 		for x in world.W:
@@ -294,7 +294,7 @@ func _on_found() -> void:
 		n = "Котоград"
 	world.saves.release_save()
 	_notice.visible = false
-	world.island = _island
+	world.mapgen.island = _island
 	world.new_game()
 	world.city_name = n
 	world.saves.save_game()

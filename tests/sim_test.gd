@@ -87,7 +87,7 @@ func _run() -> void:
 
 ## Квартал у стартовой точки: суша, сетка дорог и по одной постройке каждого вида, что встанет.
 func _build_city(w) -> Dictionary:
-	var st: Vector2 = w.start_spot()
+	var st: Vector2 = w.mapgen.start_spot()
 	var x0 := clampi(int(st.x) - 16, 1, w.W - 34)
 	var y0 := clampi(int(st.y) - 14, 1, w.H - 26)
 	var x1 := x0 + 32

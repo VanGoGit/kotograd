@@ -106,7 +106,7 @@ func serialize() -> String:
 			k["y"] = roundf(c.y)
 		cat_list.append(k)
 	var data := {
-		"v": SAVE_V, "seed": world.map_seed, "island": world.island, "terrain": Array(world.terrain), "objs": mains, "coins": world.coins, "food": world.food,
+		"v": SAVE_V, "seed": world.map_seed, "island": world.mapgen.island, "terrain": Array(world.terrain), "objs": mains, "coins": world.coins, "food": world.food,
 		"time": world.time, "day": world.day, "cats": cat_list, "max_cats": world.max_cats, "next_id": world.next_id, "speed": world.speed,
 		"used_names": world.used_names, "cam": [world.cam.position.x, world.cam.position.y, world.zoom],
 		"name": world.city_name, "goals": world.goals.done.keys(), "pets": world.pets_total, "events": world.events_seen, "rides": world.transit.rides,
@@ -296,7 +296,7 @@ func _check_save(d: Dictionary) -> bool:
 
 func _apply_save(d: Dictionary) -> void:
 	world.map_seed = int(d.seed)
-	world.island = str(d.get("island", "sa"))
+	world.mapgen.island = str(d.get("island", "sa"))
 	world.terrain = PackedByteArray(d.terrain)
 	world.objs = []
 	world.objs.resize(W * H)
