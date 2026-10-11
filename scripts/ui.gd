@@ -797,7 +797,7 @@ func _short_lines(o: Dictionary, d: Dictionary) -> Array:
 	if d.has("service") and out.size() < 3:
 		out.append(tr("Уют района: +%d в радиусе %d") % [int(world.stat(o, "service")), d.sradius])
 	# одна главная подсказка, если что-то мешает
-	if (d.has("jobs") or d.has("parking") or D.MAKES.has(o.t)) and world.access_roads(i).is_empty() and not d.has("need_water"):
+	if (d.has("jobs") or d.has("parking") or D.MAKES.has(o.t)) and world.paths.access_roads(i).is_empty() and not d.has("need_water"):
 		out.append(tr("Подведите дорогу рядом."))
 	elif d.has("jobs") and world.workers.get(i, []).is_empty():
 		out.append(tr("Ждём сотрудников — нужны новые жители."))
@@ -903,14 +903,14 @@ func _render_info() -> void:
 				lines.append("  • %s%s" % [I18n.cat(c.name), tr(" — на месте") if c.state == "in" and c.at == i else ""])
 			if ws.is_empty():
 				lines.append(tr("  Ждём сотрудников — нужны новые жители."))
-			if d.has("vehicle") and world.roads_around(i).is_empty():
+			if d.has("vehicle") and world.paths.roads_around(i).is_empty():
 				lines.append(tr("Подведите дорогу, чтобы выезжала служебная машина."))
 		if o.build <= 0.0:
 			lines.append_array(_chain_lines(o))
 		if d.has("parking") and o.build <= 0.0:
 			lines.append("")
 			lines.append(tr("Машин: %d/%d") % [world.lot_count.get(i, 0), int(world.stat(o, "parking"))])
-			if world.roads_around(i).is_empty():
+			if world.paths.roads_around(i).is_empty():
 				lines.append(tr("Подведите дорогу — иначе сюда не заехать."))
 		if d.has("happy"):
 			lines.append(tr("Радость: +%d домам в радиусе %d") % [int(world.stat(o, "happy")), d.radius])
@@ -972,7 +972,7 @@ func _chain_lines(o: Dictionary) -> Array:
 			out.append(tr("  Работает на полную: доход +50%"))
 		if world.workers.get(o.i, []).is_empty():
 			out.append(tr("  Без работников производство стоит."))
-		elif world.access_roads(o.i).is_empty():
+		elif world.paths.access_roads(o.i).is_empty():
 			out.append(tr("  Подведите дорогу — грузовикам не выехать."))
 	var uses: Array = D.USES.get(o.t, [])
 	if not uses.is_empty():

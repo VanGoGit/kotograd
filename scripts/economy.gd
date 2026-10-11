@@ -220,7 +220,7 @@ func _dispatch(b: int, inc: Dictionary) -> void:
 		offers.shuffle()
 	else:
 		offers.append([D.MAKES[o.t][0], float(o.get("out", 0.0))])
-	var starts := world.access_roads(b)
+	var starts := world.paths.access_roads(b)
 	if starts.is_empty():
 		return
 	var bc := world.center_of(b)
@@ -249,7 +249,7 @@ func _dispatch(b: int, inc: Dictionary) -> void:
 		cands.sort_custom(func(x, y): return x[0] < y[0])
 		for k in mini(3, cands.size()):
 			var s: int = cands[k][1]
-			var route = world.road_route(starts, world._to_set(world.access_roads(s)))
+			var route = world.paths.road_route(starts, world._to_set(world.paths.access_roads(s)))
 			if route == null:
 				continue
 			var n := mini(TRUCK_LOAD, int(minf(have, cands[k][2])))
