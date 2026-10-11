@@ -56,6 +56,12 @@ jobs:
       - name: Проверить сохранения
         run: timeout 300 ~/godot/godot --headless --path . -s res://tests/save_test.gd
 
+      - name: Проверить перевод
+        run: timeout 120 ~/godot/godot --headless --path . -s res://tests/tr_test.gd
+
+      - name: Прогнать город несколько игровых дней
+        run: timeout 600 ~/godot/godot --headless --path . -s res://tests/sim_test.gd
+
       - name: Собрать веб-версию
         run: |
           mkdir -p build/web

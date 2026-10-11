@@ -90,14 +90,16 @@ static func tex(img: Image) -> ImageTexture:
 
 
 static func flipped(t: Texture2D) -> ImageTexture:
-	var img := t.get_image()
+	# копия: без видеокарты get_image() отдаёт саму картинку текстуры, и правка испортила бы оригинал
+	var img: Image = t.get_image().duplicate()
 	img.flip_x()
 	return ImageTexture.create_from_image(img)
 
 
 ## Увеличенная копия (для кнопок интерфейса).
 static func scaled(t: Texture2D, k: int) -> ImageTexture:
-	var img := t.get_image()
+	# копия: без видеокарты get_image() отдаёт саму картинку текстуры, и правка испортила бы оригинал
+	var img: Image = t.get_image().duplicate()
 	img.resize(img.get_width() * k, img.get_height() * k, Image.INTERPOLATE_NEAREST)
 	return ImageTexture.create_from_image(img)
 
@@ -1495,7 +1497,7 @@ func level_variant(key: String, lvl: int) -> Array:
 	var ck := "%s|%d" % [key, lvl]
 	if _lvl_cache.has(ck):
 		return _lvl_cache[ck]
-	var img: Image = obj[key].get_image()
+	var img: Image = obj[key].get_image().duplicate()
 	img.convert(Image.FORMAT_RGBA8)
 	var w := img.get_width()
 	var wins: Array = windows.get(key, []).duplicate()

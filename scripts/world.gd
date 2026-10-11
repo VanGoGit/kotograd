@@ -260,6 +260,8 @@ func serialize() -> String:
 		k["path"] = []
 		k["dest"] = null
 		k["plan"] = null
+		# пауза после неудачного маршрута — временная, при загрузке всё равно сбрасывается
+		k["fail_until"] = 0.0
 		if c.state == "drive":
 			k["state"] = "in"
 			k["at"] = c.dest.b if c.dest != null and c.dest.has("b") and objs[c.dest.b] != null else c.home
