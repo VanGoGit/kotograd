@@ -276,7 +276,7 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 func _draw_tut_arrow() -> void:
 	if tut_cat == null or not world.cats.has(tut_cat) or tut_cat.state == "in" or tut_cat.state == "drive" or tut_cat.state == "ride":
 		return
-	var p := world.cat_pos(tut_cat) + Vector2(0, -24 + roundf(sin(world.anim_time * 5.0) * 2.0))
+	var p := world.cats_ai.cat_pos(tut_cat) + Vector2(0, -24 + roundf(sin(world.anim_time * 5.0) * 2.0))
 	var tri := PackedVector2Array([p + Vector2(-5, -6), p + Vector2(5, -6), p])
 	world.draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -7), p + Vector2(7, -7), p + Vector2(0, 2)]), INK)
 	world.draw_colored_polygon(tri, Color("ff8fb1"))
@@ -303,7 +303,7 @@ func _draw_construction(o: Dictionary, x: int, y: int) -> void:
 
 
 func _cat_texture(c: Dictionary) -> Texture2D:
-	var fs: Dictionary = world.spr.cat_set(c.color, world.outfit_key(c))
+	var fs: Dictionary = world.spr.cat_set(c.color, world.cats_ai.outfit_key(c))
 	var f := 1 if c.dir < 0 else 0
 	match c.state:
 		"sleep":

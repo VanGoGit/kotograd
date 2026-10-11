@@ -117,7 +117,7 @@ func _build_city(w) -> void:
 	w.place_obj((y + 1) * w.W + x, "road", 3, 0.0)
 	w.recalc()
 	w.rebuild_maps()
-	w.spawn_cat()
+	w.cats_ai.spawn_cat()
 	w.coins = 1234.5
 	w.city_name = "Тестоград"
 

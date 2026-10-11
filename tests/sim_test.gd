@@ -114,7 +114,7 @@ func _sane(w) -> bool:
 		print("  монетки или еда: %s / %s" % [w.coins, w.food])
 		return false
 	for c in w.cats:
-		var p: Vector2 = w.cat_pos(c)
+		var p: Vector2 = w.cats_ai.cat_pos(c)
 		if not (is_finite(p.x) and is_finite(p.y)) or not w.in_map(int(c.x), int(c.y)):
 			print("  котик вне карты: %s %s" % [c.name, p])
 			return false

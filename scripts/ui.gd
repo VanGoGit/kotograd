@@ -813,7 +813,7 @@ func _toggle_info_more() -> void:
 
 func _pet_selected() -> void:
 	if world.info_target != null and world.info_target.has("cat"):
-		world.pet_cat(world.info_target.cat)
+		world.cats_ai.pet_cat(world.info_target.cat)
 
 
 func _upgrade_selected() -> void:
@@ -837,11 +837,11 @@ func _render_info() -> void:
 			world.info_target = null
 			info_panel.visible = false
 			return
-		var fs: Dictionary = spr.cat_set(c.color, world.outfit_key(c))
+		var fs: Dictionary = spr.cat_set(c.color, world.cats_ai.outfit_key(c))
 		info_img.texture = Spr.scaled(fs.stand[0], 3)
 		info_name.text = I18n.cat(c.name)
-		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.profession(c)]
-		lines.append(tr("Сейчас: ") + world.activity_text(c))
+		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
+		lines.append(tr("Сейчас: ") + world.cats_ai.activity_text(c))
 		lines.append(tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
 		lines.append(tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
 		var car_txt := tr("ходит пешком")
@@ -888,7 +888,7 @@ func _render_info() -> void:
 			lines.append("")
 			lines.append(tr("Жильцы: %d/%d") % [res.size(), world.stat(o, "cap")])
 			for c in res:
-				lines.append("  • %s — %s" % [I18n.cat(c.name), world.profession(c).to_lower()])
+				lines.append("  • %s — %s" % [I18n.cat(c.name), world.cats_ai.profession(c).to_lower()])
 			if res.is_empty():
 				lines.append(tr("  Скоро сюда кто-нибудь переедет…"))
 			var hh: float = world.stats.house_happy.get(i, 0.0)
