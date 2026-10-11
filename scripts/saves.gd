@@ -87,8 +87,9 @@ func serialize() -> String:
 		k["path"] = []
 		k["dest"] = null
 		k["plan"] = null
-		# пауза после неудачного маршрута — временная, при загрузке всё равно сбрасывается
+		# пауза после неудачного маршрута и «стоит у машины» — временные, при загрузке всё равно сбрасываются
 		k["fail_until"] = 0.0
+		k["near_car"] = false
 		if c.state == "drive":
 			k["state"] = "in"
 			k["at"] = c.dest.b if c.dest != null and c.dest.has("b") and world.objs[c.dest.b] != null else c.home
@@ -342,6 +343,9 @@ func _apply_save(d: Dictionary) -> void:
 	for c in d.cats:
 		for k in ["id", "home", "job", "at", "casual", "dir", "lx", "ly", "pi", "car_lot", "car_tile"]:
 			c[k] = int(c.get(k, -1))
+		# JSON читает все числа дробными: счётчик неудач возвращаем целым
+		if c.has("home_fails"):
+			c["home_fails"] = int(c.home_fails)
 		c["near_car"] = false
 		c["path"] = []
 		c["dest"] = null

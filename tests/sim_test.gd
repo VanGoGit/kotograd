@@ -44,7 +44,7 @@ func _run() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	var w = main.world
-	seed(12345)
+	seed(int(OS.get_environment("KOTO_SEED")) if OS.has_environment("KOTO_SEED") else 12345)
 	w.new_game()
 	w.unlimited = true
 
@@ -73,9 +73,10 @@ func _run() -> void:
 	_check(w.saves.save_game(), "большой город сохраняется")
 	_check(w.saves.import_save(text), "и загружается")
 	var again: String = w.saves.serialize()
-	if again != text:
+	if _norm(again) != _norm(text):
 		_diff(JSON.parse_string(text), JSON.parse_string(again), "")
-	_check(again == text, "после загрузки город тот же")
+		_text_diff(_norm(text), _norm(again))
+	_check(_norm(again) == _norm(text), "после загрузки город тот же")
 	for k in 30:
 		w._process(0.1)
 	_check(_sane(w), "загруженный город живёт дальше")
@@ -101,12 +102,35 @@ func _diff(a, b, path: String, budget := [8]) -> void:
 			if not a.has(k):
 				budget[0] -= 1
 				print("  лишнее после загрузки: %s.%s" % [path, k])
-	elif a is Array and b is Array and a.size() == b.size():
-		for n in a.size():
+	elif a is Array and b is Array:
+		if a.size() != b.size():
+			budget[0] -= 1
+			print("  %s: длина %d → %d" % [path, a.size(), b.size()])
+		for n in mini(a.size(), b.size()):
 			_diff(a[n], b[n], "%s[%d]" % [path, n], budget)
 	elif a != b:
 		budget[0] -= 1
 		print("  %s: %s → %s" % [path, str(a).left(80), str(b).left(80)])
+
+
+## Дробные числа — с точностью до 6 знаков: JSON может по-разному записать 1e-15.
+## Целые и дробные при этом различаются: 1 и 1.0 — разные записи.
+func _norm(text: String) -> String:
+	var re := RegEx.create_from_string("-?[0-9]+[.][0-9]+(?:[eE][-+]?[0-9]+)?")
+	var out := ""
+	var at := 0
+	for m in re.search_all(text):
+		out += text.substr(at, m.get_start() - at) + ("%.6f" % m.get_string().to_float())
+		at = m.get_end()
+	return out + text.substr(at)
+
+
+## Значения равны, а текст нет — обычно целое число стало дробным (1 → 1.0). Показываем место.
+func _text_diff(a: String, b: String) -> void:
+	var n := 0
+	while n < mini(a.length(), b.length()) and a[n] == b[n]:
+		n += 1
+	print("  текст расходится: …%s… → …%s…" % [a.substr(maxi(0, n - 60), 90), b.substr(maxi(0, n - 60), 90)])
 
 
 func _sane(w) -> bool:
