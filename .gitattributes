@@ -1,0 +1,5 @@
+# Godot пишет файлы с LF — храним и выдаём их так же на любой системе
+* text=auto eol=lf
+*.png binary
+*.wav binary
+*.ogg binary
