@@ -62,6 +62,9 @@ jobs:
       - name: Прогнать город несколько игровых дней
         run: timeout 600 ~/godot/godot --headless --path . -s res://tests/sim_test.gd
 
+      - name: Пройтись по интерфейсу
+        run: timeout 600 ~/godot/godot --headless --path . -s res://tests/ui_test.gd
+
       - name: Собрать веб-версию
         run: |
           mkdir -p build/web
