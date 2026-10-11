@@ -208,7 +208,7 @@ static func make_logo() -> Control:
 
 
 func _quit() -> void:
-	world.save_game()
+	world.saves.save_game()
 	get_tree().quit()
 
 
@@ -231,11 +231,11 @@ func open(has_city: bool) -> void:
 
 
 func _save_notice_text() -> String:
-	match world.save_notice:
+	match world.saves.save_notice:
 		"restored":
 			return tr("Файл сохранения был повреждён — город восстановлен из резервной копии.")
 		"broken":
-			return tr("Файл сохранения не читается, поэтому начнётся новый город. Старый файл не удалён: %s") % world.save_aside
+			return tr("Файл сохранения не читается, поэтому начнётся новый город. Старый файл не удалён: %s") % world.saves.save_aside
 		"newer":
 			return tr("Город сохранён более новой версией игры. Обновите игру (в браузере — перезагрузите страницу), чтобы продолжить его. До тех пор он не будет перезаписан.")
 	return ""
@@ -282,7 +282,7 @@ func _on_new() -> void:
 	_name_box.visible = true
 	_name_edit.text = _random_name()
 	_warn.text = (tr("Город «%s» будет заменён новым островом.") % tr(world.city_name)) if _btn_continue.visible else ""
-	if world.save_blocked:
+	if world.saves.save_blocked:
 		_warn.text = tr("Город из более новой версии игры не удалится — его файл будет отложен в сторону.")
 	_warn.visible = _warn.text != ""
 	_name_edit.grab_focus()
@@ -292,12 +292,12 @@ func _on_found() -> void:
 	var n := _name_edit.text.strip_edges()
 	if n == "":
 		n = "Котоград"
-	world.release_save()
+	world.saves.release_save()
 	_notice.visible = false
 	world.island = _island
 	world.new_game()
 	world.city_name = n
-	world.save_game()
+	world.saves.save_game()
 	ui.refresh_tools()
 	ui.hide_title()
 	ui.toast(tr("Добро пожаловать в %s!") % tr(n), true)

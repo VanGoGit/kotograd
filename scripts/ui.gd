@@ -1295,7 +1295,7 @@ func _menu_btn(text: String, cb: Callable) -> Button:
 
 
 func _quit_game() -> void:
-	world.save_game()
+	world.saves.save_game()
 	get_tree().quit()
 
 
@@ -1412,9 +1412,9 @@ func _file_dialog(mode: int) -> FileDialog:
 
 func _on_export() -> void:
 	if _web:
-		world.save_game()
+		world.saves.save_game()
 		var name := "kotograd_den%d_%s.json" % [world.day, Time.get_date_string_from_system()]
-		JavaScriptBridge.download_buffer(world.serialize().to_utf8_buffer(), name, "application/json")
+		JavaScriptBridge.download_buffer(world.saves.serialize().to_utf8_buffer(), name, "application/json")
 		toast(tr("Город скачан: ") + name, true)
 		return
 	var fd := _file_dialog(FileDialog.FILE_MODE_SAVE_FILE)
@@ -1425,12 +1425,12 @@ func _on_export() -> void:
 
 
 func _export_to(path: String) -> void:
-	world.save_game()
+	world.saves.save_game()
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		toast(tr("Не получилось сохранить файл"))
 		return
-	f.store_string(world.serialize())
+	f.store_string(world.saves.serialize())
 	f.close()
 	toast(tr("Город сохранён: ") + path.get_file(), true)
 
@@ -1450,8 +1450,8 @@ func _import_from(path: String) -> void:
 
 
 func _import_text(text: String, fname: String) -> void:
-	if text == "" or not world.import_save(text):
-		if world.save_error == "newer":
+	if text == "" or not world.saves.import_save(text):
+		if world.saves.save_error == "newer":
 			toast(tr("Этот город сохранён более новой версией игры — сначала обновите игру"))
 		else:
 			toast(tr("Этот файл не похож на сохранение Котограда"))

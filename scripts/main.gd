@@ -96,4 +96,4 @@ func _process(_delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and world != null:
-		world.save_game()
+		world.saves.save_game()

@@ -7,6 +7,15 @@ const H := 90
 const OLD_W := 56
 const OLD_H := 40
 const T := 16
+# виды земли на карте
+const GRASS := 0
+const WATER := 1
+const SAND := 2
+const HILL := 3
+const MOUNTAIN := 4
+const DRY := 5
+const MEADOW := 6
+const DAY_LEN := 360.0           # длина игровых суток, секунд
 
 const DEFS := {
 	"t_grass": {"name": "Земля", "cost": 0, "unlock": 0, "terra": 0, "paint": true, "desc": "Насыпать землю на воду или песок. Бесплатно — расширяйте остров!"},

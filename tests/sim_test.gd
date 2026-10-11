@@ -68,10 +68,10 @@ func _run() -> void:
 	_check(w.employed_count() > 0, "котики ходят на работу")
 	_check(_sane(w), "монетки, еда и координаты — обычные числа")
 
-	var text: String = w.serialize()
-	_check(w.save_game(), "большой город сохраняется")
-	_check(w.import_save(text), "и загружается")
-	var again: String = w.serialize()
+	var text: String = w.saves.serialize()
+	_check(w.saves.save_game(), "большой город сохраняется")
+	_check(w.saves.import_save(text), "и загружается")
+	var again: String = w.saves.serialize()
 	if again != text:
 		_diff(JSON.parse_string(text), JSON.parse_string(again), "")
 	_check(again == text, "после загрузки город тот же")
