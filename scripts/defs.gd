@@ -463,6 +463,32 @@ const NO_UPGRADE := ["road", "boatdock", "blvd", "pawtile", "highway", "path", "
 	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
 
 
+## Чем украшено улучшенное здание (sprites.level_variant). По умолчанию — по вкладке меню,
+## UPGRADE_LOOK уточняет там, где вкладка не подходит (рынку — сено, а не столики под зонтиком).
+const UPGRADE_LOOK_TAB := {
+	"Жильё": "home", "Магазины": "shop", "Еда": "cafe", "Услуги": "shop", "Бизнес": "office", "Медиа": "office",
+	"Промышленность": "industry", "Город": "civic", "Транспорт": "transport", "Отдых": "fun", "Природа": "home",
+}
+const UPGRADE_LOOK := {
+	"florist": "home", "pier": "farm", "farm": "farm", "market": "farm", "wheat": "farm", "cottonfield": "farm",
+	"gasstation": "auto", "carwash": "auto", "autorepair": "auto", "cardealer": "auto", "construction": "industry",
+	"cinema": "fun", "theater": "fun", "motel": "home", "hotel": "shop",
+	"metro": "transport", "busstation": "transport", "taxidepot": "transport", "helipad": "transport",
+	"fountain": "home", "playground": "home", "zoo": "home", "museum": "civic", "gallery": "shop",
+	"surf": "beach", "marina": "beach", "boatdock": "beach", "aquarium": "beach", "lifeguard": "beach",
+}
+
+
+static func upgrade_look(t: String) -> String:
+	t = t.trim_prefix("pair_")
+	if UPGRADE_LOOK.has(t):
+		return UPGRADE_LOOK[t]
+	for tab in TABS:
+		if tab.tools.has(t):
+			return UPGRADE_LOOK_TAB.get(tab.name, "home")
+	return "home"
+
+
 static func ups(t: String) -> Array:
 	var d: Dictionary = DEFS.get(t, {})
 	if d.has("up"):

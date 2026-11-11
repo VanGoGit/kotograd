@@ -1517,56 +1517,176 @@ func pair_variant(o: Dictionary) -> Array:
 	return [obj[key], windows.get(key, [])]
 
 
-## Улучшенное здание того же размера — только нарядные детали на фасаде:
-## уровень 2 — ящики с цветами под окнами и два горшка у основания,
-## уровень 3 — ещё золотой карниз и огоньки гирлянды по краю крыши.
+## Улучшенное здание того же размера, а рядом с ним — предметы, подходящие этому зданию (D.upgrade_look).
+## Картинка шире на PROP_PAD с каждой стороны: здание рисуется по центру клетки и остаётся на месте,
+## а предметы стоят слева и справа от него, на краю тротуара.
+##   home      — горшки с цветами и ящики с цветами под окнами;    3: золотой карниз и гирлянда
+##   cafe      — столики под зонтиками;                            3: гирлянда
+##   shop      — кадки с подстриженными кустами;                   3: золотой карниз
+##   office    — строгие кубы самшита;                             3: золотой карниз и блики на стёклах
+##   civic     — круглые кусты;                                    3: флагшток и золотой карниз
+##   industry  — ящики с грузом;                                   3: ещё ящики сверху
+##   transport — скамейки;                                         3: золотой карниз
+##   farm      — тюки сена;                                        3: ещё тюки сверху
+##   auto      — стопки шин;                                       3: гирлянда-флажки
+##   fun       — лампочки по краю крыши;                           3: гирлянда
+##   beach     — спасательные круги;                               3: гирлянда
+const PROP_PAD := 5
+const HEADROOM := 0
+
+
 func level_variant(key: String, lvl: int) -> Array:
 	var ck := "%s|%d" % [key, lvl]
 	if _lvl_cache.has(ck):
 		return _lvl_cache[ck]
-	var img: Image = obj[key].get_image().duplicate()
-	img.convert(Image.FORMAT_RGBA8)
-	var w := img.get_width()
-	var h := img.get_height()
-	var wins: Array = windows.get(key, [])
-	var blooms := [Color("ff6b8b"), Color("ffd23f"), Color("ff9fc0"), Color("fff6c2")]
-	var leaf := Color("5fae73")
-	var box := Color("8a5a3b")
-	for r in wins:
-		var y: int = r.end.y
-		# ящик — прямо под окном, только если там стена здания (не воздух и не край картинки)
-		if r.size.x < 2 or y >= h - 1 or img.get_pixel(r.position.x, y).a < 0.5:
-			continue
-		for x in range(r.position.x, r.end.x):
-			img.set_pixel(x, y, box)
-			img.set_pixel(x, y - 1, blooms[(x + y) % blooms.size()] if (x - r.position.x) % 2 == 0 else leaf)
-	# у каждого улучшенного здания — два горшка с цветами у основания по краям:
-	# заметно даже у маленьких киосков и зданий без окон
-	var pot := Color("c97b4a")
-	for px in [0, w - 2]:
-		for dx in 2:
-			img.set_pixel(px + dx, h - 1, pot.darkened(0.25))
-			img.set_pixel(px + dx, h - 2, pot)
-			img.set_pixel(px + dx, h - 3, leaf)
-		img.set_pixel(px, h - 4, blooms[(px + lvl) % blooms.size()])
-		img.set_pixel(px + 1, h - 4, leaf)
+	var src: Image = obj[key].get_image().duplicate()
+	src.convert(Image.FORMAT_RGBA8)
+	var look := D.upgrade_look(key)
+	var bw := src.get_width()
+	var w := bw + PROP_PAD * 2
+	var h := src.get_height() + HEADROOM
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.blit_rect(src, Rect2i(0, 0, bw, src.get_height()), Vector2i(PROP_PAD, HEADROOM))
+	var wins := []
+	for r in windows.get(key, []):
+		wins.append(Rect2i(r.position + Vector2i(PROP_PAD, HEADROOM), r.size))
+	var top := HEADROOM
+	while top < h and not _row_has_pixels(img, top):
+		top += 1
+	var put := func(im: Image, x: int, y: int, col) -> void:
+		if x >= 0 and x < w and y >= 0 and y < h:
+			im.set_pixel(x, y, Color(col))
+	# предметы рисуются на отдельном слое и получают контур, как всё в игре
+	var props := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	var gy := h - 2  # нижний ряд предмета (под ним — ещё ряд на контур)
+	for x0 in [0, w - PROP_PAD]:
+		var x: int = x0 + 1
+		match look:
+			"home":
+				for dx in 3:
+					put.call(props, x + dx, gy, "c97b4a")
+					put.call(props, x + dx, gy - 1, "e0905a")
+					put.call(props, x + dx, gy - 2, "5fae73")
+				put.call(props, x, gy - 3, "ff6b8b")
+				put.call(props, x + 2, gy - 3, "ffd23f")
+			"cafe":
+				put.call(props, x + 1, gy, "6a4a3a")
+				for dx in 3:
+					put.call(props, x + dx, gy - 1, "a0703f")
+				put.call(props, x + 1, gy - 2, "6a6478")
+				put.call(props, x + 1, gy - 3, "6a6478")
+				for dx in 3:
+					put.call(props, x + dx, gy - 4, ["ff6b8b", "ffffff", "ff6b8b"][dx])
+				put.call(props, x + 1, gy - 5, "ff6b8b")
+			"shop":
+				for dx in 3:
+					put.call(props, x + dx, gy, "6c7090")
+					put.call(props, x + dx, gy - 1, "8a8fae")
+				put.call(props, x + 1, gy - 2, "6a4a3a")
+				for dx in 3:
+					put.call(props, x + dx, gy - 3, "5fae73")
+					put.call(props, x + dx, gy - 4, "5fae73")
+				put.call(props, x + 1, gy - 5, "7cc46a")
+				put.call(props, x, gy - 4, "7cc46a")
+			"office":
+				for dx in 3:
+					put.call(props, x + dx, gy, "a8adb8")
+					for dy in range(1, 4):
+						put.call(props, x + dx, gy - dy, "3f7a4a" if dy < 3 else "5fae73")
+			"civic":
+				for dx in 3:
+					put.call(props, x + dx, gy, "3f7a4a")
+					put.call(props, x + dx, gy - 1, "5fae73")
+					put.call(props, x + dx, gy - 2, "5fae73")
+				put.call(props, x + 1, gy - 3, "7cc46a")
+			"industry":
+				# ящик 3×3; на 3 уровне сверху ещё один, поменьше
+				for dx in 3:
+					for dy in 3:
+						put.call(props, x + dx, gy - dy, "b07a45" if dx == 1 or dy == 1 else "8a5a3b")
+				put.call(props, x + 1, gy - 1, "e8c870")
+				if lvl >= 3:
+					for dx in 2:
+						for dy in 2:
+							put.call(props, x + dx, gy - 3 - dy, "b07a45" if dy == 0 else "8a5a3b")
+			"transport":
+				put.call(props, x, gy, "4a4e69")
+				put.call(props, x + 2, gy, "4a4e69")
+				for dx in 3:
+					put.call(props, x + dx, gy - 1, "a0703f")
+					put.call(props, x + dx, gy - 3, "a0703f")
+				put.call(props, x, gy - 2, "4a4e69")
+			"farm":
+				for dx in 3:
+					for dy in 2:
+						put.call(props, x + dx, gy - dy, "e8c870" if dy == 1 else "c8a850")
+				if lvl >= 3:
+					for dx in 3:
+						put.call(props, x + dx, gy - 2, "c8a850")
+						put.call(props, x + dx, gy - 3, "e8c870")
+			"auto":
+				for dy in 4:
+					for dx in 3:
+						put.call(props, x + dx, gy - dy, "8a8f9a" if dx == 1 and dy % 2 == 1 else "2b2b33")
+			"beach":
+				for pt in [[1, 0], [0, 1], [2, 1], [1, 2], [0, 0], [2, 2]]:
+					put.call(props, x + pt[0], gy - 1 - pt[1], "e0483a" if (pt[0] + pt[1]) % 2 == 0 else "ffffff")
+	if lvl >= 3 and look == "civic":
+		# флагшток слева от здания
+		for dy in range(0, 11):
+			put.call(props, 2, gy - dy, "6a6478")
+		for dx in range(1, 4):
+			put.call(props, 2 + dx, gy - 10, "e45b6b")
+			put.call(props, 2 + dx, gy - 9, "5b8de4")
+	if look != "fun":
+		outline(props)
+		img.blend_rect(props, Rect2i(0, 0, w, h), Vector2i.ZERO)
+	match look:
+		"home":
+			# ящики с цветами под окнами — только там, где под окном стена
+			var blooms := ["ff6b8b", "ffd23f", "ff9fc0", "fff6c2"]
+			for r in wins:
+				var y: int = r.end.y
+				if r.size.x < 2 or y >= h - 1 or img.get_pixel(r.position.x, y).a < 0.5:
+					continue
+				for x in range(r.position.x, r.end.x):
+					put.call(img, x, y, "8a5a3b")
+					put.call(img, x, y - 1, blooms[(x + y) % blooms.size()] if (x - r.position.x) % 2 == 0 else "5fae73")
+		"fun":
+			# лампочки по краю крыши
+			for x in range(PROP_PAD + 1, w - PROP_PAD - 1, 2):
+				if img.get_pixel(x, top).a > 0.5:
+					put.call(img, x, top, "ffe066")
 	if lvl >= 3:
-		# золотой карниз: тёмный контур верхних двух рядов крыши становится золотым,
-		# а по самому краю — огоньки гирлянды
-		var top := 0
-		while top < h and not _row_has_pixels(img, top):
-			top += 1
-		var ink := INK
-		for y in range(top, mini(top + 2, h)):
-			for x in w:
-				if img.get_pixel(x, y).is_equal_approx(ink):
-					img.set_pixel(x, y, Color("e8b830"))
-		for x in range(1, w - 1, 3):
-			if img.get_pixel(x, top).a > 0.5:
-				img.set_pixel(x, top, [Color("ff6b8b"), Color("5fd3c8"), Color("fff6c2")][(x / 3) % 3])
+		match look:
+			"home", "shop", "office", "civic", "transport":
+				_gold_trim(img, top)
+		match look:
+			"home", "cafe", "fun", "beach", "auto":
+				_garland(img, top)
+			"office":
+				# новое остекление: блик в верхнем углу каждого окна
+				for r in wins:
+					if r.size.x >= 2 and r.size.y >= 2:
+						put.call(img, r.position.x, r.position.y, "ffffff")
 	var res := [tex(img), wins]
 	_lvl_cache[ck] = res
 	return res
+
+
+## Золотой карниз: тёмный контур двух верхних рядов крыши становится золотым.
+func _gold_trim(img: Image, top: int) -> void:
+	for y in range(top, mini(top + 2, img.get_height())):
+		for x in img.get_width():
+			if img.get_pixel(x, y).is_equal_approx(INK):
+				img.set_pixel(x, y, Color("e8b830"))
+
+
+## Огоньки гирлянды по самому краю крыши.
+func _garland(img: Image, top: int) -> void:
+	for x in range(1, img.get_width() - 1, 3):
+		if img.get_pixel(x, top).a > 0.5:
+			img.set_pixel(x, top, [Color("ff6b8b"), Color("5fd3c8"), Color("fff6c2")][(x / 3) % 3])
 
 
 func _row_has_pixels(img: Image, y: int) -> bool:
