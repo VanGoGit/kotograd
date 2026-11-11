@@ -349,7 +349,7 @@ func _try_drive(c: Dictionary, d: Dictionary) -> bool:
 	elif c.state == "in" and c.at == c.home and world.is_ready(c.home):
 		starts = world.paths.home_roads(c.home)
 		if starts.is_empty():
-			# дорога не у дома — сначала дойти до неё пешком
+			# дорога не у дома — сначала дойти до неё по тротуару
 			var acc := world.paths.access_roads(c.home)
 			if acc.is_empty():
 				return false
@@ -561,10 +561,6 @@ func _walk_done(c: Dictionary) -> void:
 
 func _update_cat(c: Dictionary, dt: float) -> void:
 	c.anim += dt
-	# плавно переходим на тротуар у края дороги и обратно
-	if c.has("otx"):
-		c["ox"] = move_toward(c.get("ox", 0.0), c.otx, dt * 40.0)
-		c["oy"] = move_toward(c.get("oy", 0.0), c.oty, dt * 40.0)
 	if c.pet > 0.0:
 		c.pet -= dt
 	match c.state:
@@ -623,10 +619,7 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 			var dy: float = tgt.y - c.y
 			var dist := sqrt(dx * dx + dy * dy)
 			var o = world.obj_at(tgt.x, tgt.y)
-			var sp := dt * (1.7 if o != null and (o.t == "path" or o.t == "blvd" or o.t == "road") else 1.1)
-			if c.get("o_pi", -1) != c.pi:
-				c["o_pi"] = c.pi
-				_sidewalk_target(c)
+			var sp := dt * (1.7 if o != null and (o.t == "path" or o.t == "blvd") else (1.4 if o != null and o.t == "road" else 1.1))
 			if absf(dx) > 0.01:
 				c.dir = 1 if dx > 0 else -1
 			if dist <= sp:
@@ -640,40 +633,6 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 				c.y += dy / dist * sp
 			if world.happy > 70.0 and randf() < dt * 0.01:
 				world.hearts_at(Vector2(c.x * T + 8, c.y * T + 2), 1)
-
-
-## На прямой дороге котик идёт по тротуару у её края. Сторона — та, с которой он вышел на дорогу
-## (или та, где он с неё сойдёт), и меняется только при переходе по «зебре».
-## Сдвиг — только для рисования (ox, oy в пикселях), клетка котика остаётся прежней.
-func _sidewalk_target(c: Dictionary) -> void:
-	var t: Vector2i = c.path[c.pi]
-	var ti := t.y * W + t.x
-	var axis: int = world.road_axis.get(ti, 0)
-	if axis == 0:
-		c["otx"] = 0.0
-		c["oty"] = 0.0
-		return
-	var p: Vector2i = c.path[c.pi - 1] if c.pi > 0 else Vector2i(roundi(c.x), roundi(c.y))
-	var side := world.paths.entry_side(axis, t - p)
-	if side < 0 and world.road_axis.get(p.y * W + p.x, 0) == axis:
-		side = c.get("side", 1)
-	if side < 0:
-		# пришли с перекрёстка — смотрим, с какой стороны потом сойдём с дороги
-		side = c.get("side", 1)
-		for j in range(c.pi + 1, c.path.size()):
-			var q: Vector2i = c.path[j]
-			if world.road_axis.get(q.y * W + q.x, 0) != axis:
-				var es: int = world.paths.exit_side(axis, q - c.path[j - 1])
-				if es >= 0:
-					side = es
-				break
-	c["side"] = side
-	if axis == 1:
-		c["otx"] = 0.0
-		c["oty"] = -13.0 if side == 0 else 0.0
-	else:
-		c["otx"] = -6.0 if side == 0 else 6.0
-		c["oty"] = 0.0
 
 
 func pet_cat(c: Dictionary) -> void:

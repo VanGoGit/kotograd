@@ -271,39 +271,19 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if up and rt: _r(px, py, 15, 0, 1, 1, asph)
 		if dn and lf: _r(px, py, 0, 15, 1, 1, asph)
 		if dn and rt: _r(px, py, 15, 15, 1, 1, asph)
-		# тротуар по краю, где у дороги нет соседа: плитка и бордюр, по ним ходят котики
-		var pave := "dcd6d0"
-		var seam := "c9c2bc"
-		if not up:
-			_r(px, py, 0, 0, 16, 3, pave)
-			_r(px, py, 0, 3, 16, 1, curb)
-			for k in range(3, 16, 4): _r(px, py, k, 0, 1, 3, seam)
-		if not dn:
-			_r(px, py, 0, 13, 16, 3, pave)
-			_r(px, py, 0, 12, 16, 1, curb)
-			for k in range(3, 16, 4): _r(px, py, k, 13, 1, 3, seam)
-		if not lf:
-			_r(px, py, 0, 0, 3, 16, pave)
-			_r(px, py, 3, 0, 1, 16, curb)
-			for k in range(3, 16, 4): _r(px, py, 0, k, 3, 1, seam)
-		if not rt:
-			_r(px, py, 13, 0, 3, 16, pave)
-			_r(px, py, 12, 0, 1, 16, curb)
-			for k in range(3, 16, 4): _r(px, py, 13, k, 3, 1, seam)
-		# углы тротуаров на перекрёстках — плитка, а не асфальт
-		if up and lf and not world.is_road(x - 1, y - 1): _r(px, py, 0, 0, 3, 3, pave)
-		if up and rt and not world.is_road(x + 1, y - 1): _r(px, py, 13, 0, 3, 3, pave)
-		if dn and lf and not world.is_road(x - 1, y + 1): _r(px, py, 0, 13, 3, 3, pave)
-		if dn and rt and not world.is_road(x + 1, y + 1): _r(px, py, 13, 13, 3, 3, pave)
+		if not up: _r(px, py, 1, 1, 14, 1, curb)
+		if not dn: _r(px, py, 1, 14, 14, 1, curb)
+		if not lf: _r(px, py, 1, 1, 1, 14, curb)
+		if not rt: _r(px, py, 14, 1, 1, 14, curb)
 	var n := int(up) + int(dn) + int(lf) + int(rt)
 	if not water and world.is_crosswalk(x, y):
 		# «зебра» поперёк дороги
 		if (lf or rt) and not (up or dn):
-			for k in range(5, 12, 2):
+			for k in range(3, 14, 2):
 				_r(px, py, 6, k, 4, 1, "f4f4f8")
 			return
 		if (up or dn) and not (lf or rt):
-			for k in range(5, 12, 2):
+			for k in range(3, 14, 2):
 				_r(px, py, k, 6, 1, 4, "f4f4f8")
 			return
 	if n >= 3:

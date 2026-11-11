@@ -82,7 +82,7 @@ func draw_world() -> void:
 			continue
 		if c.x < v[0] - 1 or c.x > v[2] + 1 or c.y < v[1] - 1 or c.y > v[3] + 1:
 			continue
-		list.append([c.y * T + 14.0 + c.get("oy", 0.0), 1, c])
+		list.append([c.y * T + 14.0, 1, c])
 	for car in world.cars:
 		list.append([car.py + 4.0, 2, car])
 	for vis in world.events.visitors:
@@ -316,8 +316,8 @@ func _cat_texture(c: Dictionary) -> Texture2D:
 
 func _draw_cat(c: Dictionary) -> void:
 	var tx := _cat_texture(c)
-	var sx := roundi(c.x * T + 3 + c.get("ox", 0.0))
-	var sy := roundi(c.y * T - 1 + c.get("oy", 0.0)) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
+	var sx := roundi(c.x * T + 3)
+	var sy := roundi(c.y * T - 1) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
 	world.draw_texture(tx, Vector2(sx, sy))
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:

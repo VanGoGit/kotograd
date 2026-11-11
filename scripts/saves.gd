@@ -90,8 +90,6 @@ func serialize() -> String:
 		# пауза после неудачного маршрута и «стоит у машины» — временные, при загрузке всё равно сбрасываются
 		k["fail_until"] = 0.0
 		k["near_car"] = false
-		for f in ["ox", "oy", "otx", "oty", "o_pi", "side"]:
-			k.erase(f)
 		if c.state == "drive":
 			k["state"] = "in"
 			k["at"] = c.dest.b if c.dest != null and c.dest.has("b") and world.objs[c.dest.b] != null else c.home

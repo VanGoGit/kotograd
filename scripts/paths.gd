@@ -20,16 +20,14 @@ func _init(w) -> void:
 #  Поиск путей
 # =====================================================================
 
-## Сколько стоит шаг на клетку (без учёта перехода через дорогу — его считает walk_path).
 func _tile_cost(i: int) -> float:
 	var o = world.objs[i]
 	if o != null:
 		if o.t == "path" or o.t == "blvd":
 			return 1.0
 		if o.t == "road":
-			# у дороги по краям тротуары: идти вдоль дороги удобно;
-			# на перекрёстке приходится переходить проезжую часть
-			return 3.0 if world.junctions.has(i) else 1.2
+			# по проезжей части котики не гуляют — только переходят её, лучше по зебре
+			return 4.0 if world.crosswalks.has(i) else 30.0
 		if o.t == "rail" or o.t == "crossing":
 			return 30.0
 		return 1.6
@@ -41,71 +39,37 @@ func _tile_cost(i: int) -> float:
 	return 2.0
 
 
-const CROSS_ZEBRA := 3.0         # перейти дорогу по «зебре»
-const CROSS_ANYWHERE := 30.0     # перейти дорогу где попало — котики так почти не делают
-
-
-## Сторона тротуара, на которую попадаешь, шагнув на прямую дорогу поперёк (0 — верх/лево, 1 — низ/право),
-## или -1, если шаг вдоль дороги.
-static func entry_side(axis: int, dv: Vector2i) -> int:
-	if axis == 1 and dv.y != 0:
-		return 0 if dv.y > 0 else 1
-	if axis == 2 and dv.x != 0:
-		return 0 if dv.x > 0 else 1
-	return -1
-
-
-## Сторона тротуара, с которой уходишь с прямой дороги поперёк, или -1, если шаг вдоль.
-static func exit_side(axis: int, dv: Vector2i) -> int:
-	if axis == 1 and dv.y != 0:
-		return 0 if dv.y < 0 else 1
-	if axis == 2 and dv.x != 0:
-		return 0 if dv.x < 0 else 1
-	return -1
-
-
 ## Пешеходный путь (Дейкстра; тротуары дешевле травы).
-## У прямой дороги два тротуара — состояние «клетка + сторона»: вдоль дороги котик идёт по своей стороне,
-## а на другую сторону переходит по «зебре» у перекрёстка (или, если её нет, неохотно — где придётся).
 func walk_path(sx: int, sy: int, goals: Dictionary):
 	var s := sy * W + sx
 	if goals.has(s):
 		return []
-	var axis: Dictionary = world.road_axis
 	var dist := PackedFloat32Array()
-	dist.resize(W * H * 2)
+	dist.resize(W * H)
 	dist.fill(1e20)
 	var prev := PackedInt32Array()
-	prev.resize(W * H * 2)
+	prev.resize(W * H)
 	prev.fill(-1)
 	var hk := PackedFloat32Array()
 	var hv := PackedInt32Array()
-	# стоим на прямой дороге — сторона неизвестна, годятся обе
-	var s0 := s * 2
-	dist[s0] = 0.0
-	_heap_push(hk, hv, 0.0, s0)
-	if axis.has(s):
-		dist[s0 + 1] = 0.0
-		_heap_push(hk, hv, 0.0, s0 + 1)
+	dist[s] = 0.0
+	_heap_push(hk, hv, 0.0, s)
 	while hk.size() > 0:
 		var top := _heap_pop(hk, hv)
 		var dd: float = top[0]
-		var node: int = top[1]
-		if dd > dist[node]:
+		var u: int = top[1]
+		if dd > dist[u]:
 			continue
-		var u := node >> 1
-		var su := node & 1
 		if goals.has(u):
 			var out := []
-			var k := node
-			while k >> 1 != s:
-				out.append(Vector2i((k >> 1) % W, (k >> 1) / W))
+			var k := u
+			while k != s:
+				out.append(Vector2i(k % W, k / W))
 				k = prev[k]
 			out.reverse()
 			return out
 		var ux := u % W
 		var uy := u / W
-		var au: int = axis.get(u, 0)
 		for dv in DIRS:
 			var nx: int = ux + dv.x
 			var ny: int = uy + dv.y
@@ -115,27 +79,10 @@ func walk_path(sx: int, sy: int, goals: Dictionary):
 			if not world.walkable_idx(n):
 				continue
 			var nd := dd + _tile_cost(n)
-			# уходим с прямой дороги поперёк — не с той стороны, значит, переходим проезжую часть
-			if au != 0:
-				var es := exit_side(au, dv)
-				if es >= 0 and es != su:
-					nd += CROSS_ZEBRA if world.crosswalks.has(u) else CROSS_ANYWHERE
-			var an: int = axis.get(n, 0)
-			var sides := [0]
-			if an != 0:
-				var en := entry_side(an, dv)
-				if en >= 0:
-					sides = [en]
-				elif au == an:
-					sides = [su]
-				else:
-					sides = [0, 1]
-			for sn in sides:
-				var m: int = n * 2 + sn
-				if nd < dist[m]:
-					dist[m] = nd
-					prev[m] = node
-					_heap_push(hk, hv, nd, m)
+			if nd < dist[n]:
+				dist[n] = nd
+				prev[n] = u
+				_heap_push(hk, hv, nd, n)
 	return null
 
 

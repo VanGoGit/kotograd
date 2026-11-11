@@ -80,7 +80,6 @@ var _pinch_mid := Vector2.ZERO
 var _touch_pending := false
 # перекрёстки со светофорами, пешеходные переходы и въезды на магистраль
 var junctions := {}
-var road_axis := {}             # прямая дорога -> 1 (вдоль x) или 2 (вдоль y): по краям у неё тротуары
 var crosswalks := {}
 var crossings := {}
 var pairs := {}              # объединённые соседние здания: клетка -> "L" или "R"
@@ -519,7 +518,6 @@ func _compute_roads() -> void:
 	junctions = {}
 	crosswalks = {}
 	crossings = {}
-	road_axis = {}
 	ramps = []
 	for i in W * H:
 		var o = objs[i]
@@ -534,14 +532,6 @@ func _compute_roads() -> void:
 			junctions[i] = true
 		elif is_crosswalk(x, y):
 			crosswalks[i] = true
-		var lf := is_road(x - 1, y)
-		var rt := is_road(x + 1, y)
-		var up := is_road(x, y - 1)
-		var dn := is_road(x, y + 1)
-		if lf and rt and not up and not dn:
-			road_axis[i] = 1
-		elif up and dn and not lf and not rt:
-			road_axis[i] = 2
 		for dv in DIRS:
 			if is_highway(x + dv.x, y + dv.y):
 				ramps.append([i, dv])
@@ -1243,6 +1233,9 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if here != null and ((tool == "rail" and here.t == "road") or (tool == "road" and here.t == "rail")):
 		_make_crossing(x, y)
 		return
+	# дорогу ведут по тротуару — тротуар уступает место дороге
+	if here != null and tool == "road" and here.t == "path":
+		remove_obj(here)
 	var r := can_place(tool, x, y)
 	if not r.ok:
 		if r.has("reason") and first and Time.get_ticks_msec() - _last_reason_ms > 400:
@@ -1255,6 +1248,8 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 		return
 	coins -= r.cost
 	place_obj(y * W + x, tool, randi() % 1000, d.get("build", 0.0))
+	if tool == "road" and terrain[y * W + x] != WATER:
+		_lay_sidewalks(x, y)
 	var w := D.size_of(tool)
 	# большое здание — тёплое арпеджио, мелочь — привычный «поп»
 	sound.play("build" if w >= 2 else "pop", 1.0, -6.0 if w >= 2 else -4.0)
@@ -1263,6 +1258,20 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if r.cost > 0:
 		float_text(Vector2(x * T + 8 * w, y * T), "-%d" % r.cost, Color("8a5a3b"))
 	recalc()
+
+
+## Улица: новая дорога сама кладёт тротуар на свободную сушу по краям (бесплатно).
+## Тротуар перед кистью по ходу дороги потом просто заменяется дорогой.
+func _lay_sidewalks(x: int, y: int) -> void:
+	for dv in DIRS:
+		var nx: int = x + dv.x
+		var ny: int = y + dv.y
+		if not in_map(nx, ny):
+			continue
+		var i := ny * W + nx
+		if objs[i] != null or terrain[i] == WATER:
+			continue
+		place_obj(i, "path", randi() % 1000, 0.0)
 
 
 ## Рельсы через дорогу (или дорога через рельсы) — переезд со шлагбаумом.

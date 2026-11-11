@@ -959,11 +959,11 @@ const EN := {
 	"Сейчас на работе в форме — наряд наденет после смены.": "At work in uniform now — will change into the outfit after the shift.",
 	"В карточке котика есть «Гардероб»: одежда, бантики, шляпки и очки": "The cat's card has a Wardrobe: clothes, bows, hats and glasses",
 	# дороги и дорожки
-	"Дорожка": "Footpath",
-	"Пешеходная дорожка для дворов, парков и набережных: котики гуляют по ней быстрее. У дорог тротуары уже есть. Дорожка между домом и дорогой — не помеха: машина выедет прямо через неё.": "A footpath for yards, parks and promenades: cats walk faster on it. Roads already have sidewalks. A footpath between a house and the road is fine — the car will drive right across it.",
-	"Две полосы для машин и тротуары по краям. Ставьте дома прямо у дороги — жители будут ездить на работу на машинах, а пешком ходить по тротуарам. На воде получается мост (8 мон.).": "Two lanes for cars with sidewalks on both sides. Put houses right next to the road — residents will drive to work and walk on the sidewalks. On water it becomes a bridge (8 coins).",
 	"Дорога рядом — жители ездят на машинах.": "Road nearby — residents drive their cars.",
 	"До дороги пара шагов — жители доходят до машины пешком.": "The road is a few steps away — residents walk to their cars.",
 	"Дорога далеко — жители ходят пешком.": "The road is far — residents go on foot.",
 	"Совет: дорога, клумбы и городские службы рядом делают дом уютнее.": "Tip: a road, flower beds and city services nearby make a home cozier.",
+	"Тротуар": "Sidewalk",
+	"По тротуару котики ходят быстрее. Дорога кладёт тротуары по краям сама, а здесь их можно дорисовать — во дворах, парках и на набережных. Машина выезжает от дома прямо через тротуар.": "Cats walk faster on sidewalks. A road lays sidewalks along its edges by itself; here you can add more — in yards, parks and on promenades. Cars drive out of a house right across the sidewalk.",
+	"Две полосы для машин. Новая дорога сама кладёт тротуары по краям — получается улица: ставьте дома за тротуаром, жители будут ездить на машинах прямо от дома. На воде получается мост (8 мон.).": "Two lanes for cars. A new road lays sidewalks along its edges by itself, making a street: put houses behind the sidewalk and residents will drive right from home. On water it becomes a bridge (8 coins).",
 }
