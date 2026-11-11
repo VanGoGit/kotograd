@@ -78,8 +78,9 @@ func _run() -> void:
 
 	# гардероб: часть котиков наряжаем — наряд должен пережить сохранение
 	for c in w.cats.slice(0, 12):
-		for k in randi() % 9:
-			w.cats_ai.next_look(c, ["acc", "color", "shirt"].pick_random())
+		w.cats_ai.set_look(c, "acc", ([""] + w.D.ACCESSORIES.keys()).pick_random())
+		w.cats_ai.set_look(c, "color", w.D.ACC_COLORS.pick_random())
+		w.cats_ai.set_look(c, "shirt", randi() % 6)
 	var text: String = w.saves.serialize()
 	_check(w.saves.save_game(), "большой город сохраняется")
 	_check(w.saves.import_save(text), "и загружается")

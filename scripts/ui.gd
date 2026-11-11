@@ -46,7 +46,10 @@ var info_img: TextureRect
 var info_name: Label
 var info_sub: Label
 var info_body: Label
-var info_look: HBoxContainer     # гардероб котика: одежда, аксессуар, цвет
+var info_look: Button            # «Гардероб» — открывает выбор наряда котика
+var wardrobe: VBoxContainer      # одежда, аксессуар и его цвет — всё видно сразу
+var _ward_cat = null             # для какого котика собран гардероб
+var _swatches := {}
 var info_pet: Button
 var info_up: Button
 var toasts_box: VBoxContainer
@@ -756,15 +759,13 @@ func _build_info() -> void:
 	vb.add_child(info_more)
 	info_pet = _btn("Погладить", _pet_selected)
 	vb.add_child(info_pet)
-	info_look = HBoxContainer.new()
-	info_look.add_theme_constant_override("separation", 6)
+	info_look = _btn("Гардероб", _toggle_wardrobe, "Нарядить котика: одежда, бантик, шляпка, очки…")
+	info_look.toggle_mode = true
 	vb.add_child(info_look)
-	for it in [["Одежда", "shirt", "Другой цвет повседневной одежды"], ["Аксессуар", "acc", "Бантик, шляпка, очки, шарфик…"], ["Цвет", "color", "Цвет аксессуара"]]:
-		var what: String = it[1]
-		var b := _btn(it[0], func(): _restyle(what), it[2])
-		b.add_theme_font_size_override("font_size", 13)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info_look.add_child(b)
+	wardrobe = VBoxContainer.new()
+	wardrobe.add_theme_constant_override("separation", 4)
+	wardrobe.visible = false
+	vb.add_child(wardrobe)
 	info_up = _btn("Улучшить", _upgrade_selected, "Улучшенное здание вмещает больше котиков, даёт больше монет и радости")
 	info_up.add_theme_stylebox_override("normal", _sb(GOLD, INK, 3, 8, 8.0))
 	vb.add_child(info_up)
@@ -826,10 +827,69 @@ func _pet_selected() -> void:
 		world.cats_ai.pet_cat(world.info_target.cat)
 
 
-func _restyle(what: String) -> void:
-	if world.info_target != null and world.info_target.has("cat"):
-		world.cats_ai.next_look(world.info_target.cat, what)
-		_render_info()
+func _toggle_wardrobe() -> void:
+	wardrobe.visible = not wardrobe.visible
+	info_look.set_pressed_no_signal(wardrobe.visible)
+	_ward_cat = null
+	_render_info()
+
+
+## Гардероб котика: кружки цвета одежды, портреты с каждым аксессуаром, кружки цвета аксессуара.
+## Нажал — котик сразу так выглядит; выбранное подсвечено.
+func _fill_wardrobe(c: Dictionary) -> void:
+	_ward_cat = c
+	for ch in wardrobe.get_children():
+		wardrobe.remove_child(ch)
+		ch.queue_free()
+	var own_shirt := int(c.casual) if c.get("style", "") == "" else -1
+	wardrobe.add_child(_label("Одежда", 13, false))
+	var row := HBoxContainer.new()
+	for i in Spr.CASUAL_SHIRTS.size():
+		row.add_child(_look_btn(_swatch(Spr.CASUAL_SHIRTS[i]), i == own_shirt, c, "shirt", i, ""))
+	wardrobe.add_child(row)
+	wardrobe.add_child(_label("Аксессуар", 13, false))
+	var grid := GridContainer.new()
+	grid.columns = 5
+	var col: String = c.get("acc_col", D.ACC_COLORS[0])
+	var base: String = c.style if c.get("style", "") != "" else "casual%d" % c.casual
+	for acc in [""] + D.ACCESSORIES.keys():
+		var key: String = base if acc == "" else "%s+%s:%s" % [base, acc, col]
+		var tex: Texture2D = Spr.scaled(spr.cat_set(c.color, key).stand[0], 2)
+		var tip: String = tr(D.ACCESSORIES[acc].name) if acc != "" else tr("Без аксессуара")
+		grid.add_child(_look_btn(tex, acc == c.get("acc", ""), c, "acc", acc, tip))
+	wardrobe.add_child(grid)
+	if c.get("acc", "") != "":
+		wardrobe.add_child(_label("Цвет", 13, false))
+		var crow := HBoxContainer.new()
+		for hc in D.ACC_COLORS:
+			crow.add_child(_look_btn(_swatch(hc), hc == col, c, "color", hc, ""))
+		wardrobe.add_child(crow)
+
+
+func _look_btn(tex: Texture2D, chosen: bool, c: Dictionary, what: String, value, tip: String) -> Button:
+	var b := _btn("", func(): _pick_look(c, what, value), tip)
+	b.icon = tex
+	b.add_theme_stylebox_override("normal", _sb(PINK, INK, 3, 6, 3.0) if chosen else _sb(PAPER, Color(INK, 0.25), 2, 6, 3.0))
+	return b
+
+
+func _pick_look(c: Dictionary, what: String, value) -> void:
+	world.cats_ai.set_look(c, what, value)
+	_fill_wardrobe(c)
+	_render_info()
+
+
+## Кружок цвета для гардероба.
+func _swatch(hex: String) -> Texture2D:
+	if not _swatches.has(hex):
+		var img := Image.create_empty(14, 14, false, Image.FORMAT_RGBA8)
+		for y in 14:
+			for x in 14:
+				var d := Vector2(x - 6.5, y - 6.5).length()
+				if d <= 6.6:
+					img.set_pixel(x, y, INK if d > 5.2 else Color(hex))
+		_swatches[hex] = ImageTexture.create_from_image(img)
+	return _swatches[hex]
 
 
 func _upgrade_selected() -> void:
@@ -853,7 +913,9 @@ func _render_info() -> void:
 			world.info_target = null
 			info_panel.visible = false
 			return
-		var fs: Dictionary = spr.cat_set(c.color, world.cats_ai.outfit_key(c))
+		# в открытом гардеробе — свой наряд котика, иначе то, что он носит сейчас (может быть форма)
+		var look: String = world.cats_ai.own_outfit_key(c) if wardrobe.visible else world.cats_ai.outfit_key(c)
+		var fs: Dictionary = spr.cat_set(c.color, look)
 		info_img.texture = Spr.scaled(fs.stand[0], 3)
 		info_name.text = I18n.cat(c.name)
 		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
@@ -889,6 +951,10 @@ func _render_info() -> void:
 			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
 		info_pet.visible = true
 		info_look.visible = true
+		if wardrobe.visible and not is_same(_ward_cat, c):
+			_fill_wardrobe(c)
+		if wardrobe.visible and c.job >= 0 and world.cats_ai.outfit_key(c) != world.cats_ai.own_outfit_key(c):
+			lines.append(tr("Сейчас на работе в форме — наряд наденет после смены."))
 		info_up.visible = false
 		info_more.visible = false
 	else:
@@ -951,6 +1017,8 @@ func _render_info() -> void:
 			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
 		info_look.visible = false
+		wardrobe.visible = false
+		info_look.set_pressed_no_signal(false)
 		# коротко по умолчанию, всё остальное — по кнопке «Подробнее»
 		var short := _short_lines(o, d)
 		info_more.visible = o.build <= 0.0
@@ -1278,7 +1346,7 @@ func _build_help() -> void:
 		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой",
 		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · V — спрятать постройки · Esc — отмена",
 		"Облачко над котиком — его маленькое желание. Можно исполнить, а можно и нет — котик не обидится",
-		"В карточке котика есть гардероб: одежда, аксессуар и цвет",
+		"В карточке котика есть «Гардероб»: одежда, бантики, шляпки и очки",
 		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб",
 	]:
 		kl.add_child(_label(line, 13))

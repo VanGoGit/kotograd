@@ -75,29 +75,41 @@ func spawn_cat() -> void:
 	world.ui.refresh_tools()
 
 
+## Что котик носит сейчас. Форма — в рабочие часы (и по дороге на работу и с работы),
+## а котик, которого нарядили в гардеробе, после смены ходит в своём.
 func outfit_key(c: Dictionary) -> String:
+	if c.job >= 0 and world.objs[c.job] != null and (not c.get("dressed", false) or _work_hours(c)):
+		return D.def(world.objs[c.job].t).get("job", "casual%d" % c.casual) + _acc_tail(c)
+	return own_outfit_key(c)
+
+
+## Свой наряд котика — то, что выбрано в гардеробе (без рабочей формы).
+func own_outfit_key(c: Dictionary) -> String:
+	var base: String = c.style if c.get("style", "") != "" else "casual%d" % c.casual
+	return base + _acc_tail(c)
+
+
+func _acc_tail(c: Dictionary) -> String:
 	var acc: String = c.get("acc", "")
-	var tail := "" if acc == "" else "+%s:%s" % [acc, c.get("acc_col", D.ACC_COLORS[0])]
-	if c.job >= 0 and world.objs[c.job] != null:
-		return D.def(world.objs[c.job].t).get("job", "casual%d" % c.casual) + tail
-	if c.get("style", "") != "":
-		return c.style + tail
-	return "casual%d" % c.casual + tail
+	return "" if acc == "" else "+%s:%s" % [acc, c.get("acc_col", D.ACC_COLORS[0])]
 
 
-## Гардероб: следующий цвет одежды, аксессуар или цвет аксессуара (по кругу).
-## Котик, которого переодели, ходит в своём, а не в стиле городской отрасли.
-func next_look(c: Dictionary, what: String) -> void:
+func _work_hours(c: Dictionary) -> bool:
+	var h := world.hour()
+	return h >= c.work_at - 0.6 and h < c.off + 0.4
+
+
+## Гардероб: одежда (номер цвета), аксессуар или его цвет.
+func set_look(c: Dictionary, what: String, value) -> void:
 	match what:
 		"shirt":
-			c["casual"] = (int(c.casual) + 1) % 6 if c.get("style", "") == "" else int(c.casual)
+			c["casual"] = int(value)
 			c["style"] = ""
 		"acc":
-			var keys: Array = [""] + D.ACCESSORIES.keys()
-			c["acc"] = keys[(keys.find(c.get("acc", "")) + 1) % keys.size()]
+			c["acc"] = str(value)
 		"color":
-			var i: int = D.ACC_COLORS.find(c.get("acc_col", D.ACC_COLORS[0]))
-			c["acc_col"] = D.ACC_COLORS[(i + 1) % D.ACC_COLORS.size()]
+			c["acc_col"] = str(value)
+	c["dressed"] = true
 	world.hearts_at(cat_pos(c) + Vector2(0, -12), 2)
 	world.sound.play("pop", randf_range(1.1, 1.3), -8.0)
 

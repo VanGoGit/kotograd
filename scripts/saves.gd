@@ -403,6 +403,8 @@ func _load_social(c: Dictionary) -> void:
 				fr[int(k)] = float(c.friends[k])
 	c["friends"] = fr
 	# гардероб: неизвестный аксессуар или цвет — просто без него
+	if c.has("dressed"):
+		c["dressed"] = c.dressed == true
 	if c.has("acc"):
 		c["acc"] = str(c.acc) if D.ACCESSORIES.has(str(c.acc)) else ""
 	if c.has("acc_col"):

@@ -79,10 +79,13 @@ func _run() -> void:
 			w.info_target = {"cat": c}
 			ui._render_info()
 			ui._pet_selected()
-			for k in w.D.ACCESSORIES.size() + 1:
-				ui._restyle("acc")
-				ui._restyle("color")
-				ui._restyle("shirt")
+			if not ui.wardrobe.visible:
+				ui._toggle_wardrobe()
+			ui._render_info()
+			for acc in [""] + w.D.ACCESSORIES.keys():
+				ui._pick_look(c, "acc", acc)
+				ui._pick_look(c, "color", w.D.ACC_COLORS.pick_random())
+				ui._pick_look(c, "shirt", randi() % 6)
 			w.cats_ai.activity_text(c)
 		w.info_target = null
 		ui._render_info()
