@@ -1504,7 +1504,7 @@ var _pair_cache := {}
 
 
 ## Два одинаковых маленьких здания рядом — одно широкое здание с одной дверью.
-## Для улучшенных — тот же широкий дом с этажами и украшениями уровня.
+## Для улучшенных — тот же широкий дом с украшениями уровня.
 func has_pair(t: String) -> bool:
 	return obj.has("pair_" + t)
 
@@ -1517,8 +1517,9 @@ func pair_variant(o: Dictionary) -> Array:
 	return [obj[key], windows.get(key, [])]
 
 
-## Улучшенное здание: на каждый уровень — ещё один этаж (копия ряда окон),
-## на 2 уровне — зелень на крыше, на 3 — золотой карниз, флаг и гирлянда.
+## Улучшенное здание того же размера — только нарядные детали на фасаде:
+## уровень 2 — ящики с цветами под окнами и два горшка у основания,
+## уровень 3 — ещё золотой карниз и огоньки гирлянды по краю крыши.
 func level_variant(key: String, lvl: int) -> Array:
 	var ck := "%s|%d" % [key, lvl]
 	if _lvl_cache.has(ck):
@@ -1526,82 +1527,53 @@ func level_variant(key: String, lvl: int) -> Array:
 	var img: Image = obj[key].get_image().duplicate()
 	img.convert(Image.FORMAT_RGBA8)
 	var w := img.get_width()
-	var wins: Array = windows.get(key, []).duplicate()
-	for n in lvl - 1:
-		var h := img.get_height()
-		# этаж = ряд окон ближе к середине здания (с рамками)
-		var r0 := int(h * 0.55)
-		var bh := 5 if w <= 16 else 7
-		var best := 1e9
-		for r in wins:
-			var d := absf(r.position.y - h * 0.5)
-			if d < best and r.position.y > 4 and r.end.y < h - 6:
-				best = d
-				r0 = r.position.y - 1
-				bh = r.size.y + 2
-		var out := Image.create_empty(w, h + bh, false, Image.FORMAT_RGBA8)
-		out.blit_rect(img, Rect2i(0, 0, w, r0 + bh), Vector2i(0, 0))
-		out.blit_rect(img, Rect2i(0, r0, w, h - r0), Vector2i(0, r0 + bh))
-		var nw := []
-		for r in wins:
-			if r.position.y >= r0:
-				nw.append(Rect2i(r.position + Vector2i(0, bh), r.size))
-				if r.position.y < r0 + bh:
-					nw.append(r)
-			else:
-				nw.append(r)
-		wins = nw
-		img = out
-	var pad := 8
-	var fin := Image.create_empty(w, img.get_height() + pad, false, Image.FORMAT_RGBA8)
-	fin.blit_rect(img, Rect2i(0, 0, w, img.get_height()), Vector2i(0, pad))
-	var shifted := []
+	var h := img.get_height()
+	var wins: Array = windows.get(key, [])
+	var blooms := [Color("ff6b8b"), Color("ffd23f"), Color("ff9fc0"), Color("fff6c2")]
+	var leaf := Color("5fae73")
+	var box := Color("8a5a3b")
 	for r in wins:
-		shifted.append(Rect2i(r.position + Vector2i(0, pad), r.size))
-	# верхняя строка крыши
-	var top := pad
-	for y in fin.get_height():
-		var found := false
-		for x in w:
-			if fin.get_pixel(x, y).a > 0.5:
-				found = true
-				break
-		if found:
-			top = y
-			break
-	# верх крыши в нужном столбце — чтобы украшения стояли на крыше, а не висели в воздухе
-	var col_top := func(cx: int) -> int:
-		for y in fin.get_height():
-			if fin.get_pixel(clampi(cx, 0, w - 1), y).a > 0.5:
-				return y
-		return top
-	var deco := Painter.new(w, fin.get_height())
-	var x1 := roundi(w * 0.3)
-	var x2 := roundi(w * 0.7)
-	deco.C(x1 + 0.5, col_top.call(x1) - 1.5, 1.7, "5fae73")
-	deco.C(x2 + 0.5, col_top.call(x2) - 1.5, 1.7, "7cc46a")
-	deco.P(x1, col_top.call(x1) - 3, "ff8fab")
+		var y: int = r.end.y
+		# ящик — прямо под окном, только если там стена здания (не воздух и не край картинки)
+		if r.size.x < 2 or y >= h - 1 or img.get_pixel(r.position.x, y).a < 0.5:
+			continue
+		for x in range(r.position.x, r.end.x):
+			img.set_pixel(x, y, box)
+			img.set_pixel(x, y - 1, blooms[(x + y) % blooms.size()] if (x - r.position.x) % 2 == 0 else leaf)
+	# у каждого улучшенного здания — два горшка с цветами у основания по краям:
+	# заметно даже у маленьких киосков и зданий без окон
+	var pot := Color("c97b4a")
+	for px in [0, w - 2]:
+		for dx in 2:
+			img.set_pixel(px + dx, h - 1, pot.darkened(0.25))
+			img.set_pixel(px + dx, h - 2, pot)
+			img.set_pixel(px + dx, h - 3, leaf)
+		img.set_pixel(px, h - 4, blooms[(px + lvl) % blooms.size()])
+		img.set_pixel(px + 1, h - 4, leaf)
 	if lvl >= 3:
-		var fx := w / 2
-		var ft: int = col_top.call(fx)
-		deco.R(fx, ft - 8, 1, 8, "6a6478")
-		deco.R(fx + 1, ft - 8, 4, 3, "ffd23f")
-		deco.R(fx + 1, ft - 7, 4, 1, "ff8fab")
-	outline(deco.img)
-	fin.blend_rect(deco.img, Rect2i(0, 0, w, fin.get_height()), Vector2i.ZERO)
-	if lvl >= 3:
-		# золотой карниз и гирлянда по краю крыши
+		# золотой карниз: тёмный контур верхних двух рядов крыши становится золотым,
+		# а по самому краю — огоньки гирлянды
+		var top := 0
+		while top < h and not _row_has_pixels(img, top):
+			top += 1
 		var ink := INK
-		for y in range(top, mini(top + 2, fin.get_height())):
+		for y in range(top, mini(top + 2, h)):
 			for x in w:
-				if fin.get_pixel(x, y).is_equal_approx(ink):
-					fin.set_pixel(x, y, Color("e8b830"))
+				if img.get_pixel(x, y).is_equal_approx(ink):
+					img.set_pixel(x, y, Color("e8b830"))
 		for x in range(1, w - 1, 3):
-			if fin.get_pixel(x, top).a > 0.5:
-				fin.set_pixel(x, top, [Color("ff6b8b"), Color("5fd3c8"), Color("fff6c2")][(x / 3) % 3])
-	var res := [tex(fin), shifted]
+			if img.get_pixel(x, top).a > 0.5:
+				img.set_pixel(x, top, [Color("ff6b8b"), Color("5fd3c8"), Color("fff6c2")][(x / 3) % 3])
+	var res := [tex(img), wins]
 	_lvl_cache[ck] = res
 	return res
+
+
+func _row_has_pixels(img: Image, y: int) -> bool:
+	for x in img.get_width():
+		if img.get_pixel(x, y).a > 0.5:
+			return true
+	return false
 
 
 ## Текстура для кнопки инструмента.
