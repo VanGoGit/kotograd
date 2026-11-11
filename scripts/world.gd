@@ -80,6 +80,7 @@ var _pinch_mid := Vector2.ZERO
 var _touch_pending := false
 # перекрёстки со светофорами, пешеходные переходы и въезды на магистраль
 var junctions := {}
+var road_axis := {}             # прямая дорога -> 1 (вдоль x) или 2 (вдоль y): по краям у неё тротуары
 var crosswalks := {}
 var crossings := {}
 var pairs := {}              # объединённые соседние здания: клетка -> "L" или "R"
@@ -518,6 +519,7 @@ func _compute_roads() -> void:
 	junctions = {}
 	crosswalks = {}
 	crossings = {}
+	road_axis = {}
 	ramps = []
 	for i in W * H:
 		var o = objs[i]
@@ -532,6 +534,14 @@ func _compute_roads() -> void:
 			junctions[i] = true
 		elif is_crosswalk(x, y):
 			crosswalks[i] = true
+		var lf := is_road(x - 1, y)
+		var rt := is_road(x + 1, y)
+		var up := is_road(x, y - 1)
+		var dn := is_road(x, y + 1)
+		if lf and rt and not up and not dn:
+			road_axis[i] = 1
+		elif up and dn and not lf and not rt:
+			road_axis[i] = 2
 		for dv in DIRS:
 			if is_highway(x + dv.x, y + dv.y):
 				ramps.append([i, dv])
@@ -1049,7 +1059,7 @@ func _finish_car(car: Dictionary, broken: bool) -> void:
 	match car.get("mode", "home"):
 		"home":
 			if is_ready(car.target):
-				if paths.roads_around(car.target).has(end.y * W + end.x):
+				if paths.home_roads(car.target).has(end.y * W + end.x):
 					cats_ai._enter(c, car.target)
 				else:
 					# машина уехала в гараж, а котик идёт от дороги до двери

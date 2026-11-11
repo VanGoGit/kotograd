@@ -25,7 +25,7 @@ const DEFS := {
 	"t_dry": {"name": "Сухая трава", "cost": 0, "unlock": 0, "terra": 5, "paint": true, "desc": "Калифорнийская сухая трава и кустарник. Бесплатно."},
 	"t_meadow": {"name": "Луг", "cost": 0, "unlock": 0, "terra": 6, "paint": true, "desc": "Цветущий луг с маками. Бесплатно."},
 	"t_water": {"name": "Вода", "cost": 0, "unlock": 0, "terra": 1, "paint": true, "desc": "Убрать сушу: здесь снова будет вода. Бесплатно. Под дорогой получится мост."},
-	"road": {"name": "Дорога (2 полосы)", "cost": 3, "unlock": 0, "walk": true, "paint": true, "desc": "По дорогам котики ездят на машинах на работу и домой. На воде получается мост (8 мон.)."},
+	"road": {"name": "Дорога (2 полосы)", "cost": 3, "unlock": 0, "walk": true, "paint": true, "desc": "Две полосы для машин и тротуары по краям. Ставьте дома прямо у дороги — жители будут ездить на работу на машинах, а пешком ходить по тротуарам. На воде получается мост (8 мон.)."},
 	"parking": {"name": "Парковка", "cost": 10, "unlock": 0, "parking": 4, "walk": true, "up": [10, 20], "desc": "Стоянка на 4 машины у дороги. Котики оставляют здесь машины и идут пешком. Без парковок машины стоят прямо на дорогах — бывают пробки!"},
 	"garage": {"name": "Паркинг", "cost": 90, "unlock": 8, "size": 2, "parking": 20, "build": 8.0, "up": [70, 140], "desc": "Многоэтажный паркинг на 20 машин. Ставьте рядом с офисами и достопримечательностями."},
 	"highway": {"name": "Магистраль", "cost": 6, "unlock": 5, "walk": false, "paint": true, "desc": "Широкое шоссе: по 2 полосы в каждую сторону, машины едут быстрее и обгоняют. Пешеходам сюда нельзя. Дома к магистрали не подключаются — нужна обычная дорога."},
@@ -36,7 +36,7 @@ const DEFS := {
 	"airport": {"name": "Аэропорт", "cost": 450, "unlock": 25, "size": 3, "jobs": 8, "job": "pilot", "hub": "air", "shop": 1.2, "tourism": 1.5, "build": 20.0, "look": {"wall": "e8eef4", "roof": "flat", "rc": "9aa6b8", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 64, "extra": ["runway"]}, "desc": "Самолёты летают в другие аэропорты вашего города. Нужно хотя бы два аэропорта — иначе лететь некуда. Отлично связывает дальние острова!"},
 	"blvd": {"name": "Голливудский бульвар", "cost": 8, "unlock": 10, "walk": true, "paint": true, "desc": "Аллея славы: тёмная плитка с розовыми звёздами. Котики гуляют по ней быстрее, дома рядом уютнее, а вдоль бульвара можно выложить плитку с отпечатками лапок."},
 	"pawtile": {"name": "Плитка с отпечатками лапок", "cost": 20, "unlock": 10, "walk": true, "stroll": true, "happy": 5, "radius": 3, "need_blvd": true, "desc": "Отпечатки лапок знаменитых котиков в цементе. Котики приходят их рассмотреть. Ставится только рядом с Голливудским бульваром."},
-	"path": {"name": "Тротуар", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Пешеходная дорожка: по ней котики ходят быстрее."},
+	"path": {"name": "Дорожка", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Пешеходная дорожка для дворов, парков и набережных: котики гуляют по ней быстрее. У дорог тротуары уже есть. Дорожка между домом и дорогой — не помеха: машина выедет прямо через неё."},
 
 	"house": {"name": "Домик", "cost": 30, "unlock": 0, "cap": 3, "build": 4.0, "up": [25, 50], "desc": "Домик с ушками на крыше. Живут 3 котика."},
 	"cottage": {"name": "Коттедж", "cost": 80, "unlock": 8, "size": 2, "cap": 5, "build": 9.0, "up": [60, 120], "desc": "Большой семейный дом с садиком. Живут 5 котиков."},
@@ -461,32 +461,6 @@ const USES := {
 ## Улучшения есть у всех построек, кроме дорог, природы, мелкого декора и чудес.
 const NO_UPGRADE := ["road", "boatdock", "blvd", "pawtile", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
 	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
-
-
-## Чем украшено улучшенное здание (sprites.level_variant). По умолчанию — по вкладке меню,
-## UPGRADE_LOOK уточняет там, где вкладка не подходит (рынку — сено, а не столики под зонтиком).
-const UPGRADE_LOOK_TAB := {
-	"Жильё": "home", "Магазины": "shop", "Еда": "cafe", "Услуги": "shop", "Бизнес": "office", "Медиа": "office",
-	"Промышленность": "industry", "Город": "civic", "Транспорт": "transport", "Отдых": "fun", "Природа": "home",
-}
-const UPGRADE_LOOK := {
-	"florist": "home", "pier": "farm", "farm": "farm", "market": "farm", "wheat": "farm", "cottonfield": "farm",
-	"gasstation": "auto", "carwash": "auto", "autorepair": "auto", "cardealer": "auto", "construction": "industry",
-	"cinema": "fun", "theater": "fun", "motel": "home", "hotel": "shop",
-	"metro": "transport", "busstation": "transport", "taxidepot": "transport", "helipad": "transport",
-	"fountain": "home", "playground": "home", "zoo": "home", "museum": "civic", "gallery": "shop",
-	"surf": "beach", "marina": "beach", "boatdock": "beach", "aquarium": "beach", "lifeguard": "beach",
-}
-
-
-static func upgrade_look(t: String) -> String:
-	t = t.trim_prefix("pair_")
-	if UPGRADE_LOOK.has(t):
-		return UPGRADE_LOOK[t]
-	for tab in TABS:
-		if tab.tools.has(t):
-			return UPGRADE_LOOK_TAB.get(tab.name, "home")
-	return "home"
 
 
 static func ups(t: String) -> Array:

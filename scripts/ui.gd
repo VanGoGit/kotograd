@@ -988,8 +988,14 @@ func _render_info() -> void:
 				lines.append(tr("  Скоро сюда кто-нибудь переедет…"))
 			var hh: float = world.stats.house_happy.get(i, 0.0)
 			lines.append(tr("Уют: %d%%") % int(hh))
+			if not world.paths.home_roads(i).is_empty():
+				lines.append(tr("Дорога рядом — жители ездят на машинах."))
+			elif not world.paths.access_roads(i).is_empty():
+				lines.append(tr("До дороги пара шагов — жители доходят до машины пешком."))
+			else:
+				lines.append(tr("Дорога далеко — жители ходят пешком."))
 			if hh < 60.0:
-				lines.append(tr("Совет: дорога, тротуар, клумбы и городские службы рядом делают дом уютнее."))
+				lines.append(tr("Совет: дорога, клумбы и городские службы рядом делают дом уютнее."))
 		if d.has("jobs") and o.build <= 0.0:
 			var ws: Array = world.workers.get(i, [])
 			lines.append("")

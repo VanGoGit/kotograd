@@ -82,7 +82,7 @@ func draw_world() -> void:
 			continue
 		if c.x < v[0] - 1 or c.x > v[2] + 1 or c.y < v[1] - 1 or c.y > v[3] + 1:
 			continue
-		list.append([c.y * T + 14.0, 1, c])
+		list.append([c.y * T + 14.0 + c.get("oy", 0.0), 1, c])
 	for car in world.cars:
 		list.append([car.py + 4.0, 2, car])
 	for vis in world.events.visitors:
@@ -316,8 +316,8 @@ func _cat_texture(c: Dictionary) -> Texture2D:
 
 func _draw_cat(c: Dictionary) -> void:
 	var tx := _cat_texture(c)
-	var sx := roundi(c.x * T + 3)
-	var sy := roundi(c.y * T - 1) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
+	var sx := roundi(c.x * T + 3 + c.get("ox", 0.0))
+	var sy := roundi(c.y * T - 1 + c.get("oy", 0.0)) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
 	world.draw_texture(tx, Vector2(sx, sy))
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:
@@ -448,6 +448,7 @@ func _draw_driveways(v: Array) -> void:
 	var apron := Color("a9a6b8")
 	var edge := Color("d8d4e4")
 	var arrow := Color("ffd23f")
+	_draw_home_driveways(v, apron, edge)
 	for l in world.stats.lots:
 		var o = world.objs[l]
 		if o == null:
@@ -490,6 +491,37 @@ func _draw_driveways(v: Array) -> void:
 			var tip := c - fd * 1.0
 			for q in [tip, tip + fd + side, tip + fd - side, tip + fd * 2.0 + side * 2.0, tip + fd * 2.0 - side * 2.0, tip + fd * 2.0, tip + fd * 3.0]:
 				world.draw_rect(Rect2(q, Vector2.ONE), arrow)
+
+
+## Выезды от домов: съезд через бордюр (дом у дороги) или через всю «Дорожку» (дорожка перед домом).
+## Один выезд на дом — к той дороге, куда машина и выезжает.
+func _draw_home_driveways(v: Array, apron: Color, edge: Color) -> void:
+	for b in world.stats.houses:
+		var bx: int = b % W
+		var by: int = b / W
+		if bx < v[0] - 2 or bx > v[2] + 1 or by < v[1] - 2 or by > v[3] + 1:
+			continue
+		var dws: Array = world.paths.driveways(b)
+		if dws.is_empty():
+			continue
+		# лучше выезд вниз — к фасаду
+		var dw: Array = dws[0]
+		for cand in dws:
+			if cand[2] == Vector2i(0, 1):
+				dw = cand
+				break
+		var d: Vector2i = dw[2]
+		var fd := Vector2(d)
+		var side := Vector2(absf(d.y), absf(d.x))
+		var road: int = dw[0]
+		var rc := Vector2((road % W) * T + 8, (road / W) * T + 8)
+		# от края дома (или от края дорожки) до асфальта, ширина 8
+		var start := rc - fd * (8.0 + (16.0 if dw[1] >= 0 else 0.0))
+		var stop := rc - fd * 4.0
+		var r := Rect2(start - side * 4.0, (stop - start) + side * 8.0).abs()
+		world.draw_rect(r, apron)
+		world.draw_rect(Rect2(start - side * 5.0, (stop - start) + side).abs(), edge)
+		world.draw_rect(Rect2(start + side * 4.0, (stop - start) + side).abs(), edge)
 
 
 func _scene_on(o: Dictionary, h: float) -> bool:
