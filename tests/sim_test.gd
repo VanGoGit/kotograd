@@ -80,7 +80,8 @@ func _run() -> void:
 	for c in w.cats.slice(0, 12):
 		w.cats_ai.set_look(c, "acc", ([""] + w.D.ACCESSORIES.keys()).pick_random())
 		w.cats_ai.set_look(c, "color", w.D.ACC_COLORS.pick_random())
-		w.cats_ai.set_look(c, "shirt", randi() % 6)
+		w.cats_ai.set_look(c, "cloth", w.D.CLOTHES.keys().pick_random())
+		w.cats_ai.set_look(c, "cloth_col", w.D.CLOTH_COLORS.pick_random())
 	var text: String = w.saves.serialize()
 	_check(w.saves.save_game(), "большой город сохраняется")
 	_check(w.saves.import_save(text), "и загружается")

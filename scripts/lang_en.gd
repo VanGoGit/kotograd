@@ -938,7 +938,6 @@ const EN := {
 	"%s и %s теперь лучшие друзья!": "%s and %s are now best friends!",
 	"Мечтает: ": "Wishes: ",
 	"Характер: ": "Personality: ",
-	" (лучшие друзья)": " (best friends)",
 	"Друзья: ": "Friends: ",
 	# гардероб
 	"Бантик": "Bow",
@@ -951,7 +950,6 @@ const EN := {
 	"Шарфик": "Scarf",
 	"Аксессуар": "Accessory",
 	"Цвет": "Color",
-	"Аксессуар: ": "Accessory: ",
 	"Облачко над котиком — его маленькое желание. Можно исполнить, а можно и нет — котик не обидится": "A bubble above a cat is its little wish. Grant it or not — the cat won't mind",
 	"Гардероб": "Wardrobe",
 	"Нарядить котика: одежда, бантик, шляпка, очки…": "Dress up the cat: clothes, bow, hat, glasses…",
@@ -966,4 +964,15 @@ const EN := {
 	"Тротуар": "Sidewalk",
 	"По тротуару котики ходят быстрее. Положите его между дорогой и домами — машина выедет от дома прямо через тротуар.": "Cats walk faster on sidewalks. Put one between the road and the houses — cars will drive out of a house right across it.",
 	"По дорогам котики ездят на машинах на работу и домой. Дом можно поставить прямо у дороги или за тротуаром. На воде получается мост (8 мон.).": "Cats drive to work and back home on roads. A house can stand right by the road or behind a sidewalk. On water it becomes a bridge (8 coins).",
+	# карточка котика и гардероб
+	"Лучшие друзья: ": "Best friends: ",
+	"Футболка": "T-shirt",
+	"Худи": "Hoodie",
+	"Комбинезон": "Overalls",
+	"Костюм": "Suit",
+	"Платье": "Dress",
+	"Платье в горошек": "Polka-dot dress",
+	"Блузка и юбка": "Blouse and skirt",
+	"Цвет одежды": "Clothes color",
+	"Цвет аксессуара": "Accessory color",
 }

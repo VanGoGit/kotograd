@@ -85,7 +85,8 @@ func _run() -> void:
 			for acc in [""] + w.D.ACCESSORIES.keys():
 				ui._pick_look(c, "acc", acc)
 				ui._pick_look(c, "color", w.D.ACC_COLORS.pick_random())
-				ui._pick_look(c, "shirt", randi() % 6)
+				ui._pick_look(c, "cloth", w.D.CLOTHES.keys().pick_random())
+				ui._pick_look(c, "cloth_col", w.D.CLOTH_COLORS.pick_random())
 			w.cats_ai.activity_text(c)
 		w.info_target = null
 		ui._render_info()

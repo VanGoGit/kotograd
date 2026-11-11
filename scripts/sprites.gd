@@ -209,6 +209,9 @@ const HATS := {
 
 
 static func outfit(key: String) -> Dictionary:
+	# «wear:фасон:цвет» — одежда из гардероба котика
+	if key.begins_with("wear:") and not "+" in key:
+		return _wear(key.get_slice(":", 1), key.get_slice(":", 2))
 	# «наряд+аксессуар:цвет» — из гардероба котика
 	if "+" in key:
 		var o: Dictionary = outfit(key.get_slice("+", 0)).duplicate()
@@ -233,11 +236,37 @@ static func outfit(key: String) -> Dictionary:
 	return {"s": s, "t": s, "w": s, "l": "5b7bb0"}
 
 
+## Фасон одежды: s — верх, t — середина (молния, галстук), w — воротник, l — низ.
+## dress — юбка шире на пиксель с каждой стороны, а ниже видны лапки; dots — белый горошек.
+static func _wear(style: String, col: String) -> Dictionary:
+	var dark := Color(col).darkened(0.25).to_html(false)
+	match style:
+		"hoodie":
+			return {"s": col, "t": dark, "w": col, "l": "6a6478"}
+		"overalls":
+			return {"s": "5b7bb0", "t": "5b7bb0", "w": col, "l": "4a6fb8"}
+		"suit":
+			return {"s": col, "t": "3b2a3a", "w": "ffffff", "l": dark}
+		"dress":
+			return {"s": col, "t": col, "w": "ffffff", "l": col, "dress": true}
+		"dots":
+			return {"s": col, "t": col, "w": "ffffff", "l": col, "dress": true, "dots": true}
+		"skirt":
+			return {"s": "ffffff", "t": "ffffff", "w": "ffffff", "l": col, "dress": true}
+	return {"s": col, "t": col, "w": col, "l": "5b7bb0"}
+
+
 static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleeping: bool) -> Image:
 	var rows: Array = UP_BODY.duplicate()
 	if sleeping:
 		rows[6] = SLEEP_EYES
 	rows.append_array(UP_LEGS[legs])
+	if o.get("dress", false):
+		# юбка-колокольчик от пояса, под ней лапки
+		rows[12] = "kallllllakk."
+		rows[13] = "kllllllllk.."
+		rows[14] = rows[14].replace("l", "a")
+		rows[15] = rows[15].replace("l", "a")
 	var pal := {
 		"k": fur.get("k", "3b2a3a"), "a": fur["a"], "b": fur["b"], "e": fur.get("e", "2b2233"),
 		"p": "ff8fab", "c": "f7b2c0", "s": o["s"], "t": o["t"], "w": o["w"], "l": o["l"], "o": "4a3434",
@@ -296,6 +325,9 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		px.call(3, 11, "6a6478")
 		px.call(4, 12, "6a6478")
 		px.call(6, 11, "e45b6b")
+	if o.get("dots", false):
+		for pt in [[3, 10], [6, 11], [3, 12], [6, 12], [1, 13], [4, 13], [8, 13]]:
+			px.call(pt[0], pt[1], "ffffff")
 	if o.has("scarf"):
 		for x in range(2, 8):
 			px.call(x, 9, o["scarf"])

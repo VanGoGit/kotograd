@@ -46,6 +46,8 @@ var info_img: TextureRect
 var info_name: Label
 var info_sub: Label
 var info_body: Label
+var cat_rows: VBoxContainer       # карточка котика: строки со значками
+var _cat_row := {}               # ключ строки -> [строка, надпись]
 var info_look: Button            # «Гардероб» — открывает выбор наряда котика
 var wardrobe: VBoxContainer      # одежда, аксессуар и его цвет — всё видно сразу
 var _ward_cat = null             # для какого котика собран гардероб
@@ -719,7 +721,7 @@ func _build_info() -> void:
 	info_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	info_panel.offset_top = 64
 	info_panel.offset_right = -10
-	info_panel.custom_minimum_size = Vector2(290, 0)
+	info_panel.custom_minimum_size = Vector2(300, 0)
 	info_panel.visible = false
 	root.add_child(info_panel)
 	var vb := VBoxContainer.new()
@@ -753,6 +755,28 @@ func _build_info() -> void:
 	info_body.custom_minimum_size = Vector2(266, 0)
 	info_body.add_theme_font_size_override("font_size", 14)
 	vb.add_child(info_body)
+	cat_rows = VBoxContainer.new()
+	cat_rows.add_theme_constant_override("separation", 2)
+	vb.add_child(cat_rows)
+	var row_icons := {
+		"now": spr.icons.paw, "wish": _bubble_icon(), "traits": spr.small.star, "job": spr.icons.briefcase,
+		"home": _house_icon(), "car": spr.vehicle("car", "7fc4e8").side[0], "best": spr.icons.heart,
+		"friends": spr.icons.cat, "mood": spr.small.heart, "food": spr.icons.fish,
+	}
+	for key in row_icons:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var box := CenterContainer.new()
+		box.custom_minimum_size = Vector2(24, 20)
+		box.add_child(_icon(row_icons[key], 18))
+		row.add_child(box)
+		var lb := Label.new()
+		lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lb.custom_minimum_size = Vector2(330, 0)
+		lb.add_theme_font_size_override("font_size", 14)
+		row.add_child(lb)
+		cat_rows.add_child(row)
+		_cat_row[key] = [row, lb]
 	info_more = _btn("Подробнее", _toggle_info_more)
 	info_more.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	info_more.add_theme_font_size_override("font_size", 13)
@@ -827,6 +851,42 @@ func _pet_selected() -> void:
 		world.cats_ai.pet_cat(world.info_target.cat)
 
 
+## Значок домика для строки «Дом» — в стиле остальных значков (9 пикселей, на экране вдвое крупнее).
+func _house_icon() -> Texture2D:
+	var img := Spr.grid([
+		"...kkk...",
+		"..kpppk..",
+		".kpppppk.",
+		"kkkkkkkkk",
+		".kwwwwwk.",
+		".kbwwdwk.",
+		".kwwwdwk.",
+		".kkkkkkk.",
+	], {"k": INK.to_html(false), "p": "ff8fab", "w": "fff6ea", "b": "7fc4e8", "d": "8a5a3b"})
+	return ImageTexture.create_from_image(img)
+
+
+## Облачко желания — как над головой у котика.
+func _bubble_icon() -> Texture2D:
+	var img := Spr.grid([
+		".kkkkkkk.",
+		"kwwwwwwwk",
+		"kwwrwrwwk",
+		"kwwrrrwwk",
+		"kwwwrwwwk",
+		".kkkkkkk.",
+		".kk......",
+		"k........",
+	], {"k": INK.to_html(false), "w": "ffffff", "r": "ff6b8b"})
+	return ImageTexture.create_from_image(img)
+
+
+## Строка карточки котика: пустой текст — строку прячем.
+func _set_row(key: String, text: String) -> void:
+	_cat_row[key][0].visible = text != ""
+	_cat_row[key][1].text = text
+
+
 func _toggle_wardrobe() -> void:
 	wardrobe.visible = not wardrobe.visible
 	info_look.set_pressed_no_signal(wardrobe.visible)
@@ -841,17 +901,25 @@ func _fill_wardrobe(c: Dictionary) -> void:
 	for ch in wardrobe.get_children():
 		wardrobe.remove_child(ch)
 		ch.queue_free()
-	var own_shirt := int(c.casual) if c.get("style", "") == "" else -1
+	var cloth: String = c.get("cloth", "")
+	var ccol: String = c.get("cloth_col", D.CLOTH_COLORS[int(c.casual) % D.CLOTH_COLORS.size()])
 	wardrobe.add_child(_label("Одежда", 13, false))
+	var cgrid := GridContainer.new()
+	cgrid.columns = 7
+	for st in D.CLOTHES:
+		var ctex: Texture2D = Spr.scaled(spr.cat_set(c.color, "wear:%s:%s" % [st, ccol]).stand[0], 2)
+		cgrid.add_child(_look_btn(ctex, st == cloth, c, "cloth", st, tr(D.CLOTHES[st].name)))
+	wardrobe.add_child(cgrid)
+	wardrobe.add_child(_label("Цвет одежды", 13, false))
 	var row := HBoxContainer.new()
-	for i in Spr.CASUAL_SHIRTS.size():
-		row.add_child(_look_btn(_swatch(Spr.CASUAL_SHIRTS[i]), i == own_shirt, c, "shirt", i, ""))
+	for hc in D.CLOTH_COLORS:
+		row.add_child(_look_btn(_swatch(hc), cloth != "" and hc == ccol, c, "cloth_col", hc, ""))
 	wardrobe.add_child(row)
 	wardrobe.add_child(_label("Аксессуар", 13, false))
 	var grid := GridContainer.new()
-	grid.columns = 5
+	grid.columns = 9
 	var col: String = c.get("acc_col", D.ACC_COLORS[0])
-	var base: String = c.style if c.get("style", "") != "" else "casual%d" % c.casual
+	var base: String = world.cats_ai.own_base_key(c)
 	for acc in [""] + D.ACCESSORIES.keys():
 		var key: String = base if acc == "" else "%s+%s:%s" % [base, acc, col]
 		var tex: Texture2D = Spr.scaled(spr.cat_set(c.color, key).stand[0], 2)
@@ -859,7 +927,7 @@ func _fill_wardrobe(c: Dictionary) -> void:
 		grid.add_child(_look_btn(tex, acc == c.get("acc", ""), c, "acc", acc, tip))
 	wardrobe.add_child(grid)
 	if c.get("acc", "") != "":
-		wardrobe.add_child(_label("Цвет", 13, false))
+		wardrobe.add_child(_label("Цвет аксессуара", 13, false))
 		var crow := HBoxContainer.new()
 		for hc in D.ACC_COLORS:
 			crow.add_child(_look_btn(_swatch(hc), hc == col, c, "color", hc, ""))
@@ -919,15 +987,12 @@ func _render_info() -> void:
 		info_img.texture = Spr.scaled(fs.stand[0], 3)
 		info_name.text = I18n.cat(c.name)
 		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
-		lines.append(tr("Сейчас: ") + world.cats_ai.activity_text(c))
+		_set_row("now", tr("Сейчас: ") + world.cats_ai.activity_text(c))
 		var wish: String = world.social.wish_text(c)
-		if wish != "":
-			lines.append(tr("Мечтает: ") + wish)
-		lines.append(tr("Характер: ") + world.social.traits_text(c))
-		if c.get("acc", "") != "":
-			lines.append(tr("Аксессуар: ") + tr(D.ACCESSORIES[c.acc].name))
-		lines.append(tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
-		lines.append(tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
+		_set_row("wish", tr("Мечтает: ") + wish if wish != "" else "")
+		_set_row("traits", tr("Характер: ") + world.social.traits_text(c))
+		_set_row("job", tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
+		_set_row("home", tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
 		var car_txt := tr("ходит пешком")
 		if c.car != "":
 			if c.state == "drive":
@@ -938,17 +1003,17 @@ func _render_info() -> void:
 				car_txt = tr("стоит прямо на дороге")
 			else:
 				car_txt = tr("в гараже дома")
-		lines.append(tr("Машина: ") + car_txt)
-		var fr: Array = world.social.friends_of(c)
-		if fr.size() > 0:
-			var names := []
-			for f in fr.slice(0, 4):
-				names.append(I18n.cat(f.name) + (tr(" (лучшие друзья)") if world.social.is_best(c, f) else ""))
-			lines.append(tr("Друзья: ") + ", ".join(names) + ("…" if fr.size() > 4 else ""))
+		_set_row("car", tr("Машина: ") + car_txt)
+		var best := []
+		var others := []
+		for f in world.social.friends_of(c):
+			(best if world.social.is_best(c, f) else others).append(I18n.cat(f.name))
+		_set_row("best", tr("Лучшие друзья: ") + ", ".join(best.slice(0, 4)) if best.size() > 0 else "")
+		_set_row("friends", tr("Друзья: ") + ", ".join(others.slice(0, 4)) + ("…" if others.size() > 4 else "") if others.size() > 0 else "")
 		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.economy.hungry else 0.0)
-		lines.append(tr("Настроение: ") + _mood(hv))
-		if world.economy.hungry:
-			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
+		_set_row("mood", tr("Настроение: ") + _mood(hv))
+		_set_row("food", tr("Хочет кушать! Нужен рыбный причал или пекарня.") if world.economy.hungry else "")
+		cat_rows.visible = true
 		info_pet.visible = true
 		info_look.visible = true
 		if wardrobe.visible and not is_same(_ward_cat, c):
@@ -1023,6 +1088,7 @@ func _render_info() -> void:
 			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
 		info_look.visible = false
+		cat_rows.visible = false
 		wardrobe.visible = false
 		info_look.set_pressed_no_signal(false)
 		# коротко по умолчанию, всё остальное — по кнопке «Подробнее»
@@ -1037,6 +1103,8 @@ func _render_info() -> void:
 			info_up.text = (tr("Улучшить до уровня %d") % (int(o.get("lvl", 1)) + 1)) if world.unlimited else tr("Улучшить до уровня %d — %s") % [int(o.get("lvl", 1)) + 1, tr("%d мон.") % uc]
 			info_up.disabled = world.coins < uc and not world.unlimited
 	info_body.text = "\n".join(lines)
+	info_body.visible = not lines.is_empty()
+	info_panel.custom_minimum_size.x = 380.0 if cat_rows.visible else 300.0
 	info_panel.visible = true
 
 

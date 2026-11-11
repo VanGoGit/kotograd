@@ -405,6 +405,10 @@ func _load_social(c: Dictionary) -> void:
 	# гардероб: неизвестный аксессуар или цвет — просто без него
 	if c.has("dressed"):
 		c["dressed"] = c.dressed == true
+	if c.has("cloth"):
+		c["cloth"] = str(c.cloth) if D.CLOTHES.has(str(c.cloth)) else ""
+	if c.has("cloth_col"):
+		c["cloth_col"] = str(c.cloth_col) if D.CLOTH_COLORS.has(str(c.cloth_col)) else D.CLOTH_COLORS[0]
 	if c.has("acc"):
 		c["acc"] = str(c.acc) if D.ACCESSORIES.has(str(c.acc)) else ""
 	if c.has("acc_col"):

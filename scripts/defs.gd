@@ -421,6 +421,18 @@ const ACCESSORIES := {
 	"scarf": {"name": "Шарфик", "scarf": true},
 }
 const ACC_COLORS := ["ff6b8b", "ff9fc0", "c8a8ff", "7fc4e8", "9ed8c8", "ffd75e", "ffffff", "e0483a"]
+## Гардероб: фасоны повседневной одежды (рисуются в sprites.outfit по ключу «wear:фасон:цвет»).
+const CLOTHES := {
+	"tee": {"name": "Футболка"},
+	"hoodie": {"name": "Худи"},
+	"overalls": {"name": "Комбинезон"},
+	"suit": {"name": "Костюм"},
+	"dress": {"name": "Платье"},
+	"dots": {"name": "Платье в горошек"},
+	"skirt": {"name": "Блузка и юбка"},
+}
+const CLOTH_COLORS := ["ff8fab", "e0483a", "ffb07a", "ffd75e", "9ed8c8", "7fc4e8", "c8a8ff", "ffffff"]
+
 ## Черты, которые не бывают вместе.
 const TRAIT_CLASH := [["homebody", "fidget"], ["homebody", "social"]]
 

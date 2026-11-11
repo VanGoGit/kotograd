@@ -85,8 +85,14 @@ func outfit_key(c: Dictionary) -> String:
 
 ## Свой наряд котика — то, что выбрано в гардеробе (без рабочей формы).
 func own_outfit_key(c: Dictionary) -> String:
-	var base: String = c.style if c.get("style", "") != "" else "casual%d" % c.casual
-	return base + _acc_tail(c)
+	return own_base_key(c) + _acc_tail(c)
+
+
+## Одежда без аксессуара: выбранный в гардеробе фасон, стиль отрасли города или повседневная.
+func own_base_key(c: Dictionary) -> String:
+	if c.get("cloth", "") != "":
+		return "wear:%s:%s" % [c.cloth, c.get("cloth_col", D.CLOTH_COLORS[0])]
+	return c.style if c.get("style", "") != "" else "casual%d" % c.casual
 
 
 func _acc_tail(c: Dictionary) -> String:
@@ -102,8 +108,15 @@ func _work_hours(c: Dictionary) -> bool:
 ## Гардероб: одежда (номер цвета), аксессуар или его цвет.
 func set_look(c: Dictionary, what: String, value) -> void:
 	match what:
-		"shirt":
-			c["casual"] = int(value)
+		"cloth":
+			c["cloth"] = str(value)
+			c["style"] = ""
+			if not c.has("cloth_col"):
+				c["cloth_col"] = D.CLOTH_COLORS[int(c.casual) % D.CLOTH_COLORS.size()]
+		"cloth_col":
+			c["cloth_col"] = str(value)
+			if c.get("cloth", "") == "":
+				c["cloth"] = "tee"
 			c["style"] = ""
 		"acc":
 			c["acc"] = str(value)
