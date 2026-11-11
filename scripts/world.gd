@@ -1233,9 +1233,6 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if here != null and ((tool == "rail" and here.t == "road") or (tool == "road" and here.t == "rail")):
 		_make_crossing(x, y)
 		return
-	# дорогу ведут по тротуару — тротуар уступает место дороге
-	if here != null and tool == "road" and here.t == "path":
-		remove_obj(here)
 	var r := can_place(tool, x, y)
 	if not r.ok:
 		if r.has("reason") and first and Time.get_ticks_msec() - _last_reason_ms > 400:
@@ -1248,8 +1245,6 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 		return
 	coins -= r.cost
 	place_obj(y * W + x, tool, randi() % 1000, d.get("build", 0.0))
-	if tool == "road" and terrain[y * W + x] != WATER:
-		_lay_sidewalks(x, y)
 	var w := D.size_of(tool)
 	# большое здание — тёплое арпеджио, мелочь — привычный «поп»
 	sound.play("build" if w >= 2 else "pop", 1.0, -6.0 if w >= 2 else -4.0)
@@ -1258,20 +1253,6 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 	if r.cost > 0:
 		float_text(Vector2(x * T + 8 * w, y * T), "-%d" % r.cost, Color("8a5a3b"))
 	recalc()
-
-
-## Улица: новая дорога сама кладёт тротуар на свободную сушу по краям (бесплатно).
-## Тротуар перед кистью по ходу дороги потом просто заменяется дорогой.
-func _lay_sidewalks(x: int, y: int) -> void:
-	for dv in DIRS:
-		var nx: int = x + dv.x
-		var ny: int = y + dv.y
-		if not in_map(nx, ny):
-			continue
-		var i := ny * W + nx
-		if objs[i] != null or terrain[i] == WATER:
-			continue
-		place_obj(i, "path", randi() % 1000, 0.0)
 
 
 ## Рельсы через дорогу (или дорога через рельсы) — переезд со шлагбаумом.

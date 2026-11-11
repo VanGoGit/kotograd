@@ -964,6 +964,6 @@ const EN := {
 	"Дорога далеко — жители ходят пешком.": "The road is far — residents go on foot.",
 	"Совет: дорога, клумбы и городские службы рядом делают дом уютнее.": "Tip: a road, flower beds and city services nearby make a home cozier.",
 	"Тротуар": "Sidewalk",
-	"По тротуару котики ходят быстрее. Дорога кладёт тротуары по краям сама, а здесь их можно дорисовать — во дворах, парках и на набережных. Машина выезжает от дома прямо через тротуар.": "Cats walk faster on sidewalks. A road lays sidewalks along its edges by itself; here you can add more — in yards, parks and on promenades. Cars drive out of a house right across the sidewalk.",
-	"Две полосы для машин. Новая дорога сама кладёт тротуары по краям — получается улица: ставьте дома за тротуаром, жители будут ездить на машинах прямо от дома. На воде получается мост (8 мон.).": "Two lanes for cars. A new road lays sidewalks along its edges by itself, making a street: put houses behind the sidewalk and residents will drive right from home. On water it becomes a bridge (8 coins).",
+	"По тротуару котики ходят быстрее. Положите его между дорогой и домами — машина выедет от дома прямо через тротуар.": "Cats walk faster on sidewalks. Put one between the road and the houses — cars will drive out of a house right across it.",
+	"По дорогам котики ездят на машинах на работу и домой. Дом можно поставить прямо у дороги или за тротуаром. На воде получается мост (8 мон.).": "Cats drive to work and back home on roads. A house can stand right by the road or behind a sidewalk. On water it becomes a bridge (8 coins).",
 }
