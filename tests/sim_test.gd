@@ -67,8 +67,19 @@ func _run() -> void:
 	_check(max_cats >= 10, "в город переехали котики")
 	_check(w.cats.size() >= max_cats / 2, "котики не пропадают")
 	_check(w.economy.employed_count() > 0, "котики ходят на работу")
+	print("— желаний исполнено: %d, пар друзей: %d" % [w.wishes_done, w.friendships])
+	_check(w.cats.all(func(c): return c.get("traits", []).size() == 2), "у каждого котика характер из двух черт")
+	_check(_traits_ok(w), "черты ссылаются на существующие места досуга и прогулок")
+	_check(w.wishes_done > 0, "желания котиков исполняются")
+	_check(w.friendships > 0, "котики дружат")
+	var wishing: int = w.cats.filter(func(c): return c.get("wish") != null).size()
+	_check(wishing <= maxi(2, w.cats.size() / w.social.WISH_SHARE), "желаний немного: %d на %d котиков" % [wishing, w.cats.size()])
 	_check(_sane(w), "монетки, еда и координаты — обычные числа")
 
+	# гардероб: часть котиков наряжаем — наряд должен пережить сохранение
+	for c in w.cats.slice(0, 12):
+		for k in randi() % 9:
+			w.cats_ai.next_look(c, ["acc", "color", "shirt"].pick_random())
 	var text: String = w.saves.serialize()
 	_check(w.saves.save_game(), "большой город сохраняется")
 	_check(w.saves.import_save(text), "и загружается")
@@ -131,6 +142,18 @@ func _text_diff(a: String, b: String) -> void:
 	while n < mini(a.length(), b.length()) and a[n] == b[n]:
 		n += 1
 	print("  текст расходится: …%s… → …%s…" % [a.substr(maxi(0, n - 60), 90), b.substr(maxi(0, n - 60), 90)])
+
+
+func _traits_ok(w) -> bool:
+	var ok := true
+	for t in w.D.TRAITS:
+		for key in ["likes", "strolls"]:
+			for b in w.D.TRAITS[t].get(key, []):
+				var d: Dictionary = w.D.DEFS.get(b, {})
+				if not d.get("leisure" if key == "likes" else "stroll", false):
+					print("  черта %s: «%s» — не %s" % [t, b, "место досуга" if key == "likes" else "место прогулки"])
+					ok = false
+	return ok
 
 
 func _sane(w) -> bool:

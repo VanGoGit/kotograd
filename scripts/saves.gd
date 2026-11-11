@@ -111,7 +111,7 @@ func serialize() -> String:
 		"time": world.time, "day": world.day, "cats": cat_list, "max_cats": world.max_cats, "next_id": world.next_id, "speed": world.speed,
 		"used_names": world.used_names, "cam": [world.cam.position.x, world.cam.position.y, world.zoom],
 		"name": world.city_name, "goals": world.goals.done.keys(), "pets": world.pets_total, "events": world.events_seen, "rides": world.transit.rides,
-		"deliveries": world.deliveries, "exported": world.exported,
+		"deliveries": world.deliveries, "exported": world.exported, "wishes": world.wishes_done, "friendships": world.friendships,
 	}
 	return JSON.stringify(data)
 
@@ -328,6 +328,8 @@ func _apply_save(d: Dictionary) -> void:
 	world.events_seen = int(d.get("events", 0))
 	world.deliveries = int(d.get("deliveries", 0))
 	world.exported = int(d.get("exported", 0))
+	world.wishes_done = int(d.get("wishes", 0))
+	world.friendships = int(d.get("friendships", 0))
 	world.transit.rides = int(d.get("rides", 0))
 	world.transit.trains = []
 	world.transit.planes = []
@@ -346,6 +348,7 @@ func _apply_save(d: Dictionary) -> void:
 		# JSON читает все числа дробными: счётчик неудач возвращаем целым
 		if c.has("home_fails"):
 			c["home_fails"] = int(c.home_fails)
+		_load_social(c)
 		c["near_car"] = false
 		c["path"] = []
 		c["dest"] = null
@@ -358,3 +361,49 @@ func _apply_save(d: Dictionary) -> void:
 	world._apply_zoom()
 	world.cam.position = Vector2(cm[0], cm[1])
 	world.recalc()
+
+
+## Характер, желание и друзья котика. Город из прежней версии: котики получают характер сейчас.
+## Что-то не так в файле — желание и знакомства просто забываются, город всё равно загружается.
+func _load_social(c: Dictionary) -> void:
+	var tr_ok: bool = typeof(c.get("traits")) == TYPE_ARRAY and c.traits.size() == 2 and c.traits.all(func(t): return D.TRAITS.has(str(t)))
+	if tr_ok:
+		c["traits"] = [str(c.traits[0]), str(c.traits[1])]
+	else:
+		world.social.give_traits(c)
+	c["wish_next"] = float(c.get("wish_next", 0.0)) if _is_num(c.get("wish_next")) else 0.0
+	var w = c.get("wish")
+	c["wish"] = null
+	if typeof(w) == TYPE_DICTIONARY and _is_num(w.get("until")) and typeof(w.get("k")) == TYPE_STRING:
+		var nw := {"k": str(w.k), "until": float(w.until)}
+		if w.has("t"):
+			nw["t"] = str(w.t)
+		for k in ["b", "f"]:
+			if _is_num(w.get(k)):
+				nw[k] = int(w[k])
+		var ok := true
+		match nw.k:
+			"visit", "stroll":
+				ok = nw.has("t") and nw.has("b") and nw.b >= 0 and nw.b < W * H
+			"build":
+				ok = nw.has("t") and D.DEFS.has(nw.t)
+			"meet":
+				ok = nw.has("f")
+			"pet":
+				pass
+			_:
+				ok = false
+		if ok:
+			c["wish"] = nw
+	var fr := {}
+	if typeof(c.get("friends")) == TYPE_DICTIONARY:
+		for k in c.friends:
+			# JSON пишет ключи словаря строками — id котика возвращаем числом
+			if str(k).is_valid_int() and _is_num(c.friends[k]):
+				fr[int(k)] = float(c.friends[k])
+	c["friends"] = fr
+	# гардероб: неизвестный аксессуар или цвет — просто без него
+	if c.has("acc"):
+		c["acc"] = str(c.acc) if D.ACCESSORIES.has(str(c.acc)) else ""
+	if c.has("acc_col"):
+		c["acc_col"] = str(c.acc_col) if D.ACC_COLORS.has(str(c.acc_col)) else D.ACC_COLORS[0]

@@ -14,6 +14,7 @@ const Ground = preload("res://scripts/ground.gd")
 const Drawer = preload("res://scripts/drawer.gd")
 const Paths = preload("res://scripts/paths.gd")
 const CatsAI = preload("res://scripts/cats.gd")
+const Social = preload("res://scripts/social.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const W := D.W
 const H := D.H
@@ -55,6 +56,8 @@ var city_name := "Котоград"
 var pets_total := 0
 var events_seen := 0
 var deliveries := 0              # сколько раз грузовики привезли товар
+var wishes_done := 0             # сколько желаний котиков исполнилось
+var friendships := 0             # сколько пар котиков подружилось
 var exported := 0                # сколько товара продано через грузовой порт
 var goals
 var events
@@ -67,6 +70,7 @@ var ground = Ground.new(self)
 var drawer = Drawer.new(self)
 var paths = Paths.new(self)
 var cats_ai = CatsAI.new(self)
+var social = Social.new(self)
 var _goal_t := 0.0
 var _amb_t := 0.0
 # сенсорное управление: два пальца — двигать и масштабировать карту
@@ -181,6 +185,8 @@ func new_game() -> void:
 	events_seen = 0
 	deliveries = 0
 	exported = 0
+	wishes_done = 0
+	friendships = 0
 	goals.done = {}
 	goals._m_cache = {}
 	events.active = null
@@ -1525,6 +1531,7 @@ func _step(gdt: float) -> void:
 		_job_t = 1.0
 		_assign_homes()
 		_assign_jobs()
+		social.tick()
 	_update_construction(gdt)
 	for c in cats:
 		cats_ai._update_cat(c, gdt)

@@ -50,7 +50,9 @@ func spawn_cat() -> void:
 		"timer": randf_range(0.5, 2.0), "dir": 1, "anim": randf() * 10.0, "pet": 0.0, "plan": null, "fail_until": 0.0,
 		"wake": wake, "work_at": wake + randf_range(0.4, 1.2), "off": randf_range(16.5, 18.3), "bed": randf_range(20.6, 22.4),
 		"lx": -1, "ly": -1, "car_lot": -1, "car_tile": -1, "car_dir": "r", "near_car": false,
+		"wish": null, "wish_next": world.abs_hour() + randf_range(1.0, 6.0), "friends": {},
 	}
+	world.social.give_traits(c)
 	world.next_id += 1
 	world.cats.append(c)
 	world.rebuild_maps()
@@ -74,11 +76,30 @@ func spawn_cat() -> void:
 
 
 func outfit_key(c: Dictionary) -> String:
+	var acc: String = c.get("acc", "")
+	var tail := "" if acc == "" else "+%s:%s" % [acc, c.get("acc_col", D.ACC_COLORS[0])]
 	if c.job >= 0 and world.objs[c.job] != null:
-		return D.def(world.objs[c.job].t).get("job", "casual%d" % c.casual)
+		return D.def(world.objs[c.job].t).get("job", "casual%d" % c.casual) + tail
 	if c.get("style", "") != "":
-		return c.style
-	return "casual%d" % c.casual
+		return c.style + tail
+	return "casual%d" % c.casual + tail
+
+
+## Гардероб: следующий цвет одежды, аксессуар или цвет аксессуара (по кругу).
+## Котик, которого переодели, ходит в своём, а не в стиле городской отрасли.
+func next_look(c: Dictionary, what: String) -> void:
+	match what:
+		"shirt":
+			c["casual"] = (int(c.casual) + 1) % 6 if c.get("style", "") == "" else int(c.casual)
+			c["style"] = ""
+		"acc":
+			var keys: Array = [""] + D.ACCESSORIES.keys()
+			c["acc"] = keys[(keys.find(c.get("acc", "")) + 1) % keys.size()]
+		"color":
+			var i: int = D.ACC_COLORS.find(c.get("acc_col", D.ACC_COLORS[0]))
+			c["acc_col"] = D.ACC_COLORS[(i + 1) % D.ACC_COLORS.size()]
+	world.hearts_at(cat_pos(c) + Vector2(0, -12), 2)
+	world.sound.play("pop", randf_range(1.1, 1.3), -8.0)
 
 
 ## Новые жители одеваются в стиле главных отраслей города:
@@ -121,14 +142,21 @@ func _near(list: Array, c: Dictionary, dist: float) -> Array:
 
 func _pick_leisure(c: Dictionary) -> int:
 	var opts := _near(world.stats.leisure, c, 26.0)
-	return opts.pick_random() if opts.size() > 0 else -1
+	if opts.is_empty():
+		return -1
+	# по характеру: гурман чаще идёт в кафе, книголюб — в библиотеку
+	var likes: Array = world.social.liked(c, "likes")
+	var fav := opts.filter(func(b): return likes.has(world.objs[b].t))
+	return (fav if fav.size() > 0 and randf() < 0.6 else opts).pick_random()
 
 
 func _pick_stroll(c: Dictionary):
 	var opts := _near(world.stats.strolls, c, 22.0)
 	if opts.is_empty():
 		return null
-	var b: int = opts.pick_random()
+	var likes: Array = world.social.liked(c, "strolls")
+	var fav := opts.filter(func(b): return likes.has(world.objs[b].t))
+	var b: int = (fav if fav.size() > 0 and randf() < 0.6 else opts).pick_random()
 	var bc := world.center_of(b)
 	return {"x": roundi(bc.x), "y": roundi(bc.y), "b": b}
 
@@ -147,19 +175,31 @@ func _desired(c: Dictionary) -> Dictionary:
 	if pl != null and ah < pl.until and pl.until - ah < 3.0 and (not pl.has("b") or world.is_ready(pl.b)):
 		return pl
 	var p = null
-	# у котика есть дела: сходить в кафе или магазин, прогуляться к красивому месту, съездить в другой район
-	var r := randf()
-	if r < 0.45:
+	# сначала — желание котика или друг, который сейчас в кафе
+	if randf() < 0.6:
+		p = world.social.wish_goal(c)
+	if p == null and randf() < 0.25:
+		var fs: int = world.social.friend_spot(c)
+		if fs >= 0:
+			p = {"kind": "visit", "b": fs}
+	# у котика есть дела: сходить в кафе или магазин, прогуляться к красивому месту, съездить в другой район;
+	# домосед чаще сидит дома, непоседа чаще гуляет и ездит
+	var home_w := 0.16 * (1.0 + world.social.lean(c, "home") * 1.5)
+	var out_w := 1.0 + world.social.lean(c, "out") * 0.5
+	var r := randf() * (0.76 * out_w + home_w + 0.08)
+	if p != null:
+		pass
+	elif r < 0.45 * out_w:
 		var l := _pick_leisure(c)
 		if l >= 0:
 			p = {"kind": "visit", "b": l}
-	elif r < 0.7:
+	elif r < 0.7 * out_w:
 		var s = _pick_stroll(c)
 		if s != null:
 			p = {"kind": "stroll", "tx": s.x, "ty": s.y, "sb": s.b}
-	elif r < 0.76 and world.transit.hubs.size() >= 2:
+	elif r < 0.76 * out_w and world.transit.hubs.size() >= 2:
 		p = _leisure_trip(c)
-	elif r < 0.92 and not homeless:
+	elif r < 0.76 * out_w + home_w and not homeless:
 		p = _maybe_transit(c, {"kind": "home", "b": c.home})
 	if p == null:
 		p = {"kind": "wander"}
@@ -235,6 +275,7 @@ func _enter(c: Dictionary, b: int) -> void:
 	c.timer = randf_range(0.5, 1.2)
 	c.path = []
 	c.dest = null
+	world.social.on_enter(c, b)
 
 
 func _car_at_home(c: Dictionary) -> bool:
@@ -487,6 +528,8 @@ func _walk_done(c: Dictionary) -> void:
 		if world.is_ready(d.b) and (d.kind != "home" or c.home == d.b):
 			_enter(c, d.b)
 			return
+	if d != null and d.kind == "stroll":
+		world.social.on_stroll(c, d.get("sb", -1))
 	var o = world.obj_at(roundi(c.x), roundi(c.y))
 	c.state = "idle"
 	var daytime := world.hour() >= 9.0 and world.hour() < 18.0
@@ -588,6 +631,7 @@ func pet_cat(c: Dictionary) -> void:
 	world.sound.play("mew", randf_range(0.95, 1.3))
 	world.pet_bonus = minf(10.0, world.pet_bonus + 1.5)
 	world.pets_total += 1
+	world.social.on_pet(c)
 	if c.state == "idle":
 		c.timer = maxf(c.timer, 1.5)
 

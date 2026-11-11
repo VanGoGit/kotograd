@@ -46,6 +46,7 @@ var info_img: TextureRect
 var info_name: Label
 var info_sub: Label
 var info_body: Label
+var info_look: HBoxContainer     # гардероб котика: одежда, аксессуар, цвет
 var info_pet: Button
 var info_up: Button
 var toasts_box: VBoxContainer
@@ -755,6 +756,15 @@ func _build_info() -> void:
 	vb.add_child(info_more)
 	info_pet = _btn("Погладить", _pet_selected)
 	vb.add_child(info_pet)
+	info_look = HBoxContainer.new()
+	info_look.add_theme_constant_override("separation", 6)
+	vb.add_child(info_look)
+	for it in [["Одежда", "shirt", "Другой цвет повседневной одежды"], ["Аксессуар", "acc", "Бантик, шляпка, очки, шарфик…"], ["Цвет", "color", "Цвет аксессуара"]]:
+		var what: String = it[1]
+		var b := _btn(it[0], func(): _restyle(what), it[2])
+		b.add_theme_font_size_override("font_size", 13)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info_look.add_child(b)
 	info_up = _btn("Улучшить", _upgrade_selected, "Улучшенное здание вмещает больше котиков, даёт больше монет и радости")
 	info_up.add_theme_stylebox_override("normal", _sb(GOLD, INK, 3, 8, 8.0))
 	vb.add_child(info_up)
@@ -816,6 +826,12 @@ func _pet_selected() -> void:
 		world.cats_ai.pet_cat(world.info_target.cat)
 
 
+func _restyle(what: String) -> void:
+	if world.info_target != null and world.info_target.has("cat"):
+		world.cats_ai.next_look(world.info_target.cat, what)
+		_render_info()
+
+
 func _upgrade_selected() -> void:
 	var it = world.info_target
 	if it == null or not it.has("tile"):
@@ -842,6 +858,12 @@ func _render_info() -> void:
 		info_name.text = I18n.cat(c.name)
 		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
 		lines.append(tr("Сейчас: ") + world.cats_ai.activity_text(c))
+		var wish: String = world.social.wish_text(c)
+		if wish != "":
+			lines.append(tr("Мечтает: ") + wish)
+		lines.append(tr("Характер: ") + world.social.traits_text(c))
+		if c.get("acc", "") != "":
+			lines.append(tr("Аксессуар: ") + tr(D.ACCESSORIES[c.acc].name))
 		lines.append(tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
 		lines.append(tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
 		var car_txt := tr("ходит пешком")
@@ -855,11 +877,18 @@ func _render_info() -> void:
 			else:
 				car_txt = tr("в гараже дома")
 		lines.append(tr("Машина: ") + car_txt)
+		var fr: Array = world.social.friends_of(c)
+		if fr.size() > 0:
+			var names := []
+			for f in fr.slice(0, 4):
+				names.append(I18n.cat(f.name) + (tr(" (лучшие друзья)") if world.social.is_best(c, f) else ""))
+			lines.append(tr("Друзья: ") + ", ".join(names) + ("…" if fr.size() > 4 else ""))
 		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.economy.hungry else 0.0)
 		lines.append(tr("Настроение: ") + _mood(hv))
 		if world.economy.hungry:
 			lines.append(tr("Хочет кушать! Нужен рыбный причал или пекарня."))
 		info_pet.visible = true
+		info_look.visible = true
 		info_up.visible = false
 		info_more.visible = false
 	else:
@@ -921,6 +950,7 @@ func _render_info() -> void:
 		if d.has("store_food"):
 			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
+		info_look.visible = false
 		# коротко по умолчанию, всё остальное — по кнопке «Подробнее»
 		var short := _short_lines(o, d)
 		info_more.visible = o.build <= 0.0
@@ -1247,6 +1277,8 @@ func _build_help() -> void:
 		"Колесо — масштаб · WASD — камера · Tab — вкладки · 1–9 — постройки · B — лопатка",
 		"Рельеф, дороги и клумбы можно «рисовать», ведя мышью с зажатой кнопкой",
 		"Клик по котику или машине — узнать, кто это · Пробел — скорость · Z — режим «Дзен» · V — спрятать постройки · Esc — отмена",
+		"Облачко над котиком — его маленькое желание. Можно исполнить, а можно и нет — котик не обидится",
+		"В карточке котика есть гардероб: одежда, аксессуар и цвет",
 		"На телефоне: касание — строить или выбрать · один палец — двигать карту · два пальца — масштаб",
 	]:
 		kl.add_child(_label(line, 13))

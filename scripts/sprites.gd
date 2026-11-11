@@ -203,10 +203,27 @@ const HATS := {
 	"sombrero": [[3, 1, 4, 2], [0, 3, 10, 1]],
 	"top": [[3, 0, 4, 3], [1, 3, 8, 1]],
 	"grad": [[1, 2, 8, 1], [3, 3, 4, 1]],
+	"bow": [[6, 1, 1, 3], [10, 1, 1, 3], [7, 2, 3, 1]],
+	"flower": [[7, 1, 3, 3]],
 }
 
 
 static func outfit(key: String) -> Dictionary:
+	# «наряд+аксессуар:цвет» — из гардероба котика
+	if "+" in key:
+		var o: Dictionary = outfit(key.get_slice("+", 0)).duplicate()
+		var acc_key := key.get_slice("+", 1)
+		var a: Dictionary = D.ACCESSORIES.get(acc_key.get_slice(":", 0), {})
+		var col := acc_key.get_slice(":", 1)
+		if a.has("hat") and not o.has("hat"):
+			o["hat"] = a.hat
+			o["hc"] = col
+		for f in ["glasses", "shades"]:
+			if a.get(f, false):
+				o[f] = true
+		if a.get("scarf", false):
+			o["scarf"] = col
+		return o
 	if OUTFITS.has(key):
 		return OUTFITS[key]
 	if D.JOB_OUTFITS.has(key):
@@ -279,6 +296,11 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		px.call(3, 11, "6a6478")
 		px.call(4, 12, "6a6478")
 		px.call(6, 11, "e45b6b")
+	if o.has("scarf"):
+		for x in range(2, 8):
+			px.call(x, 9, o["scarf"])
+		px.call(2, 10, o["scarf"])
+		px.call(2, 11, Color(o["scarf"]).darkened(0.2).to_html(false))
 	if o.get("badge", false) and not o.has("hat"):
 		px.call(3, 10, "ffd75e")
 	if o.has("hat"):
@@ -289,6 +311,10 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 			hat.set_pixel(3, 1, Color("fff3a0"))
 		if o["hat"] == "grad":
 			hat.set_pixel(8, 3, Color("ffd23f"))
+		if o["hat"] == "bow":
+			hat.set_pixel(8, 2, Color(o["hc"]).darkened(0.35))
+		if o["hat"] == "flower":
+			hat.set_pixel(8, 2, Color("ffd23f"))
 		if o["hat"] == "sombrero":
 			hat.set_pixel(4, 2, Color("e45b6b")); hat.set_pixel(5, 2, Color("5fae73"))
 		if o.get("badge", false):

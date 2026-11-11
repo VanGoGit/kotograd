@@ -49,6 +49,10 @@ const ACHIEVEMENTS := [
 	{"id": "trucks100", "name": "Логистика", "desc": "Грузовики сделали 100 поставок", "m": "deliveries", "n": 100},
 	{"id": "export", "name": "Сделано в Котограде", "desc": "Продайте 100 товаров через грузовой порт", "m": "exported", "n": 100},
 	{"id": "cats200", "name": "Котополис", "desc": "Поселите 200 котиков", "m": "cats", "n": 200},
+	{"id": "wish1", "name": "Мечты сбываются", "desc": "Исполните желание котика — оно в облачке над головой", "m": "wishes", "n": 1},
+	{"id": "wish50", "name": "Добрая фея", "desc": "Исполните 50 желаний котиков", "m": "wishes", "n": 50},
+	{"id": "friends1", "name": "Не разлей вода", "desc": "Пусть два котика подружатся", "m": "friendships", "n": 1},
+	{"id": "friends25", "name": "Дружный город", "desc": "В городе 25 пар друзей", "m": "friendships", "n": 25},
 ]
 const DECOR := ["palm", "flowers", "jacaranda", "statue", "umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "billboard", "watertower"]
 const NATURAL := ["wildpalm", "agave", "rock"]
@@ -93,7 +97,7 @@ func _metrics() -> Dictionary:
 		"lots": st.lots.size(), "happy": int(world.happy), "jobs": st.jobs, "wonders": st.wonders.size(),
 		"tourism": int(world.economy.tourism), "pets": world.pets_total, "day": world.day, "coins": int(world.coins),
 		"jam": world.jammed, "events": world.events_seen, "rides": world.transit.rides,
-		"deliveries": world.deliveries, "exported": world.exported,
+		"deliveries": world.deliveries, "exported": world.exported, "wishes": world.wishes_done, "friendships": world.friendships,
 		"rail_links": 0, "airports": world.transit.airports().size(),
 		"roads": 0, "highway": 0, "shops": 0, "decor": 0, "services": 0, "lvl2": 0, "lvl3": 0, "hill_home": 0, "land": 0, "kinds": 0,
 	}

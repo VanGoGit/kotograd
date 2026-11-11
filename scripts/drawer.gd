@@ -26,6 +26,7 @@ var _scan: Array = []
 var _scan_scenes: Array = []
 var _spark_key := []
 var _spark: Array = []
+var _mini := {}                  # значки построек 7×7 для облачков желаний
 var lights: Array = []
 var tut_cat = null
 
@@ -322,6 +323,39 @@ func _draw_cat(c: Dictionary) -> void:
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:
 		var bob := roundi(sin(world.anim_time * 5.0) * 1.5)
 		world.draw_texture(world.spr.small.heart, Vector2(sx + 3, sy - 4 + bob))
+	if c.get("wish") != null and world.zoom >= 2 and not world.ui.zen:
+		_draw_wish(c.wish, sx + 8, sy - 11 + roundi(sin(world.anim_time * 2.0 + c.id) * 0.8))
+
+
+## Облачко желания: белый пузырь с хвостиком и значком — куда котик хочет или что ему нужно.
+func _draw_wish(w: Dictionary, x: int, y: int) -> void:
+	world.draw_rect(Rect2(x, y, 11, 9), INK)
+	world.draw_rect(Rect2(x + 1, y + 1, 9, 7), Color.WHITE)
+	world.draw_rect(Rect2(x, y + 9, 2, 1), INK)
+	world.draw_rect(Rect2(x - 1, y + 10, 1, 1), INK)
+	match w.k:
+		"pet":
+			world.draw_texture(world.spr.small.heart, Vector2(x + 3, y + 2))
+		"meet":
+			world.draw_texture(world.spr.small.heart, Vector2(x + 1, y + 2))
+			world.draw_texture(world.spr.small.heart, Vector2(x + 5, y + 2))
+		_:
+			var tex := _mini_icon(w.t)
+			world.draw_texture(tex, Vector2(x + 2 + (7 - tex.get_width()) / 2, y + 1 + (7 - tex.get_height()) / 2))
+			if w.k == "build":
+				world.draw_texture(world.spr.small.sparkle, Vector2(x + 8, y - 2))
+
+
+func _mini_icon(t: String) -> Texture2D:
+	if not _mini.has(t):
+		var src: Texture2D = world.spr.tool_texture(t)
+		if src == null:
+			return world.spr.small.star
+		var img: Image = src.get_image().duplicate()
+		var k := 7.0 / maxf(img.get_width(), img.get_height())
+		img.resize(maxi(1, roundi(img.get_width() * k)), maxi(1, roundi(img.get_height() * k)), Image.INTERPOLATE_BILINEAR)
+		_mini[t] = ImageTexture.create_from_image(img)
+	return _mini[t]
 
 
 ## Гость события: котик в праздничной одежде, появляется и исчезает плавно.

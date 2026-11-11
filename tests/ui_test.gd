@@ -79,6 +79,10 @@ func _run() -> void:
 			w.info_target = {"cat": c}
 			ui._render_info()
 			ui._pet_selected()
+			for k in w.D.ACCESSORIES.size() + 1:
+				ui._restyle("acc")
+				ui._restyle("color")
+				ui._restyle("shirt")
 			w.cats_ai.activity_text(c)
 		w.info_target = null
 		ui._render_info()

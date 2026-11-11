@@ -388,6 +388,42 @@ const CAT_COLORS := {
 	"blackwhite": {"name": "чёрно-белый", "a": "fbf7f2", "b": "3f3a4a", "pat": "patch"},
 }
 
+## Характер котика — две черты. likes: куда такой котик охотнее ходит и о чём мечтает;
+## strolls: где охотнее гуляет; home / out — насколько чаще сидит дома или гуляет и ездит.
+const TRAITS := {
+	"sleepy": {"name": "Соня"},
+	"gourmet": {"name": "Гурман",
+		"likes": ["bakery", "sushi", "pizzeria", "cafe", "icecream", "burger", "tacotruck", "donut", "boba", "juicebar", "restaurant", "market"]},
+	"stylish": {"name": "Стиляга",
+		"likes": ["groomer", "boutique", "barber", "spa", "mall", "tattoo", "shop"]},
+	"bookworm": {"name": "Книголюб",
+		"likes": ["library", "bookstore", "museum", "gallery", "cinema", "theater"], "strolls": ["observatory", "getty", "statue"]},
+	"fidget": {"name": "Непоседа", "out": 1.0,
+		"likes": ["gym", "yoga", "bowling", "arcade", "surf"], "strolls": ["skatepark", "tennis", "volleyball", "playground", "stadium"]},
+	"beach": {"name": "Любит пляж",
+		"likes": ["surf", "marina", "aquarium", "icecream"], "strolls": ["umbrella", "boatdock", "pier_wheel", "volleyball"]},
+	"homebody": {"name": "Домосед", "home": 1.0},
+	"social": {"name": "Душа компании",
+		"likes": ["nightclub", "cafe", "bowling", "theater"], "strolls": ["concert", "fountain", "bowl"]},
+	"nature": {"name": "Любит природу",
+		"likes": ["florist", "zoo", "petshop"], "strolls": ["fountain", "cattree", "cushion", "bench", "pawtile"]},
+}
+## Гардероб: аксессуар поверх любого наряда (кроме формы со своим головным убором — на работе он главнее).
+## hat — форма из HATS в sprites.gd, glasses / shades / scarf — флаги рисования.
+const ACCESSORIES := {
+	"bow": {"name": "Бантик", "hat": "bow"},
+	"flower": {"name": "Цветочек", "hat": "flower"},
+	"beret": {"name": "Берет", "hat": "beret"},
+	"straw": {"name": "Шляпка", "hat": "straw"},
+	"beanie": {"name": "Шапочка", "hat": "beanie"},
+	"glasses": {"name": "Очки", "glasses": true},
+	"shades": {"name": "Тёмные очки", "shades": true},
+	"scarf": {"name": "Шарфик", "scarf": true},
+}
+const ACC_COLORS := ["ff6b8b", "ff9fc0", "c8a8ff", "7fc4e8", "9ed8c8", "ffd75e", "ffffff", "e0483a"]
+## Черты, которые не бывают вместе.
+const TRAIT_CLASH := [["homebody", "fidget"], ["homebody", "social"]]
+
 const CAT_NAMES := ["Барсик", "Мурка", "Пушок", "Рыжик", "Снежок", "Тучка", "Персик", "Котлетка", "Булочка", "Симба",
 	"Луна", "Маркиз", "Соня", "Ириска", "Пончик", "Уголёк", "Зефир", "Кекс", "Масяня", "Фунтик", "Мася", "Плюша",
 	"Тимоша", "Василий", "Дуся", "Ватрушка", "Бублик", "Мандарин", "Пирожок", "Клякса", "Шпрот", "Ромашка",
