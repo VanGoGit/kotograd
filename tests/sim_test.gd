@@ -48,6 +48,7 @@ func _run() -> void:
 	w.new_game()
 	w.unlimited = true
 
+	_check_neighbors(w)
 	var kinds := City.build(w)
 	print("— построено видов построек: %d" % kinds.size())
 	_check(kinds.size() >= 25, "в городе больше 25 видов построек")
@@ -100,6 +101,29 @@ func _run() -> void:
 	main.free()
 	print("ИТОГ: %s" % ("всё в порядке" if fails == 0 else "ошибок: %d" % fails))
 	quit(1 if fails > 0 else 0)
+
+
+func _check_neighbors(w) -> void:
+	for i in range(w.W + 1, w.W * (w.H - 1)):
+		if i % w.W >= w.W - 3 or w.objs[i] != null or w.objs[i + 1] != null or w.objs[i + 2] != null:
+			continue
+		var table = w.place_obj(i + 1, "domino", 0, 0)
+		var house = w.place_obj(i + 2, "house", 0, 0)
+		var cafe = w.place_obj(i, "cafe", 0, 1)
+		w.recalc()
+		_check(not w.patios.has(table.i), "стройка ещё не образует террасу")
+		cafe.build = 0.0
+		w.recalc()
+		var comfort: float = w.stats.house_happy[house.i]
+		_check(w.patios.has(table.i), "у готового кафе появляется терраса")
+		w.remove_obj(table)
+		w.recalc()
+		_check(not w.patios.has(i + 1) and comfort == w.stats.house_happy[house.i] + 7, "столик даёт пять единиц уюта и две за соседство")
+		w.remove_obj(cafe)
+		w.remove_obj(house)
+		w.recalc()
+		return
+	_check(false, "есть место для проверки соседства")
 
 
 ## Одна улица даёт прямой маршрут и пешеходу, и машине.

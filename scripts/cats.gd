@@ -518,7 +518,7 @@ func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
 	for o in opts:
 		var w := 1.0
 		var ob = world.obj_at(o.x, o.y)
-		if ob != null and ob.t in ["path", "blvd", "road"]:
+		if ob != null and ob.t in ["path", "blvd", "road", "flamingotile"]:
 			w *= 4.0
 		if c.lx == o.x and c.ly == o.y:
 			w *= 0.25
@@ -667,7 +667,7 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 			var dy: float = tgt.y - c.y
 			var dist := sqrt(dx * dx + dy * dy)
 			var o = world.obj_at(tgt.x, tgt.y)
-			var sp := dt * (1.7 if o != null and o.t in ["path", "blvd", "road"] else 1.1)
+			var sp := dt * (1.7 if o != null and o.t in ["path", "blvd", "road", "flamingotile"] else 1.1)
 			if absf(dx) > 0.01:
 				c.dir = 1 if dx > 0 else -1
 			if dist <= sp:

@@ -23,7 +23,7 @@ func _init(w) -> void:
 func _tile_cost(i: int) -> float:
 	var o = world.objs[i]
 	if o != null:
-		if o.t in ["path", "blvd", "road"]:
+		if o.t in ["path", "blvd", "road", "flamingotile"]:
 			return 1.0
 		if o.t == "rail" or o.t == "crossing":
 			return 30.0

@@ -192,6 +192,9 @@ const OUTFITS := {
 }
 const CASUAL_SHIRTS := ["ff8fab", "7fc4e8", "ffd75e", "9ed8c8", "c8a8ff", "ffb07a"]
 const HATS := {
+	"visor": [[2, 3, 7, 1], [6, 4, 5, 1]],
+	"fedora": [[3, 1, 4, 3], [7, 2, 1, 2], [0, 4, 11, 1]],
+	"hibiscus": [[7, 1, 2, 4], [5, 2, 6, 2], [9, 4, 1, 1]],
 	"sunhat": [[2, 1, 6, 3], [0, 3, 11, 2]],
 	"sailcap": [[1, 1, 8, 2], [2, 3, 6, 1]],
 	"mushroom": [[4, 0, 3, 1], [2, 1, 7, 2], [0, 3, 11, 1]],
@@ -228,6 +231,8 @@ static func outfit(key: String) -> Dictionary:
 		for f in ["glasses", "shades"]:
 			if a.get(f, false):
 				o[f] = true
+		if a.get("satchel", false):
+			o.satchel = col
 		if a.get("pack", false):
 			o.pack = col
 		if a.get("scarf", false):
@@ -247,7 +252,9 @@ static func outfit(key: String) -> Dictionary:
 static func _wear(style: String, col: String) -> Dictionary:
 	var dark := Color(col).darkened(0.25).to_html(false)
 	match style:
-		"apron", "stripes", "vest", "poncho", "pajamas":
+		"sundress":
+			return {"s": col, "t": col, "w": "fff0d2", "l": col, "dress": true, "cut": style}
+		"aloha", "guayabera", "surfshirt", "apron", "stripes", "vest", "poncho", "pajamas":
 			return {"s": col, "t": dark, "w": "fff1d2", "l": dark, "cut": style}
 		"hoodie":
 			return {"s": col, "t": dark, "w": col, "l": "6a6478"}
@@ -337,6 +344,21 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		for pt in [[3, 10], [6, 11], [3, 12], [6, 12], [1, 13], [4, 13], [8, 13]]:
 			px.call(pt[0], pt[1], "ffffff")
 	match o.get("cut", ""):
+		"aloha":
+			for center in [Vector2i(3, 10), Vector2i(7, 12)]:
+				img.fill_rect(Rect2i(center - Vector2i(1, 0), Vector2i(3, 1)), Color("ffb88f"))
+				img.set_pixelv(center + Vector2i.UP, Color("fff3c6"))
+				img.set_pixelv(center, Color("a34e64"))
+		"guayabera":
+			for x in [3, 6]:
+				img.fill_rect(Rect2i(x, 9, 1, 5), Color(o.t))
+				img.fill_rect(Rect2i(x - 1, 12, 2, 1), Color("fff3d5"))
+		"surfshirt":
+			for step in 5:
+				img.fill_rect(Rect2i(2 + step, 13 - step, 2, 1), Color("244e63"))
+		"sundress":
+			img.fill_rect(Rect2i(2, 11, 6, 1), Color("fff3ce"))
+			img.fill_rect(Rect2i(1, 13, 8, 1), Color(o.t))
 		"apron":
 			img.fill_rect(Rect2i(3, 10, 5, 4), Color(o.s))
 			img.fill_rect(Rect2i(4, 11, 3, 2), Color("ffd75e"))
@@ -353,6 +375,11 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		"pajamas":
 			for pt in [Vector2i(3, 10), Vector2i(6, 12), Vector2i(3, 14)]:
 				img.set_pixelv(pt, Color("fff0c2"))
+	if o.has("satchel"):
+		for step in 5:
+			img.set_pixel(2 + step, 9 + step, Color("704d45"))
+		img.fill_rect(Rect2i(6, 12, 4, 3), Color(o.satchel))
+		img.set_pixel(8, 13, Color("ffe0a1"))
 	if o.has("pack"):
 		var y := 9 if legs == "walkA" else 10
 		img.fill_rect(Rect2i(8, y, 4, 5), Color("75542f"))
@@ -370,6 +397,11 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		for r in HATS[o["hat"]]:
 			hat.fill_rect(Rect2i(r[0], r[1], r[2], r[3]), Color(o["hc"]))
 		match o.hat:
+			"fedora":
+				hat.fill_rect(Rect2i(2, 3, 7, 1), Color("654855"))
+			"hibiscus":
+				hat.set_pixel(8, 3, Color("ffe48d"))
+				hat.set_pixel(10, 1, Color("519977"))
 			"mushroom":
 				for pt in [Vector2i(3, 2), Vector2i(6, 1), Vector2i(8, 3)]:
 					hat.set_pixelv(pt, Color("fff3da"))
@@ -973,6 +1005,36 @@ func _make_fun() -> void:
 		p.R(4, 9, 8, 3, "ffc8d8"); p.R(5, 10, 6, 1, "ffdbe6")
 		p.P(2, 8, "e07a9c"); p.P(13, 8, "e07a9c"); p.P(2, 12, "e07a9c"); p.P(13, 12, "e07a9c")
 	, true, Rect2i(2, 14, 12, 1))
+	obj["flamingotile"] = drawn(16, 16, func(p: Painter) -> void:
+		p.R(0, 0, 16, 16, "82c8bb")
+		p.R(1, 1, 14, 14, "d9eee0")
+		p.R(2, 2, 12, 12, "61ada8")
+		p.R(4, 7, 6, 3, "ed8293")
+		p.R(3, 6, 4, 2, "ffd0b7")
+		p.R(9, 4, 2, 5, "f297a2")
+		p.R(10, 3, 3, 2, "ffd0b7")
+		p.P(12, 5, "51445b")
+		p.R(6, 10, 1, 3, "734d61")
+		p.R(8, 10, 2, 1, "734d61")
+		p.P(9, 11, "734d61")
+	, false)
+	obj["domino"] = drawn(16, 23, func(p: Painter) -> void:
+		p.R(7, 4, 1, 14, "785751")
+		p.R(2, 4, 12, 3, "ee997e")
+		p.R(4, 2, 8, 3, "f7bd9a")
+		p.R(6, 1, 4, 5, "fff1c7")
+		p.R(1, 6, 14, 2, "df766b")
+		p.R(6, 6, 4, 2, "fff1c7")
+		p.R(3, 13, 10, 4, "428c83")
+		p.R(4, 17, 2, 4, "8e6351")
+		p.R(10, 17, 2, 4, "8e6351")
+		for x in [0, 13]:
+			p.R(x, 15, 3, 4, "ebb277")
+			p.R(x + 1, 19, 1, 3, "875950")
+		for x in [4, 8]:
+			p.R(x, 14, 3, 2, "fff3cd")
+			p.P(x + 1, 15, "52485a")
+	, true)
 	obj["pawtile"] = drawn(16, 16, func(p: Painter) -> void:
 		# бетонная плитка с двумя отпечатками лап и автографом
 		p.R(1, 2, 14, 13, "c9bfb0"); p.R(2, 3, 12, 11, "e8e1d6"); p.R(2, 3, 12, 1, "f4efe8")
@@ -1105,8 +1167,9 @@ func _make_la() -> void:
 	)
 	bld("lifeguard", 16, 30, func(p: Painter) -> void:
 		p.R(14, 1, 1, 5, "6a6478"); p.R(15, 1, 1, 2, "e45b6b")
-		p.R(1, 5, 14, 3, "ffd23f")
-		p.R(2, 8, 12, 10, "8fd0f0"); p.R(2, 8, 12, 1, "b8e4f8")
+		p.R(1, 5, 14, 3, "ea827a")
+		p.R(2, 8, 12, 10, "77c5b6"); p.R(2, 8, 12, 1, "d5efcf")
+		p.R(1, 17, 14, 2, "f9bc94")
 		p.win(4, 10, 8, 4, "e8f6fc")
 		p.R(6, 15, 3, 3, "ffffff"); p.R(7, 15, 1, 3, "e45b6b"); p.R(6, 16, 3, 1, "e45b6b")
 		p.R(3, 18, 1, 11, "c9c4d6"); p.R(12, 18, 1, 11, "c9c4d6")

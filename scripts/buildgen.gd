@@ -51,11 +51,15 @@ const GLYPHS := {
 
 static func _glyph(p, x0: int, y0: int, name: String, sc, fg) -> void:
 	p.R(x0, y0, 7, 7, sc)
+	var ink := Color(fg)
+	var background := Color(sc)
+	if absf(ink.get_luminance() - background.get_luminance()) < 0.32:
+		ink = Color("453747") if background.get_luminance() > 0.4 else Color("fff4d7")
 	var g: Array = GLYPHS.get(name, GLYPHS["star"])
 	for r in 5:
 		for c in 5:
 			if g[r][c] == "x":
-				p.P(x0 + 1 + c, y0 + 1 + r, fg)
+				p.P(x0 + 1 + c, y0 + 1 + r, ink)
 
 
 static func _darker(hex: String, f := 0.85) -> Color:
@@ -75,6 +79,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 	match roof:
 		"flat", "awning":
 			roof_h = 3
+		"deco":
+			roof_h = 10
 		"gable":
 			roof_h = maxi(4, bw / 3)
 		"dome":
@@ -122,6 +128,11 @@ static func build(look: Dictionary, sz: int, make: Callable):
 			"flat", "awning":
 				p.R(m - 1, by0 - 3, bw + 2, 3, rc)
 				p.R(m - 1, by0 - 3, bw + 2, 1, Color(rc).lightened(0.25))
+			"deco":
+				p.R(m, by0 - 3, bw, 3, rc)
+				p.R(cx - 8, by0 - 6, 16, 4, wall)
+				p.R(cx - 4, by0 - 9, 8, 6, rc)
+				p.R(cx - 1, top, 2, roof_h, "fff0cf")
 			"gable":
 				for y in roof_h:
 					var hw := roundi(float(y + 1) * (bw / 2.0 + 1.0) / roof_h)
@@ -170,6 +181,8 @@ static func build(look: Dictionary, sz: int, make: Callable):
 					p.win(m + 1, wy, dx0 - m - 2, door_h - 2, wc)
 				if m + bw - (dx0 + door_w) - 2 >= 2:
 					p.win(dx0 + door_w + 1, wy, m + bw - (dx0 + door_w) - 2, door_h - 2, wc)
+				# Общий подоконник связывает витрины по обе стороны двери.
+				p.R(m, wy + door_h - 2, bw, 1, _darker(wall, 0.70))
 				var y2 := by0 + 2
 				while y2 + 3 < wy - 3:
 					p.win(m + 2, y2, bw - 4, 2, wc)
@@ -192,6 +205,11 @@ static func build(look: Dictionary, sz: int, make: Callable):
 						p.wins.append(Rect2i(wx, wy, 3, 3))
 						wx += 4
 					wy += 6
+		if roof == "deco":
+			for yy in range(by0 + 6, h - door_h - 5, 7):
+				p.R(m - 1, yy, bw + 2, 1, rc)
+				p.R(m, yy + 1, bw, 1, "fff1cf")
+			p.R(cx - 1, by0, 2, body_h - door_h - 2, "fff1cf")
 		# маркиза
 		if look.has("awn"):
 			var ay := h - 2 - door_h - 3

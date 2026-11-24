@@ -2,6 +2,21 @@ extends RefCounted
 ## Английский перевод: русская строка -> английская. Сгенерировано из таблицы перевода.
 
 const EN := {
+	"Терраса с домино · +2 к уюту рядом": "Domino terrace · +2 comfort nearby",
+	"Читальный уголок · +2 к уюту рядом": "Reading corner · +2 comfort nearby",
+	"Рубашка с гибискусами": "Hibiscus shirt",
+	"Гуаябера": "Guayabera",
+	"Лайкра для сёрфинга": "Surf rash guard",
+	"Сарафан с каймой": "Border-print sundress",
+	"Солнечный козырёк": "Sun visor",
+	"Шляпа с лентой": "Ribbon fedora",
+	"Гибискус за ухом": "Hibiscus flower",
+	"Сумка через плечо": "Crossbody bag",
+	"Мозаика с фламинго": "Flamingo mosaic",
+	"Розовый фламинго на бирюзовой мозаике. Котики любят гулять вдоль узора.": "A pink flamingo on turquoise tiles. Cats enjoy walking along the pattern.",
+	"Столик домино": "Domino table",
+	"Стулья в тени полосатого зонта, на столе уже разложены костяшки.": "Chairs under a striped umbrella, with dominoes laid out on the table.",
+	"Прибрежный отель со ступенчатой башенкой и коралловыми балконами. Здесь останавливаются туристы.": "A coastal hotel with a stepped tower and coral balconies. Tourists stay here.",
 	"Пижама": "Pajamas",
 	"Пончо": "Poncho",
 	"Жилетка": "Vest",

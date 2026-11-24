@@ -1194,6 +1194,8 @@ func _render_info() -> void:
 		info_more.text = tr("Свернуть") if _info_full else tr("Подробнее")
 		if not _info_full:
 			lines = short
+		if world.patios.has(i):
+			lines.append(tr("Терраса с домино · +2 к уюту рядом") if o.t == "domino" else tr("Читальный уголок · +2 к уюту рядом"))
 		var uc: int = world.upgrade_cost(i) if o.build <= 0.0 else -1
 		info_up.visible = uc >= 0
 		if uc >= 0:

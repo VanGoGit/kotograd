@@ -82,6 +82,7 @@ var _touch_pending := false
 var junctions := {}
 var crosswalks := {}
 var crossings := {}
+var patios := {}             # клетка столика или скамейки -> направление к заведению
 var pairs := {}              # объединённые соседние здания: клетка -> "L" или "R"
 var ramps: Array = []
 var _light_clock := 0.0
@@ -419,6 +420,7 @@ func recalc() -> void:
 		"constructing": [], "builder_yards": [], "house_happy": {}, "food_prod": stats.get("food_prod", 0.0), "wonders": [], "lots": [], "tourists": [], "hubs": [],
 		"coin_cap": 3000.0, "food_cap": 150.0, "sinks": {}, "depots": [], "ports": [],
 	}
+	patios.clear()
 	var decor := []
 	var services := []
 	for i in W * H:
@@ -453,6 +455,15 @@ func recalc() -> void:
 			st.lots.append(i)
 		if d.has("happy") or o.has("decor"):
 			decor.append(i)
+			var furnishing: String = o.get("decor", o.t)
+			if furnishing in ["domino", "bench"]:
+				for dv in DIRS:
+					var neighbor = obj_at(i % W + dv.x, i / W + dv.y)
+					if neighbor == null or neighbor.build > 0.0:
+						continue
+					if (furnishing == "domino" and neighbor.t in ["cafe", "juicebar", "icecream"]) or (furnishing == "bench" and neighbor.t == "library"):
+						patios[i] = dv
+						break
 		if d.has("service"):
 			services.append(i)
 		if d.has("hub"):
@@ -473,6 +484,8 @@ func recalc() -> void:
 			var d := D.def(item.get("decor", item.t))
 			if center_of(di).distance_to(c) <= d.radius + 0.5:
 				v += float(d.happy if item.has("decor") else stat(item, "happy"))
+				if patios.has(di):
+					v += 2.0
 		for si in services:
 			var d := D.def(objs[si].t)
 			if center_of(si).distance_to(c) <= d.sradius:

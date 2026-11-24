@@ -35,6 +35,8 @@ const DEFS := {
 	"station": {"name": "Вокзал «Юнион»", "cost": 160, "unlock": 10, "size": 2, "jobs": 4, "job": "conductor", "hub": "rail", "need_rail": true, "nopad": true, "shop": 0.6, "service": 5, "sradius": 8, "build": 10.0, "up": [120, 240], "look": {"wall": "f2dcc0", "roof": "gable", "rc": "c8553d", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "train", "sc": "c8553d", "fg": "ffffff", "h": 30, "extra": ["tower"]}, "desc": "Большой вокзал с часовой башней. Ставьте вплотную к рельсам — поезд будет останавливаться здесь."},
 	"airport": {"name": "Аэропорт", "cost": 450, "unlock": 25, "size": 3, "jobs": 8, "job": "pilot", "hub": "air", "shop": 1.2, "tourism": 1.5, "build": 20.0, "look": {"wall": "e8eef4", "roof": "flat", "rc": "9aa6b8", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "h": 64, "extra": ["runway"]}, "desc": "Самолёты летают в другие аэропорты вашего города. Нужно хотя бы два аэропорта — иначе лететь некуда. Отлично связывает дальние острова!"},
 	"blvd": {"name": "Голливудский бульвар", "cost": 8, "unlock": 10, "walk": true, "paint": true, "desc": "Аллея славы: тёмная плитка с розовыми звёздами. Котики гуляют по ней быстрее, дома рядом уютнее, а вдоль бульвара можно выложить плитку с отпечатками лапок."},
+	"flamingotile": {"name": "Мозаика с фламинго", "cost": 8, "unlock": 0, "walk": true, "paint": true, "stroll": true, "happy": 3, "radius": 2, "desc": "Розовый фламинго на бирюзовой мозаике. Котики любят гулять вдоль узора."},
+	"domino": {"name": "Столик домино", "cost": 18, "unlock": 2, "walk": true, "stroll": true, "happy": 5, "radius": 3, "desc": "Стулья в тени полосатого зонта, на столе уже разложены костяшки."},
 	"pawtile": {"name": "Плитка с отпечатками лапок", "cost": 20, "unlock": 10, "walk": true, "stroll": true, "happy": 5, "radius": 3, "need_blvd": true, "desc": "Отпечатки лапок знаменитых котиков в цементе. Котики приходят их рассмотреть. Ставится только рядом с Голливудским бульваром."},
 	"path": {"name": "Пешеходная дорожка", "cost": 2, "unlock": 0, "walk": true, "paint": true, "desc": "Для прогулок пешком. Проложите короткий путь через квартал или к любимому парку."},
 
@@ -130,7 +132,7 @@ const DEFS := {
 	"autorepair": {"name": "Автосервис", "cost": 55, "unlock": 6, "jobs": 2, "job": "mechanic", "shop": 0.6, "build": 4.0, "look": {"wall": "d8d4cc", "roof": "flat", "rc": "6a6478", "win": "none", "wc": "9fd3e6", "door": "8a5a3b", "sign": "wrench", "sc": "ffd23f", "fg": "3b3b4a", "h": 22, "extra": ["garage_door"]}, "desc": "Меняем колёса и чиним моторы."},
 	"cardealer": {"name": "Автосалон", "cost": 150, "unlock": 14, "size": 2, "jobs": 4, "job": "cardealer", "shop": 1.6, "build": 8.0, "look": {"wall": "e8eef6", "roof": "flat", "rc": "5b8de4", "win": "glass", "wc": "cfe6f7", "door": "8a5a3b", "sign": "car", "sc": "5b8de4", "fg": "ffffff", "h": 32, "extra": ["lotcars"]}, "desc": "Новенькие кабриолеты с открытым верхом."},
 	"motel": {"name": "Мотель", "cost": 70, "unlock": 7, "jobs": 1, "job": "receptionist", "shop": 0.6, "tourism": 0.5, "build": 4.0, "look": {"wall": "ffe0a0", "roof": "flat", "rc": "5fbfb0", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "bed", "sc": "5fbfb0", "fg": "ffffff", "h": 24, "extra": ["neon"]}, "desc": "Придорожный мотель с неоновой вывеской."},
-	"hotel": {"name": "Отель", "cost": 220, "unlock": 16, "size": 2, "jobs": 6, "job": "concierge", "shop": 1.5, "tourism": 1.5, "build": 14.0, "up": [160, 320], "look": {"wall": "f4ead8", "roof": "flat", "rc": "c9a77a", "win": "grid", "wc": "fff1b0", "door": "8a5a3b", "sign": "star", "sc": "c9a77a", "fg": "ffffff", "h": 56, "extra": ["flag"]}, "desc": "Высокий отель с бассейном на крыше. Туристы!"},
+	"hotel": {"name": "Отель", "cost": 220, "unlock": 16, "size": 2, "jobs": 6, "job": "concierge", "shop": 1.5, "tourism": 1.5, "build": 14.0, "up": [160, 320], "look": {"wall": "f4ead8", "roof": "deco", "rc": "e89a96", "win": "grid", "wc": "60a5ab", "door": "44777e", "h": 56}, "desc": "Прибрежный отель со ступенчатой башенкой и коралловыми балконами. Здесь останавливаются туристы."},
 	"coworking": {"name": "Коворкинг", "cost": 70, "unlock": 6, "jobs": 3, "job": "freelancer", "shop": 0.8, "build": 5.0, "look": {"wall": "f2e6cc", "roof": "flat", "rc": "5fae73", "win": "glass", "wc": "9fd3e6", "door": "8a5a3b", "sign": "cup", "sc": "5fae73", "fg": "ffffff", "h": 26}, "desc": "Фрилансеры с ноутбуками и кофе."},
 	"bank": {"name": "Банк", "cost": 180, "unlock": 12, "size": 2, "jobs": 4, "job": "banker", "shop": 1.0, "store_coins": 8000, "build": 12.0, "up": [150, 300], "look": {"wall": "f4ead8", "roof": "gable", "rc": "c9b48a", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "dollar", "sc": "ffd23f", "fg": "3b7a4a", "h": 40, "extra": ["columns"]}, "desc": "Хранилище монеток: сильно поднимает лимит монет."},
 	"insurance": {"name": "Страховая компания", "cost": 90, "unlock": 9, "jobs": 3, "job": "insurer", "shop": 1.0, "build": 6.0, "look": {"wall": "d8e6f0", "roof": "flat", "rc": "3d5a98", "win": "grid", "wc": "9fd3e6", "door": "8a5a3b", "sign": "heart", "sc": "3d5a98", "fg": "ffffff", "h": 30}, "desc": "Страхуем хвосты от прищемления дверью."},
@@ -184,7 +186,7 @@ const DEFS := {
 
 const TABS := [
 	{"name": "Рельеф", "icon": "t_grass", "tools": ["t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow"]},
-	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "blvd", "pawtile", "parking", "garage", "rail", "platform", "station", "airport"]},
+	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "blvd", "pawtile", "flamingotile", "parking", "garage", "rail", "platform", "station", "airport"]},
 	{"name": "Жильё", "icon": "house", "tools": ["trailer", "house", "bungalow", "townhouse", "cottage", "villa", "mansion", "apartments", "condo"]},
 	{"name": "Магазины", "icon": "shop", "tools": ["shop", "techstore", "boutique", "bookstore", "toystore", "petshop", "florist", "pharmacy", "supermarket", "mall"]},
 	{"name": "Еда", "icon": "sushi", "tools": ["pier", "farm", "bakery", "cafe", "sushi", "pizzeria", "icecream", "burger", "tacotruck", "donut", "boba", "juicebar", "restaurant", "market"]},
@@ -193,7 +195,7 @@ const TABS := [
 	{"name": "Медиа", "icon": "cinema", "tools": ["cinema", "studio", "recording", "radio", "tvcenter", "newspaper", "theater"]},
 	{"name": "Промышленность", "icon": "factory", "tools": ["wheat", "cottonfield", "factory", "clothing", "warehouse", "cargoport", "powerplant", "solar", "waterplant", "recycling"]},
 	{"name": "Город", "icon": "townhall", "tools": ["townhall", "lifeguard", "post", "school", "police", "hospital", "fire", "library", "courthouse", "kindergarten", "university", "lab", "metro", "busstation", "taxidepot", "helipad"]},
-	{"name": "Отдых", "icon": "umbrella", "tools": ["umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "playground", "surf", "boatdock", "marina", "skatepark", "tennis", "volleyball", "arcade", "bowling", "nightclub", "aquarium", "zoo", "museum", "gallery"]},
+	{"name": "Отдых", "icon": "umbrella", "tools": ["umbrella", "bench", "domino", "cushion", "lantern", "cattree", "fountain", "playground", "surf", "boatdock", "marina", "skatepark", "tennis", "volleyball", "arcade", "bowling", "nightclub", "aquarium", "zoo", "museum", "gallery"]},
 	{"name": "Природа", "icon": "palm", "tools": ["flowers", "palm", "jacaranda", "statue", "billboard", "watertower"]},
 	{"name": "Достопримечательности", "icon": "observatory", "tools": ["sign", "urban_light", "pier_wheel", "bowl", "observatory", "chinese", "concert", "capitol", "stadium", "getty", "tower"]},
 ]
@@ -411,6 +413,10 @@ const TRAITS := {
 ## Гардероб: аксессуар поверх любого наряда (кроме формы со своим головным убором — на работе он главнее).
 ## hat — форма из HATS в sprites.gd, glasses / shades / scarf — флаги рисования.
 const ACCESSORIES := {
+	"visor": {"name": "Солнечный козырёк", "hat": "visor"},
+	"fedora": {"name": "Шляпа с лентой", "hat": "fedora"},
+	"hibiscus": {"name": "Гибискус за ухом", "hat": "hibiscus"},
+	"satchel": {"name": "Сумка через плечо", "satchel": true},
 	"sunhat": {"name": "Панама", "hat": "sunhat"},
 	"sailcap": {"name": "Бескозырка", "hat": "sailcap"},
 	"mushroom": {"name": "Грибная шляпка", "hat": "mushroom"},
@@ -428,6 +434,10 @@ const ACCESSORIES := {
 const ACC_COLORS := ["ff6b8b", "ff9fc0", "c8a8ff", "7fc4e8", "9ed8c8", "ffd75e", "ffffff", "e0483a", "c09347"]
 ## Гардероб: фасоны повседневной одежды (рисуются в sprites.outfit по ключу «wear:фасон:цвет»).
 const CLOTHES := {
+	"aloha": {"name": "Рубашка с гибискусами"},
+	"guayabera": {"name": "Гуаябера"},
+	"surfshirt": {"name": "Лайкра для сёрфинга"},
+	"sundress": {"female_only": true, "name": "Сарафан с каймой"},
 	"apron": {"name": "Фартук"},
 	"stripes": {"name": "Тельняшка"},
 	"vest": {"name": "Жилетка"},
@@ -515,7 +525,7 @@ const USES := {
 const STREET_DECOR := ["flowers", "palm", "jacaranda", "lantern", "bench", "umbrella", "cushion", "cattree", "statue"]
 const PAVED := ["road", "path", "blvd"]
 
-const NO_UPGRADE := ["road", "boatdock", "blvd", "pawtile", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
+const NO_UPGRADE := ["flamingotile", "domino", "road", "boatdock", "blvd", "pawtile", "highway", "path", "rail", "crossing", "flowers", "palm", "jacaranda", "wildpalm", "agave", "rock",
 	"bench", "umbrella", "cushion", "lantern", "cattree", "statue", "billboard"]
 
 

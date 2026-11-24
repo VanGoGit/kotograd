@@ -9,7 +9,7 @@ const T := D.T
 const WATER := D.WATER
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const INK := Color("3b2a3a")
-const FLAT := ["pawtile", "boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
+const FLAT := ["flamingotile", "pawtile", "boatdock", "parking", "tennis", "volleyball", "skatepark", "helipad"]
 const CHUNK := 16
 const CW := (W + CHUNK - 1) / CHUNK
 const CH := (H + CHUNK - 1) / CHUNK
@@ -100,6 +100,7 @@ func draw_world() -> void:
 		list.append([pc.py + 4.0, 2, pc])
 	list.sort_custom(func(a, b): return a[0] < b[0])
 	_draw_driveways(v)
+	_draw_patios(v)
 
 	for it in list:
 		match it[1]:
@@ -216,6 +217,33 @@ func _decor_offset(x: int, y: int) -> Vector2i:
 	return Vector2i(0, -14 if not world.is_road(x, y - 1) else -1)
 
 
+func _draw_patios(v: Array) -> void:
+	for i in world.patios:
+		var x: int = i % W
+		var y: int = i / W
+		if x < v[0] or x > v[2] or y < v[1] or y > v[3]:
+			continue
+		var o = world.objs[i]
+		var origin := Vector2(x * T, y * T)
+		var side: Vector2 = world.patios[i]
+		if o.t == "domino":
+			world.draw_rect(Rect2(origin, Vector2(T, T)), Color("e3b79b"))
+			for yy in [3, 8, 13]:
+				world.draw_rect(Rect2(origin + Vector2(0, yy), Vector2(T, 1)), Color("c99680"))
+			world.draw_rect(Rect2(origin + Vector2(5, 5) + side * 5, Vector2(6, 6)), Color("f6d9ac"))
+
+
+func _join_mosaic(x: int, y: int) -> void:
+	var origin := Vector2(x * T, y * T)
+	for dv in world.DIRS:
+		var neighbor = world.obj_at(x + dv.x, y + dv.y)
+		if neighbor == null or neighbor.t != "flamingotile":
+			continue
+		var center := origin + Vector2(8, 8) + Vector2(dv) * 7
+		var size := Vector2(2, 12) if dv.x != 0 else Vector2(12, 2)
+		world.draw_rect(Rect2(center - size / 2, size), Color("61ada8"))
+
+
 func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	if o.build > 0.0:
 		_draw_construction(o, x, y)
@@ -251,6 +279,13 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 		world.draw_set_transform_matrix(Transform2D.IDENTITY)
 		return
 	world.draw_texture(tx, Vector2(sx, sy))
+	if o.t == "bench" and world.patios.has(o.i):
+		var shelf := Vector2(sx + 10, sy + 10)
+		world.draw_rect(Rect2(shelf, Vector2(6, 4)), Color("80574c"))
+		world.draw_rect(Rect2(shelf + Vector2(1, -2), Vector2(2, 4)), Color("ef927b"))
+		world.draw_rect(Rect2(shelf + Vector2(3, -1), Vector2(2, 3)), Color("68bcb1"))
+	if o.t == "flamingotile":
+		_join_mosaic(x, y)
 	var mk = D.MAKES.get(o.t)
 	if mk != null and float(o.get("out", 0.0)) >= 4.0:
 		# готовые ящики с товаром у здания

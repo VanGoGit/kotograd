@@ -54,7 +54,7 @@ const ACHIEVEMENTS := [
 	{"id": "friends1", "name": "Не разлей вода", "desc": "Пусть два котика подружатся", "m": "friendships", "n": 1},
 	{"id": "friends25", "name": "Дружный город", "desc": "В городе 25 пар друзей", "m": "friendships", "n": 25},
 ]
-const DECOR := ["palm", "flowers", "jacaranda", "statue", "umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "billboard", "watertower"]
+const DECOR := ["flamingotile", "domino", "palm", "flowers", "jacaranda", "statue", "umbrella", "bench", "cushion", "lantern", "cattree", "fountain", "billboard", "watertower"]
 const NATURAL := ["wildpalm", "agave", "rock"]
 
 var world
