@@ -498,10 +498,8 @@ func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
 	for o in opts:
 		var w := 1.0
 		var ob = world.obj_at(o.x, o.y)
-		if ob != null and (ob.t == "path" or ob.t == "blvd"):
+		if ob != null and ob.t in ["path", "blvd", "road"]:
 			w *= 4.0
-		if ob != null and ob.t == "road":
-			w *= 0.6
 		if c.lx == o.x and c.ly == o.y:
 			w *= 0.25
 		if _standing_at(o.x, o.y, c):
@@ -632,7 +630,7 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 			var dy: float = tgt.y - c.y
 			var dist := sqrt(dx * dx + dy * dy)
 			var o = world.obj_at(tgt.x, tgt.y)
-			var sp := dt * (1.7 if o != null and (o.t == "path" or o.t == "blvd") else (1.4 if o != null and o.t == "road" else 1.1))
+			var sp := dt * (1.7 if o != null and o.t in ["path", "blvd", "road"] else 1.1)
 			if absf(dx) > 0.01:
 				c.dir = 1 if dx > 0 else -1
 			if dist <= sp:
@@ -672,7 +670,19 @@ func cat_pos(c: Dictionary) -> Vector2:
 				return Vector2(car.px, car.py)
 	if c.state == "in" and c.at >= 0 and world.objs[c.at] != null:
 		return world.center_of(c.at) * T + Vector2(8, 8)
-	return Vector2(c.x * T + 8, c.y * T + 14)
+	var tile := Vector2(c.x, c.y)
+	var start := Vector2i(tile.floor())
+	var end := Vector2i(tile.ceil())
+	return tile * T + Vector2(8, 14) + _pavement_offset(start).lerp(_pavement_offset(end), clampf(tile.distance_to(Vector2(start)), 0.0, 1.0))
+
+
+## На горизонтальной улице лапы уже у нижнего бордюра. На вертикальной идём по краю.
+func _pavement_offset(tile: Vector2i) -> Vector2:
+	if world.is_road(tile.x, tile.y):
+		if world.is_road(tile.x, tile.y + 1) or world.is_road(tile.x, tile.y - 1):
+			var side := -6 if world.is_road(tile.x + 1, tile.y) else 6
+			return Vector2(side, 0)
+	return Vector2.ZERO
 
 
 func activity_text(c: Dictionary) -> String:

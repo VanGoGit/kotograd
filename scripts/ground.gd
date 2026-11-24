@@ -252,7 +252,7 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 	var lf := world.is_road(x - 1, y) or (world.is_highway(x - 1, y) and not world.is_road(x, y - 1) and not world.is_road(x, y + 1))
 	var rt := world.is_road(x + 1, y) or (world.is_highway(x + 1, y) and not world.is_road(x, y - 1) and not world.is_road(x, y + 1))
 	var asph := "7a7888"
-	var curb := "b8b6c4"
+	var curb := "d8c7ac"
 	var line := "f4ecd0"
 	if water:
 		_r(px, py, 0, 0, 16, 16, "6cc1e0")
@@ -271,10 +271,10 @@ func _draw_road(px: int, py: int, x: int, y: int, water: bool) -> void:
 		if up and rt: _r(px, py, 15, 0, 1, 1, asph)
 		if dn and lf: _r(px, py, 0, 15, 1, 1, asph)
 		if dn and rt: _r(px, py, 15, 15, 1, 1, asph)
-		if not up: _r(px, py, 1, 1, 14, 1, curb)
-		if not dn: _r(px, py, 1, 14, 14, 1, curb)
-		if not lf: _r(px, py, 1, 1, 1, 14, curb)
-		if not rt: _r(px, py, 14, 1, 1, 14, curb)
+		if not up: _r(px, py, 0, 0, 16, 2, curb)
+		if not dn: _r(px, py, 0, 14, 16, 2, curb)
+		if not lf: _r(px, py, 0, 0, 2, 16, curb)
+		if not rt: _r(px, py, 14, 0, 2, 16, curb)
 	var n := int(up) + int(dn) + int(lf) + int(rt)
 	if not water and world.is_crosswalk(x, y):
 		# «зебра» поперёк дороги

@@ -23,11 +23,8 @@ func _init(w) -> void:
 func _tile_cost(i: int) -> float:
 	var o = world.objs[i]
 	if o != null:
-		if o.t == "path" or o.t == "blvd":
+		if o.t in ["path", "blvd", "road"]:
 			return 1.0
-		if o.t == "road":
-			# по проезжей части котики не гуляют — только переходят её, лучше по зебре
-			return 4.0 if world.crosswalks.has(i) else 30.0
 		if o.t == "rail" or o.t == "crossing":
 			return 30.0
 		return 1.6

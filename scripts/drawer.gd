@@ -160,6 +160,9 @@ func _scan_buildings(v: Array) -> void:
 		for x in range(v[0], v[2] + 1):
 			var i := y * W + x
 			var o = world.objs[i]
+			if o != null and o.has("decor"):
+				var prop := {"i": i, "t": o.decor, "v": o.v, "w": 1, "build": 0.0, "offset": _decor_offset(x, y)}
+				_scan.append([(y + 1) * T + prop.offset.y, 0, prop, x, y])
 			if o != null and o.i == i and o.t != "path" and o.t != "blvd" and o.t != "road" and world.pairs.get(i, "") != "R":
 				# плоские постройки (парковки, корты) — часть земли: котики и машины поверх них
 				_scan.append([(y * T - 8.0) if FLAT.has(o.t) else float((y + o.w) * T), 0, o, x, y])
@@ -202,6 +205,16 @@ func _draw_crossings(v: Array) -> void:
 					world.draw_rect(Rect2(post.x + 1, post.y - 7 - s, 1, 1), Color("e0483a") if s % 2 == 0 else Color("f4f4f8"))
 
 
+func _garden_offset(x: int, y: int) -> Vector2i:
+	return Vector2i(roundi(world.hashf(x, y, 21) * 6) - 3, -roundi(world.hashf(x, y, 22) * 5))
+
+
+func _decor_offset(x: int, y: int) -> Vector2i:
+	if world.is_road(x, y - 1) or world.is_road(x, y + 1):
+		return Vector2i(-7 if not world.is_road(x - 1, y) else 7, -6)
+	return Vector2i(0, -14 if not world.is_road(x, y - 1) else -1)
+
+
 func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	if o.build > 0.0:
 		_draw_construction(o, x, y)
@@ -222,6 +235,11 @@ func _draw_obj(o: Dictionary, x: int, y: int, h: float) -> void:
 	var span: int = 2 if paired else o.w
 	var sx: int = x * T + (span * T - tx.get_width()) / 2
 	var sy: int = (y + o.w) * T - tx.get_height()
+	var offset: Vector2i = o.get("offset", Vector2i.ZERO)
+	if o.t in D.STREET_DECOR and not o.has("offset"):
+		offset = _garden_offset(x, y)
+	sx += offset.x
+	sy += offset.y
 	if WINDY.has(o.t) and absf(world.wind) > 0.02:
 		# пальма чуть покачивается на ветру: верхушка смещается, корни на месте
 		var ph := world.hashf(x, y, 31) * TAU
@@ -316,10 +334,11 @@ func _cat_texture(c: Dictionary) -> Texture2D:
 
 func _draw_cat(c: Dictionary) -> void:
 	var tx := _cat_texture(c)
-	var sx := roundi(c.x * T + 3)
-	var sy := roundi(c.y * T - 1) - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
+	var feet := world.cats_ai.cat_pos(c)
+	var sx := roundi(feet.x) - 5
+	var sy := roundi(feet.y) - 15 - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
-	world.draw_texture(tx, Vector2(sx, sy))
+	_draw_small_cat(tx, sx, sy)
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:
 		var bob := roundi(sin(world.anim_time * 5.0) * 1.5)
 		world.draw_texture(world.spr.small.heart, Vector2(sx + 3, sy - 4 + bob))
@@ -328,6 +347,12 @@ func _draw_cat(c: Dictionary) -> void:
 
 
 ## Облачко желания: белый пузырь с хвостиком и значком — куда котик хочет или что ему нужно.
+func _draw_small_cat(tx: Texture2D, sx: int, sy: int, tint := Color.WHITE) -> void:
+	var size := (tx.get_size() * 0.75).round()
+	world.draw_texture_rect(tx, Rect2(Vector2(sx + 1, sy + 4), size), false, tint)
+
+
+## Облачко желания: белый пузырь с хвостиком — куда котик хочет или что ему нужно.
 func _draw_wish(w: Dictionary, x: int, y: int) -> void:
 	world.draw_rect(Rect2(x, y, 11, 9), INK)
 	world.draw_rect(Rect2(x + 1, y + 1, 9, 7), Color.WHITE)
@@ -371,7 +396,7 @@ func _draw_visitor(v: Dictionary) -> void:
 		sy -= int(v.anim * 3.0) % 2  # пританцовывают
 	var m := Color(1, 1, 1, clampf(v.fade, 0.0, 1.0))
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2 * m.a))
-	world.draw_texture(tx, Vector2(sx, sy), m)
+	_draw_small_cat(tx, sx, sy, m)
 
 
 ## Флажки-гирлянда над местом праздника.
@@ -736,7 +761,15 @@ func _draw_ghost() -> void:
 	world.draw_rect(Rect2(tx * T, ty * T, w * T, w * T), Color(0.5, 1, 0.63, 0.35) if r.ok else Color(1, 0.35, 0.43, 0.35))
 	if world.tool != "path" and world.tool != "blvd" and world.tool != "road" and not d.has("terra"):
 		var img: Texture2D = world.spr.tool_texture(world.tool)
-		world.draw_texture(img, Vector2(tx * T + (w * T - img.get_width()) / 2, (ty + w) * T - img.get_height()), Color(1, 1, 1, 0.7))
+		var off := Vector2i.ZERO
+		var base = world.obj_at(tx, ty)
+		if world.tool in D.STREET_DECOR:
+			img = world.spr.obj_texture({"t": world.tool, "v": base.v if base != null else 0})
+			if base != null and base.t in D.PAVED:
+				off = _decor_offset(tx, ty)
+			else:
+				off = _garden_offset(tx, ty)
+		world.draw_texture(img, Vector2(off) + Vector2(tx * T + (w * T - img.get_width()) / 2, (ty + w) * T - img.get_height()), Color(1, 1, 1, 0.7))
 
 
 func _draw_particles() -> void:

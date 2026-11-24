@@ -122,7 +122,9 @@ func _metrics() -> Dictionary:
 			m.shops += 1
 		if d.has("service"):
 			m.services += 1
-		if DECOR.has(o.t):
+		if o.has("decor"):
+			kinds[o.decor] = true
+		if DECOR.has(o.get("decor", o.t)):
 			m.decor += 1
 		var lvl := int(o.get("lvl", 1))
 		if lvl >= 2:

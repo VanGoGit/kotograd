@@ -52,6 +52,8 @@ func _run() -> void:
 	print("— построено видов построек: %d" % kinds.size())
 	_check(kinds.size() >= 25, "в городе больше 25 видов построек")
 
+	_check_street(w)
+
 	var t0 := Time.get_ticks_msec()
 	w.speed = 10
 	var day0: int = w.day
@@ -98,6 +100,33 @@ func _run() -> void:
 	main.free()
 	print("ИТОГ: %s" % ("всё в порядке" if fails == 0 else "ошибок: %d" % fails))
 	quit(1 if fails > 0 else 0)
+
+
+## Одна улица даёт прямой маршрут и пешеходу, и машине.
+func _check_street(w) -> void:
+	for y in w.H:
+		for x in range(w.W - 4):
+			if not range(5).all(func(dx): return w.is_road(x + dx, y)):
+				continue
+			var start: int = y * w.W + x
+			w.tool = "bulldoze"
+			if w.objs[start].has("decor"):
+				w.apply_tool(x, y, true)
+			w.tool = "lantern"
+			w.apply_tool(x, y, true)
+			_check(w.objs[start].get("decor") == "lantern", "фонарь помещается на улице")
+			w.tool = "bulldoze"
+			w.apply_tool(x, y, true)
+			_check(w.is_road(x, y) and not w.objs[start].has("decor"), "после снятия фонаря улица остаётся")
+			w.tool = "bench"
+			w.apply_tool(x, y, true)
+			w.tool = "hand"
+			var goal := {start + 4: true}
+			var walk = w.paths.walk_path(x, y, goal)
+			_check(w.foot_ok(start) and walk != null and walk.size() == 4, "котик проходит по встроенному тротуару")
+			_check(w.paths.road_route([start], goal) != null, "по той же улице проезжает машина")
+			return
+	_check(false, "в тестовом городе есть прямая улица")
 
 
 ## Печатает первые расхождения двух сохранений — чтобы сразу видеть, какое поле теряется.

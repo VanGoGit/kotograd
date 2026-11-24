@@ -2,6 +2,7 @@ extends RefCounted
 ## Английский перевод: русская строка -> английская. Сгенерировано из таблицы перевода.
 
 const EN := {
+	"Можно поставить прямо на тротуаре или дорожке.": "Place directly on a sidewalk or footpath.",
 	"Котоград": "Kotograd",
 	"Монетки": "Coins",
 	"Еда для котиков": "Food for the cats",
@@ -91,7 +92,7 @@ const EN := {
 	"• Жильё — домики, коттеджи, виллы и многоэтажки. Сколько мест в домах — столько котиков в городе.": "• Housing — little houses, cottages, villas and apartment blocks. The more home spaces, the more cats in the city.",
 	"• Работа и бизнес — котики сами устраиваются на работу и надевают форму: блогеры, разработчики в худи, актёры, серферы, строители в касках…": "• Work and business — cats find jobs on their own and wear uniforms: bloggers, developers in hoodies, actors, surfers, builders in hard hats…",
 	"• Город — мэрия, школа, больница, полиция, почта. Делают районы уютнее, а их машины разъезжают по улицам.": "• City — city hall, school, hospital, police, post office. They make neighbourhoods cosier, and their vehicles drive around the streets.",
-	"• Дороги — двусторонние, по ним котики утром едут на работу, а вечером домой. Дом и работа должны стоять у дороги. Пешком котики ходят по тротуарам и только переходят дорогу.": "• Roads — two-way; cats drive to work in the morning and home in the evening. Homes and workplaces must stand next to a road. On foot, cats walk on sidewalks and only cross roads.",
+	"• Проведите улицу вдоль домов. Тротуары появятся вместе с ней. Для прогулки через парк можно проложить отдельную дорожку.": "• Build a street beside the houses. Sidewalks come with it. Add a footpath for a walk through the park.",
 	"• Магистраль — по 2 полосы в каждую сторону: быстро и с обгонами. Здания к ней не подключаются: подведите обычную дорогу вплотную — на стыке появится съезд с зелёным указателем.": "• Highway — 2 lanes each way: fast, with overtaking. Buildings do not connect to it: bring a regular road right up to it — an on-ramp with a green sign appears at the junction.",
 	"• Перекрёстки — где сходятся 3–4 дороги, сами появляются светофоры и пешеходные зебры: машины ждут зелёного, а котики переходят по зебре.": "• Intersections — where 3–4 roads meet, traffic lights and zebra crossings appear by themselves: cars wait for green, and cats cross at the zebra.",
 	"• Поезда — проложите рельсы и поставьте вплотную к ним вокзал или платформу (минимум две). Поезд будет ходить сам, а котики — ездить в другие районы. Рельсы через дорогу — переезд со шлагбаумом.": "• Trains — lay rails and place a station or platform right next to them (at least two). The train runs by itself, and cats ride it to other districts. Rails across a road make a level crossing with a barrier.",
@@ -370,7 +371,7 @@ const EN := {
 	"Цветущий луг с маками. Бесплатно.": "A blooming meadow with poppies. Free.",
 	"Вода": "Water",
 	"Убрать сушу: здесь снова будет вода. Бесплатно. Под дорогой получится мост.": "Remove land: there will be water here again. Free. Under a road it becomes a bridge.",
-	"Дорога (2 полосы)": "Road (2 lanes)",
+	"Улица": "Street",
 	"Парковка": "Parking lot",
 	"Стоянка на 4 машины у дороги. Котики оставляют здесь машины и идут пешком. Без парковок машины стоят прямо на дорогах — бывают пробки!": "A lot for 4 cars by the road. Cats leave their cars here and walk. Without parking, cars stand right on the roads — traffic jams happen!",
 	"Паркинг": "Parking garage",
@@ -901,7 +902,7 @@ const EN := {
 	"Уютный остров с холмом посередине и бухточками, а рядом ещё три островка.": "A cosy island with a hill in the middle and little coves, plus three small islands nearby.",
 	"Котик приехал! Нажмите на него, чтобы погладить.": "A cat has arrived! Click it to give it a pet.",
 	"Поставьте первый домик: вкладка «Жильё» внизу, затем «Домик» — и нажмите на зелёную клетку.": "Place your first house: the «Housing» tab below, then «Little house» — and click a green tile.",
-	"Теперь проведите дорогу рядом с домиком: вкладка «Транспорт» → «Дорога». Зажмите и ведите.": "Now lay a road next to the house: the «Transport» tab → «Road». Hold and drag.",
+	"Выберите «Улица» во вкладке «Транспорт» и проведите её рядом с домиком. Тротуары уже по краям.": "Choose Street in the Transport tab and drag beside the house. The sidewalks are already there.",
 	"Готово! Скоро в домик переедет первый котик…": "Done! The first cat will move in soon…",
 	"Пропустить подсказки": "Skip hints",
 	"Улучшить до уровня %d": "Upgrade to level %d",
@@ -961,9 +962,9 @@ const EN := {
 	"До дороги пара шагов — жители доходят до машины пешком.": "The road is a few steps away — residents walk to their cars.",
 	"Дорога далеко — жители ходят пешком.": "The road is far — residents go on foot.",
 	"Совет: дорога, клумбы и городские службы рядом делают дом уютнее.": "Tip: a road, flower beds and city services nearby make a home cozier.",
-	"Тротуар": "Sidewalk",
-	"По тротуару котики ходят быстрее. Положите его между дорогой и домами — машина выедет от дома прямо через тротуар.": "Cats walk faster on sidewalks. Put one between the road and the houses — cars will drive out of a house right across it.",
-	"По дорогам котики ездят на машинах на работу и домой. Дом можно поставить прямо у дороги или за тротуаром. На воде получается мост (8 мон.).": "Cats drive to work and back home on roads. A house can stand right by the road or behind a sidewalk. On water it becomes a bridge (8 coins).",
+	"Пешеходная дорожка": "Footpath",
+	"Для прогулок пешком. Проложите короткий путь через квартал или к любимому парку.": "For walks. Make a shortcut through a block or a path to a favorite park.",
+	"Машины едут по центру, котики гуляют по тротуарам вдоль улицы. На воде получится мост (8 мон.).": "Cars use the middle and cats walk along the sidewalks. On water this becomes a bridge (8 coins).",
 	# карточка котика и гардероб
 	"Лучшие друзья: ": "Best friends: ",
 	"Футболка": "T-shirt",

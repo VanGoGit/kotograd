@@ -1455,7 +1455,9 @@ func _make_icons() -> void:
 		p.P(3, 7, "d3c1b0"); p.P(9, 9, "d3c1b0"); p.P(12, 6, "f7efe4"); p.P(6, 9, "f7efe4")
 	, false)
 	icons["road"] = drawn(16, 16, func(p: Painter) -> void:
-		p.R(0, 2, 16, 12, "7a7888"); p.R(0, 2, 16, 1, "b8b6c4"); p.R(0, 13, 16, 1, "b8b6c4")
+		p.R(0, 2, 16, 12, "7a7888")
+		p.R(0, 2, 16, 2, "d8c7ac")
+		p.R(0, 12, 16, 2, "d8c7ac")
 		p.R(1, 7, 4, 1, "f4ecd0"); p.R(9, 7, 4, 1, "f4ecd0")
 	, false)
 	icons["blvd"] = drawn(16, 16, func(p: Painter) -> void:

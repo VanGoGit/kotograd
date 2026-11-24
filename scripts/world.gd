@@ -389,14 +389,14 @@ func upgrade(b: int) -> bool:
 func walkable_idx(i: int) -> bool:
 	var o = objs[i]
 	if o != null:
-		return D.def(o.t).get("walk", false)
+		return o.t in D.STREET_DECOR or D.def(o.t).get("walk", false)
 	return terrain[i] != WATER
 
 
 ## Пешеходу можно стоять/идти здесь, не выходя на проезжую часть.
 func foot_ok(i: int) -> bool:
 	var o = objs[i]
-	if o != null and (o.t == "road" or o.t == "rail" or o.t == "crossing"):
+	if o != null and (o.t == "rail" or o.t == "crossing"):
 		return false
 	return walkable_idx(i)
 
@@ -440,7 +440,7 @@ func recalc() -> void:
 		st.food_cap += float(stat(o, "store_food", 0))
 		if d.get("leisure", false):
 			st.leisure.append(i)
-		if d.get("stroll", false):
+		if d.get("stroll", false) or D.def(o.get("decor", "")).get("stroll", false):
 			st.strolls.append(i)
 		if d.has("vehicle"):
 			st.vehicle_bases.append(i)
@@ -450,7 +450,7 @@ func recalc() -> void:
 			st.wonders.append(i)
 		if d.has("parking"):
 			st.lots.append(i)
-		if d.has("happy"):
+		if d.has("happy") or o.has("decor"):
 			decor.append(i)
 		if d.has("service"):
 			services.append(i)
@@ -468,9 +468,10 @@ func recalc() -> void:
 		var c := center_of(h)
 		var v := 30.0
 		for di in decor:
-			var d := D.def(objs[di].t)
+			var item = objs[di]
+			var d := D.def(item.get("decor", item.t))
 			if center_of(di).distance_to(c) <= d.radius + 0.5:
-				v += float(stat(objs[di], "happy"))
+				v += float(d.happy if item.has("decor") else stat(item, "happy"))
 		for si in services:
 			var d := D.def(objs[si].t)
 			if center_of(si).distance_to(c) <= d.sradius:
@@ -1163,8 +1164,12 @@ func can_place(t: String, x: int, y: int) -> Dictionary:
 			if not in_map(xx, yy):
 				return {"ok": false, "reason": tr("Не помещается")}
 			var i := yy * W + xx
-			if objs[i] != null:
-				return {"ok": false, "reason": tr("Здесь занято")}
+			var existing = objs[i]
+			if existing != null:
+				var add_decor: bool = t in D.STREET_DECOR and existing.t in D.PAVED and not existing.has("decor")
+				var pave: bool = t in D.PAVED and existing.t in D.STREET_DECOR
+				if not add_decor and not pave:
+					return {"ok": false, "reason": tr("Здесь занято")}
 			if terrain[i] == WATER:
 				water += 1
 	var high := 0
@@ -1231,7 +1236,8 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 		return
 	var here = objs[y * W + x]
 	if here != null and ((tool == "rail" and here.t == "road") or (tool == "road" and here.t == "rail")):
-		_make_crossing(x, y)
+		if not here.has("decor"):
+			_make_crossing(x, y)
 		return
 	var r := can_place(tool, x, y)
 	if not r.ok:
@@ -1244,7 +1250,13 @@ func apply_tool(x: int, y: int, first: bool) -> void:
 		_terraform(x, y, d.terra)
 		return
 	coins -= r.cost
-	place_obj(y * W + x, tool, randi() % 1000, d.get("build", 0.0))
+	if here != null and tool in D.STREET_DECOR:
+		here.decor = tool
+		objs_version += 1
+	else:
+		var placed := place_obj(y * W + x, tool, randi() % 1000, d.get("build", 0.0))
+		if here != null and here.t in D.STREET_DECOR:
+			placed.decor = here.t
 	var w := D.size_of(tool)
 	# большое здание — тёплое арпеджио, мелочь — привычный «поп»
 	sound.play("build" if w >= 2 else "pop", 1.0, -6.0 if w >= 2 else -4.0)
@@ -1274,6 +1286,13 @@ func _make_crossing(x: int, y: int) -> void:
 func _bulldoze(x: int, y: int, first: bool) -> void:
 	var o = obj_at(x, y)
 	if o == null:
+		return
+	if o.has("decor"):
+		coins += int(D.def(o.decor).cost / 2)
+		o.erase("decor")
+		objs_version += 1
+		sound.play("dig")
+		recalc()
 		return
 	var d := D.def(o.t)
 	if d.get("natural", false) and unlimited:
@@ -1620,8 +1639,9 @@ func cat_at(wp: Vector2):
 	for c in cats:
 		if c.state == "in" or c.state == "drive" or c.state == "ride":
 			continue
-		var sx: float = c.x * T + 3
-		var sy: float = c.y * T - 1
+		var feet := cats_ai.cat_pos(c)
+		var sx := feet.x - 5
+		var sy := feet.y - 15
 		if wp.x >= sx - 2 and wp.x <= sx + 12 and wp.y >= sy and wp.y <= sy + 17:
 			if best == null or c.y > best.y:
 				best = c

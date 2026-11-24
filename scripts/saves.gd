@@ -74,7 +74,7 @@ func serialize() -> String:
 	for i in W * H:
 		var o = world.objs[i]
 		if o != null and o.i == i:
-			var m := [i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), -1]
+			var m := [i, o.t, o.v, snappedf(o.build, 0.1), int(o.get("lvl", 1)), o.get("decor", -1)]
 			if o.has("stock") or o.has("out"):
 				var st := {}
 				for g in o.get("stock", {}):
@@ -305,6 +305,8 @@ func _apply_save(d: Dictionary) -> void:
 		if not D.DEFS.has(str(m[1])):
 			continue
 		var o := world.place_obj(int(m[0]), str(m[1]), int(m[2]), float(m[3]))
+		if m.size() > 5 and m[5] in D.STREET_DECOR and o.t in D.PAVED:
+			o.decor = m[5]
 		if m.size() > 4:
 			o["lvl"] = int(m[4])
 		if m.size() > 6 and typeof(m[6]) == TYPE_DICTIONARY:
