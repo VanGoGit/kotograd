@@ -124,6 +124,7 @@ var _wind_to := 0.0
 var _wind_t := 8.0
 var mobile := false              # телефон или планшет в браузере: 30 кадров и реже тяжёлые расчёты
 var _had_goals := false
+var follow_cat = null
 var _pan_active := false
 var _pan_moved := false
 var _pan_button := 0
@@ -1483,6 +1484,12 @@ func _process(delta: float) -> void:
 	var dt := minf(0.1, delta)
 	anim_time += dt
 	_key_pan(dt)
+	if follow_cat != null:
+		if not cats.has(follow_cat) or ui.title_open():
+			follow_cat = null
+		else:
+			cam.position = cam.position.lerp(cats_ai.cat_pos(follow_cat), 1.0 - exp(-4.0 * dt))
+			clamp_cam()
 	# на больших скоростях считаем мелкими шагами, чтобы машины не «перепрыгивали»
 	var gdt := dt * speed
 	while gdt > 0.0:
@@ -1581,6 +1588,7 @@ func _apply_zoom() -> void:
 
 
 func center_cam(tx: float, ty: float) -> void:
+	follow_cat = null
 	cam.position = Vector2(tx * T + 8, ty * T + 8)
 	clamp_cam()
 
@@ -1624,6 +1632,7 @@ func _key_pan(dt: float) -> void:
 	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 		dv.y += sp
 	if dv != Vector2.ZERO:
+		follow_cat = null
 		cam.position += dv
 		clamp_cam()
 
@@ -1724,6 +1733,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if absf(dlt.x) + absf(dlt.y) > 5.0:
 				_pan_moved = true
 			if _pan_moved:
+				follow_cat = null
 				cam.position = _pan_cam - dlt / float(zoom)
 				clamp_cam()
 		elif _painting:
@@ -1750,6 +1760,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif g.factor < 0.95:
 			set_zoom(zoom - 1, g.position)
 	elif event is InputEventPanGesture:
+		follow_cat = null
 		cam.position += (event as InputEventPanGesture).delta * 8.0 / float(zoom)
 		clamp_cam()
 	elif event is InputEventKey and event.pressed and not event.echo:
@@ -1793,6 +1804,7 @@ func _pinch_move() -> void:
 	var b: Vector2 = pts[1]
 	var mid := (a + b) / 2.0
 	var d := maxf(1.0, a.distance_to(b))
+	follow_cat = null
 	cam.position -= (mid - _pinch_mid) / float(zoom)
 	_pinch_mid = mid
 	clamp_cam()
@@ -1816,13 +1828,14 @@ func _update_cursor() -> void:
 
 
 func _click(wp: Vector2) -> void:
+	follow_cat = null
 	var c = cat_at(wp)
 	if c != null:
 		cats_ai.pet_cat(c)
 		info_target = {"cat": c}
 		return
 	var o = obj_at(mouse_tile.x, mouse_tile.y)
-	if o != null and o.t != "path" and o.t != "blvd" and o.t != "road":
+	if o != null and o.t != "path" and o.t != "blvd":
 		info_target = {"tile": o.i}
 	else:
 		info_target = null
@@ -1833,6 +1846,8 @@ func select_tool(t: String) -> void:
 	if not d.is_empty() and not unlimited and max_cats < d.get("unlock", 0):
 		ui.toast(tr("«%s» откроется, когда в городе будет %d котиков") % [tr(d.name), d.unlock])
 		return
+	if t != "hand":
+		follow_cat = null
 	tool = t
 	ui.refresh_tools()
 

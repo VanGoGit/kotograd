@@ -121,12 +121,29 @@ func _check_street(w) -> void:
 			w.tool = "bench"
 			w.apply_tool(x, y, true)
 			w.tool = "hand"
+			_check_bench_visit(w, x, y)
 			var goal := {start + 4: true}
 			var walk = w.paths.walk_path(x, y, goal)
 			_check(w.foot_ok(start) and walk != null and walk.size() == 4, "котик проходит по встроенному тротуару")
 			_check(w.paths.road_route([start], goal) != null, "по той же улице проезжает машина")
 			return
 	_check(false, "в тестовом городе есть прямая улица")
+
+
+## Друг проходит мимо занятой лавочки и садится на свободное место.
+func _check_bench_visit(w, x: int, y: int) -> void:
+	var host := {"id": -101, "state": "idle", "seat": -1, "x": x, "y": y, "timer": 12.0}
+	var guest := {"id": -102, "state": "idle", "x": x + 1, "y": y, "friends": {-101: 40.0}}
+	w.cats.append(host)
+	w.cats.append(guest)
+	w.cats_ai._wander_step(guest, Vector2(x, y), 1.0)
+	_check(guest.get("dest", {}).get("kind") == "bench_visit", "друг подходит к лавочке")
+	guest.x = x
+	w.cats_ai._walk_done(guest)
+	_check(guest.get("seat") == 1 and host.timer == guest.timer, "котики отдыхают вместе")
+	_check(w.cats_ai.cat_pos(guest) != w.cats_ai.cat_pos(host), "у каждого своё место")
+	w.cats.erase(guest)
+	w.cats.erase(host)
 
 
 ## Печатает первые расхождения двух сохранений — чтобы сразу видеть, какое поле теряется.

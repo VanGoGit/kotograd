@@ -33,6 +33,18 @@ func _run() -> void:
 	_check(w.saves.serialize() == city, "после загрузки город тот же")
 	_check(w.cats.size() > 0 and w.city_name == "Тестоград", "котики и название на месте")
 
+	var old_city: Dictionary = JSON.parse_string(city)
+	var resident: Dictionary = old_city.cats[0]
+	resident.erase("sex")
+	resident.name = "Барсик"
+	resident.cloth = "dots"
+	_check(w.saves.deserialize(JSON.stringify(old_city)), "город без поля пола загружается")
+	_check(w.cats[0].sex == "female" and w.cats[0].cloth == "dots", "старое платье сохраняется")
+	resident.cloth = "tee"
+	_check(w.saves.deserialize(JSON.stringify(old_city)), "старый город с обычной одеждой загружается")
+	w.cats_ai.set_look(w.cats[0], "cloth", "dress")
+	_check(w.cats[0].sex == "male" and w.cats[0].cloth == "tee", "гардероб учитывает пол после загрузки")
+
 	print("— 2. Обрезанный файл восстанавливается из .bak и не затирается")
 	var cut := city.substr(0, city.length() / 2)
 	_write(PATH, cut)

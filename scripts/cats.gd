@@ -52,6 +52,7 @@ func spawn_cat() -> void:
 		"lx": -1, "ly": -1, "car_lot": -1, "car_tile": -1, "car_dir": "r", "near_car": false,
 		"wish": null, "wish_next": world.abs_hour() + randf_range(1.0, 6.0), "friends": {},
 	}
+	c["sex"] = D.sex_for_name(c.name)
 	world.social.give_traits(c)
 	world.next_id += 1
 	world.cats.append(c)
@@ -109,6 +110,8 @@ func _work_hours(c: Dictionary) -> bool:
 func set_look(c: Dictionary, what: String, value) -> void:
 	match what:
 		"cloth":
+			if not D.can_wear(c.sex, str(value)):
+				return
 			c["cloth"] = str(value)
 			c["style"] = ""
 			if not c.has("cloth_col"):
@@ -152,7 +155,7 @@ func _city_style() -> String:
 func profession(c: Dictionary) -> String:
 	if c.job >= 0 and world.objs[c.job] != null:
 		return tr(D.PROFESSIONS.get(D.def(world.objs[c.job].t).get("job", ""), ""))
-	return tr("Ищет работу")
+	return tr("Отдыхает")
 
 
 func _near(list: Array, c: Dictionary, dist: float) -> Array:
@@ -442,6 +445,8 @@ func _go_to(c: Dictionary, d: Dictionary, allow_car := true) -> void:
 					g[y * W + x] = true
 		if world.objs[d.sb] != null:
 			g.merge(world.paths.goals_around(d.sb))
+		if _is_bench(d.tx, d.ty):
+			g = {d.ty * W + d.tx: true}
 		path = world.paths.walk_path(sx, sy, g) if g.size() > 0 else null
 	elif d.has("b") and d.b >= 0 and world.objs[d.b] != null:
 		path = world.paths.walk_path(sx, sy, world.paths.goals_around(d.b))
@@ -472,7 +477,22 @@ static func _to_set(arr: Array) -> Dictionary:
 	return s
 
 
+func _is_bench(x: int, y: int) -> bool:
+	var o = world.obj_at(x, y)
+	return o != null and o.get("decor", o.t) == "bench"
+
+
 func _wander_step(c: Dictionary, anchor: Vector2, rad: float) -> void:
+	for friend in world.social.friends_of(c):
+		if friend.state != "idle" or friend.get("seat", 0) != -1 or friend.timer < 2.0:
+			continue
+		var tile := Vector2i(roundi(friend.x), roundi(friend.y))
+		if absf(tile.x - c.x) + absf(tile.y - c.y) == 1 and _is_bench(tile.x, tile.y):
+			c.path = [tile]
+			c.pi = 0
+			c.dest = {"kind": "bench_visit"}
+			c.state = "walk"
+			return
 	var cx := roundi(c.x)
 	var cy := roundi(c.y)
 	var opts := []
@@ -560,9 +580,23 @@ func _walk_done(c: Dictionary) -> void:
 		c.state = "sleep"
 		c.timer = randf_range(8, 16)
 		return
-	if o != null and o.t == "bench" and daytime and randf() < 0.6:
-		c.timer = randf_range(4, 9)
-		return
+	if _is_bench(roundi(c.x), roundi(c.y)):
+		var occupied := false
+		for other in world.cats:
+			if other != c and other.state == "idle" and other.has("seat") and other.x == c.x and other.y == c.y:
+				occupied = true
+				if other.seat == -1 and d != null and d.kind == "bench_visit" and other in world.social.friends_of(c):
+					c.seat = 1
+					other.seat = -2
+					c.dir = -1
+					other.dir = 1
+					c.timer = randf_range(6, 10)
+					other.timer = c.timer
+					return
+		if not occupied and randf() < 0.65:
+			c.seat = -1
+			c.timer = randf_range(8, 16)
+			return
 	c.timer = randf_range(1.2, 3.5) if randf() < 0.22 else 0.0
 	# на этой клетке уже кто-то стоит — отойти на соседнюю свободную
 	if _standing_at(roundi(c.x), roundi(c.y), c):
@@ -608,16 +642,19 @@ func _update_cat(c: Dictionary, dt: float) -> void:
 				c.state = "idle"
 				c.timer = 0.2
 		"idle":
+			if c.has("seat") and not _is_bench(roundi(c.x), roundi(c.y)):
+				c.timer = 0.0
 			c.timer -= dt
 			if c.timer > 0.0:
 				return
+			c.erase("seat")
 			var d := _desired(c)
 			if d.kind == "wander":
 				_wander_step(c, world.anchor_of(c), 7.0)
 			elif d.kind == "rest":
 				c.state = "sleep"
 				c.timer = randf_range(12, 20)
-			elif d.kind == "stroll" and Vector2(c.x, c.y).distance_to(Vector2(d.tx, d.ty)) <= 3.0:
+			elif d.kind == "stroll" and not _is_bench(d.tx, d.ty) and Vector2(c.x, c.y).distance_to(Vector2(d.tx, d.ty)) <= 3.0:
 				_wander_step(c, Vector2(d.tx, d.ty), 2.0)
 			else:
 				_go_to(c, d)
@@ -671,6 +708,10 @@ func cat_pos(c: Dictionary) -> Vector2:
 	if c.state == "in" and c.at >= 0 and world.objs[c.at] != null:
 		return world.center_of(c.at) * T + Vector2(8, 8)
 	var tile := Vector2(c.x, c.y)
+	if c.state == "idle" and c.has("seat") and _is_bench(roundi(c.x), roundi(c.y)):
+		var o = world.obj_at(roundi(c.x), roundi(c.y))
+		var off: Vector2 = world.drawer._decor_offset(o.i % W, o.i / W) if o.has("decor") else world.drawer._garden_offset(o.i % W, o.i / W)
+		return tile * T + off + Vector2(11 if c.seat > 0 else 5, 13)
 	var start := Vector2i(tile.floor())
 	var end := Vector2i(tile.ceil())
 	return tile * T + Vector2(8, 14) + _pavement_offset(start).lerp(_pavement_offset(end), clampf(tile.distance_to(Vector2(start)), 0.0, 1.0))
@@ -686,6 +727,8 @@ func _pavement_offset(tile: Vector2i) -> Vector2:
 
 
 func activity_text(c: Dictionary) -> String:
+	if c.state == "idle" and c.has("seat"):
+		return tr("Отдыхает на лавочке")
 	var d = c.dest
 	var where := func(dd) -> String:
 		if dd == null:

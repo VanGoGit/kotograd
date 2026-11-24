@@ -9,7 +9,7 @@ const LangEN = preload("res://scripts/lang_en.gd")
 ## Файлы, где русские строки — не текст интерфейса.
 const SKIP_FILES := ["lang_en.gd", "i18n.gd"]
 ## Имена котиков переводятся транслитом (i18n.cat), их в таблице нет.
-const SKIP_BLOCKS := ["const CAT_NAMES"]
+const SKIP_BLOCKS := ["const CAT_NAMES_MALE", "const CAT_NAMES_FEMALE"]
 
 var fails := 0
 

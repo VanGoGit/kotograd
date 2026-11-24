@@ -192,6 +192,10 @@ const OUTFITS := {
 }
 const CASUAL_SHIRTS := ["ff8fab", "7fc4e8", "ffd75e", "9ed8c8", "c8a8ff", "ffb07a"]
 const HATS := {
+	"sunhat": [[2, 1, 6, 3], [0, 3, 11, 2]],
+	"sailcap": [[1, 1, 8, 2], [2, 3, 6, 1]],
+	"mushroom": [[4, 0, 3, 1], [2, 1, 7, 2], [0, 3, 11, 1]],
+	"nightcap": [[3, 2, 5, 2], [5, 1, 4, 2], [8, 2, 2, 1]],
 	"hard": [[2, 1, 6, 2], [1, 3, 8, 1]],
 	"sou": [[2, 2, 6, 2], [0, 4, 10, 1]],
 	"cap": [[2, 2, 6, 2], [2, 4, 7, 1]],
@@ -224,6 +228,8 @@ static func outfit(key: String) -> Dictionary:
 		for f in ["glasses", "shades"]:
 			if a.get(f, false):
 				o[f] = true
+		if a.get("pack", false):
+			o.pack = col
 		if a.get("scarf", false):
 			o["scarf"] = col
 		return o
@@ -241,6 +247,8 @@ static func outfit(key: String) -> Dictionary:
 static func _wear(style: String, col: String) -> Dictionary:
 	var dark := Color(col).darkened(0.25).to_html(false)
 	match style:
+		"apron", "stripes", "vest", "poncho", "pajamas":
+			return {"s": col, "t": dark, "w": "fff1d2", "l": dark, "cut": style}
 		"hoodie":
 			return {"s": col, "t": dark, "w": col, "l": "6a6478"}
 		"overalls":
@@ -260,7 +268,7 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 	var rows: Array = UP_BODY.duplicate()
 	if sleeping:
 		rows[6] = SLEEP_EYES
-	rows.append_array(UP_LEGS[legs])
+	rows.append_array(UP_LEGS["stand" if legs == "sit" else legs])
 	if o.get("dress", false):
 		# юбка-колокольчик от пояса, под ней лапки
 		rows[12] = "kallllllakk."
@@ -328,6 +336,28 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 	if o.get("dots", false):
 		for pt in [[3, 10], [6, 11], [3, 12], [6, 12], [1, 13], [4, 13], [8, 13]]:
 			px.call(pt[0], pt[1], "ffffff")
+	match o.get("cut", ""):
+		"apron":
+			img.fill_rect(Rect2i(3, 10, 5, 4), Color(o.s))
+			img.fill_rect(Rect2i(4, 11, 3, 2), Color("ffd75e"))
+		"stripes":
+			for y in [10, 12]:
+				img.fill_rect(Rect2i(2, y, 6, 1), Color.WHITE)
+		"vest":
+			img.fill_rect(Rect2i(4, 10, 2, 4), Color("f4dfb0"))
+		"poncho":
+			for y in range(9, 14):
+				var inset := (13 - y) / 2
+				img.fill_rect(Rect2i(inset, y, 10 - 2 * inset, 1), Color(o.s))
+			img.fill_rect(Rect2i(1, 12, 8, 1), Color("f7cb89"))
+		"pajamas":
+			for pt in [Vector2i(3, 10), Vector2i(6, 12), Vector2i(3, 14)]:
+				img.set_pixelv(pt, Color("fff0c2"))
+	if o.has("pack"):
+		var y := 9 if legs == "walkA" else 10
+		img.fill_rect(Rect2i(8, y, 4, 5), Color("75542f"))
+		img.fill_rect(Rect2i(9, y, 3, 4), Color(o.pack))
+		img.set_pixel(10, y + 2, Color("f9cf83"))
 	if o.has("scarf"):
 		for x in range(2, 8):
 			px.call(x, 9, o["scarf"])
@@ -339,6 +369,14 @@ static func make_cat_frame(fur: Dictionary, o: Dictionary, legs: String, sleepin
 		var hat := Image.create_empty(12, 16, false, Image.FORMAT_RGBA8)
 		for r in HATS[o["hat"]]:
 			hat.fill_rect(Rect2i(r[0], r[1], r[2], r[3]), Color(o["hc"]))
+		match o.hat:
+			"mushroom":
+				for pt in [Vector2i(3, 2), Vector2i(6, 1), Vector2i(8, 3)]:
+					hat.set_pixelv(pt, Color("fff3da"))
+			"sunhat", "sailcap":
+				hat.fill_rect(Rect2i(2, 3, 6, 1), Color("56647a"))
+			"nightcap":
+				hat.fill_rect(Rect2i(9, 4 if sleeping or legs == "sit" else 3, 2, 2), Color("fff0c2"))
 		if o["hat"] == "hard":
 			hat.set_pixel(3, 1, Color("fff3a0"))
 		if o["hat"] == "grad":
@@ -368,6 +406,9 @@ func cat_set(color_key: String, outfit_key: String) -> Dictionary:
 	for f in [["stand", "stand", false], ["walkA", "walkA", false], ["walkB", "walkB", false], ["sleep", "stand", true]]:
 		var t := tex(make_cat_frame(fur, o, f[1], f[2]))
 		out[f[0]] = [t, flipped(t)]
+	if o.get("hat") == "nightcap":
+		var seated := tex(make_cat_frame(fur, o, "sit", false))
+		out.sit = [seated, flipped(seated)]
 	_cat_cache[key] = out
 	return out
 

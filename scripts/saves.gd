@@ -407,8 +407,11 @@ func _load_social(c: Dictionary) -> void:
 	# гардероб: неизвестный аксессуар или цвет — просто без него
 	if c.has("dressed"):
 		c["dressed"] = c.dressed == true
+	if c.get("sex") not in ["female", "male"]:
+		var old_style: Dictionary = D.CLOTHES.get(str(c.get("cloth", "")), {})
+		c["sex"] = "female" if old_style.get("female_only", false) else D.sex_for_name(c.name)
 	if c.has("cloth"):
-		c["cloth"] = str(c.cloth) if D.CLOTHES.has(str(c.cloth)) else ""
+		c["cloth"] = str(c.cloth) if D.can_wear(c.sex, str(c.cloth)) else ""
 	if c.has("cloth_col"):
 		c["cloth_col"] = str(c.cloth_col) if D.CLOTH_COLORS.has(str(c.cloth_col)) else D.CLOTH_COLORS[0]
 	if c.has("acc"):

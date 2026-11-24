@@ -50,8 +50,13 @@ var cat_rows: VBoxContainer       # карточка котика: строки 
 var _cat_row := {}               # ключ строки -> [строка, надпись]
 var info_look: Button            # «Гардероб» — открывает выбор наряда котика
 var wardrobe: VBoxContainer      # одежда, аксессуар и его цвет — всё видно сразу
+var wardrobe_modal: Control
+var wardrobe_tab := "cloth"
+var fitting_preview: Control
+var fitting_walk := true
 var _ward_cat = null             # для какого котика собран гардероб
 var _swatches := {}
+var info_follow: Button
 var info_pet: Button
 var info_up: Button
 var toasts_box: VBoxContainer
@@ -785,13 +790,15 @@ func _build_info() -> void:
 	vb.add_child(info_more)
 	info_pet = _btn("Погладить", _pet_selected)
 	vb.add_child(info_pet)
+	info_follow = _btn("Пойти рядом", _toggle_follow)
+	vb.add_child(info_follow)
 	info_look = _btn("Гардероб", _toggle_wardrobe, "Нарядить котика: одежда, бантик, шляпка, очки…")
 	info_look.toggle_mode = true
 	vb.add_child(info_look)
 	wardrobe = VBoxContainer.new()
 	wardrobe.add_theme_constant_override("separation", 4)
 	wardrobe.visible = false
-	vb.add_child(wardrobe)
+	wardrobe_modal = _modal(wardrobe)
 	info_up = _btn("Улучшить", _upgrade_selected, "Улучшенное здание вмещает больше котиков, даёт больше монет и радости")
 	info_up.add_theme_stylebox_override("normal", _sb(GOLD, INK, 3, 8, 8.0))
 	vb.add_child(info_up)
@@ -801,6 +808,8 @@ func _build_info() -> void:
 func _short_lines(o: Dictionary, d: Dictionary) -> Array:
 	var i: int = o.i
 	var out: Array = []
+	if o.t == "road":
+		return [tr(d.desc), tr("Машины можно оставлять у обочины. Парковка рядом освободит место на улице.")]
 	if o.build > 0.0:
 		return [tr(d.desc)]
 	if d.get("wonder", false):
@@ -848,6 +857,13 @@ func _toggle_info_more() -> void:
 	_info_t = 1.0
 
 
+func _toggle_follow() -> void:
+	if world.info_target != null and world.info_target.has("cat"):
+		var cat = world.info_target.cat
+		world.follow_cat = null if is_same(world.follow_cat, cat) else cat
+		_render_info()
+
+
 func _pet_selected() -> void:
 	if world.info_target != null and world.info_target.has("cat"):
 		world.cats_ai.pet_cat(world.info_target.cat)
@@ -890,10 +906,16 @@ func _set_row(key: String, text: String) -> void:
 
 
 func _toggle_wardrobe() -> void:
-	wardrobe.visible = not wardrobe.visible
-	info_look.set_pressed_no_signal(wardrobe.visible)
-	_ward_cat = null
-	_render_info()
+	if wardrobe.visible:
+		close_modals()
+		return
+	if world.info_target == null or not world.info_target.has("cat"):
+		return
+	open_modal(wardrobe_modal)
+	wardrobe_tab = "cloth"
+	wardrobe.visible = true
+	info_look.set_pressed_no_signal(true)
+	_fill_wardrobe(world.info_target.cat)
 
 
 ## Гардероб котика: кружки цвета одежды, портреты с каждым аксессуаром, кружки цвета аксессуара.
@@ -903,37 +925,100 @@ func _fill_wardrobe(c: Dictionary) -> void:
 	for ch in wardrobe.get_children():
 		wardrobe.remove_child(ch)
 		ch.queue_free()
-	var cloth: String = c.get("cloth", "")
-	var ccol: String = c.get("cloth_col", D.CLOTH_COLORS[int(c.casual) % D.CLOTH_COLORS.size()])
-	wardrobe.add_child(_label("Одежда", 13, false))
-	var cgrid := GridContainer.new()
-	cgrid.columns = 7
-	for st in D.CLOTHES:
-		var ctex: Texture2D = Spr.scaled(spr.cat_set(c.color, "wear:%s:%s" % [st, ccol]).stand[0], 2)
-		cgrid.add_child(_look_btn(ctex, st == cloth, c, "cloth", st, tr(D.CLOTHES[st].name)))
-	wardrobe.add_child(cgrid)
-	wardrobe.add_child(_label("Цвет одежды", 13, false))
-	var row := HBoxContainer.new()
-	for hc in D.CLOTH_COLORS:
-		row.add_child(_look_btn(_swatch(hc), cloth != "" and hc == ccol, c, "cloth_col", hc, ""))
-	wardrobe.add_child(row)
-	wardrobe.add_child(_label("Аксессуар", 13, false))
+	var width := clampf(root.size.x - 80, 265, 800)
+	wardrobe.custom_minimum_size.x = width
+	wardrobe.add_theme_constant_override("separation", 10)
+	var heading := HBoxContainer.new()
+	wardrobe.add_child(heading)
+	var title := _label(tr("Гардероб") + " · " + I18n.cat(c.name), 23, false)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(title)
+	heading.add_child(_btn(tr("Готово"), close_modals))
+	fitting_preview = Control.new()
+	fitting_preview.custom_minimum_size.y = 152
+	fitting_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	fitting_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var key: String = world.cats_ai.own_outfit_key(c)
+	fitting_preview.draw.connect(_draw_fitting.bind(fitting_preview, spr.cat_set(c.color, key)))
+	wardrobe.add_child(fitting_preview)
+	var walk := _btn(tr("Пройтись"), _toggle_fitting_walk)
+	walk.toggle_mode = true
+	walk.set_pressed_no_signal(fitting_walk)
+	wardrobe.add_child(walk)
+	var tabs := HBoxContainer.new()
+	wardrobe.add_child(tabs)
+	var sections := {"cloth": "Одежда", "acc": "Аксессуар"}
+	for id in sections:
+		var tab := _btn(tr(sections[id]), _show_wardrobe_tab.bind(c, id))
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.toggle_mode = true
+		tab.set_pressed_no_signal(wardrobe_tab == id)
+		tabs.add_child(tab)
 	var grid := GridContainer.new()
-	grid.columns = 9
-	var col: String = c.get("acc_col", D.ACC_COLORS[0])
-	var base: String = world.cats_ai.own_base_key(c)
-	for acc in [""] + D.ACCESSORIES.keys():
-		var key: String = base if acc == "" else "%s+%s:%s" % [base, acc, col]
-		var tex: Texture2D = Spr.scaled(spr.cat_set(c.color, key).stand[0], 2)
-		var tip: String = tr(D.ACCESSORIES[acc].name) if acc != "" else tr("Без аксессуара")
-		grid.add_child(_look_btn(tex, acc == c.get("acc", ""), c, "acc", acc, tip))
+	grid.columns = clampi(int(width / 150), 2, 5)
 	wardrobe.add_child(grid)
-	if c.get("acc", "") != "":
-		wardrobe.add_child(_label("Цвет аксессуара", 13, false))
-		var crow := HBoxContainer.new()
-		for hc in D.ACC_COLORS:
-			crow.add_child(_look_btn(_swatch(hc), hc == col, c, "color", hc, ""))
-		wardrobe.add_child(crow)
+	var ccol: String = c.get("cloth_col", D.CLOTH_COLORS[int(c.casual) % D.CLOTH_COLORS.size()])
+	var acol: String = c.get("acc_col", D.ACC_COLORS[0])
+	var items: Array = D.CLOTHES.keys().filter(func(style): return D.can_wear(c.sex, style)) if wardrobe_tab == "cloth" else [""] + D.ACCESSORIES.keys()
+	for id in items:
+		var candidate: String
+		var label: String
+		var selected: bool
+		match wardrobe_tab:
+			"cloth":
+				candidate = "wear:%s:%s" % [id, ccol] + world.cats_ai._acc_tail(c)
+				label = tr(D.CLOTHES[id].name)
+				selected = id == c.get("cloth", "")
+			"acc":
+				candidate = world.cats_ai.own_base_key(c)
+				if id != "":
+					candidate += "+%s:%s" % [id, acol]
+				label = tr("Без аксессуара") if id == "" else tr(D.ACCESSORIES[id].name)
+				selected = id == c.get("acc", "")
+		var portrait := Spr.scaled(spr.cat_set(c.color, candidate).stand[0], 4)
+		var card := _look_btn(portrait, selected, c, wardrobe_tab, id, label)
+		card.text = label
+		card.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		card.custom_minimum_size = Vector2(floorf((width - (grid.columns - 1) * 6) / grid.columns), 98)
+		card.add_theme_font_size_override("font_size", 16)
+		grid.add_child(card)
+	if wardrobe_tab == "cloth" or (wardrobe_tab == "acc" and c.get("acc", "") != ""):
+		wardrobe.add_child(_label(tr("Цвет одежды") if wardrobe_tab == "cloth" else tr("Цвет аксессуара"), 17, false))
+		var palette := GridContainer.new()
+		palette.columns = maxi(4, int(width / 48))
+		wardrobe.add_child(palette)
+		for color in (D.CLOTH_COLORS if wardrobe_tab == "cloth" else D.ACC_COLORS):
+			var swatch := _look_btn(Spr.scaled(_swatch(color), 2), color == (ccol if wardrobe_tab == "cloth" else acol), c, "cloth_col" if wardrobe_tab == "cloth" else "color", color, "")
+			swatch.custom_minimum_size = Vector2(42, 40)
+			palette.add_child(swatch)
+	_fit_modal(wardrobe_modal)
+
+
+func _show_wardrobe_tab(c: Dictionary, id: String) -> void:
+	wardrobe_tab = id
+	_fill_wardrobe(c)
+
+
+func _toggle_fitting_walk() -> void:
+	fitting_walk = not fitting_walk
+	fitting_preview.queue_redraw()
+
+
+func _draw_fitting(canvas: Control, frames: Dictionary) -> void:
+	var phase := fmod(float(world.anim_time), 4.0)
+	var facing := 1 if fitting_walk and phase >= 2.0 else 0
+	var pose := "stand"
+	if fitting_walk:
+		pose = "walkA" if int(world.anim_time * 6) % 2 else "walkB"
+	var frame: Texture2D = frames[pose][facing]
+	var stride := (1.0 - absf(phase - 2.0)) if fitting_walk else 0.0
+	var street_size: Vector2 = (frame.get_size() * 0.75).round() * world.zoom
+	for sample in [[canvas.size.x * 0.28, frame.get_size() * 9], [canvas.size.x * 0.73, street_size]]:
+		var size: Vector2 = sample[1]
+		var foot := Vector2(sample[0] + stride * 16, canvas.size.y - 4).round()
+		canvas.draw_rect(Rect2(Vector2(sample[0] - 55, foot.y), Vector2(110, 2)), Color("d8c7ac"))
+		canvas.draw_texture_rect(frame, Rect2(foot - Vector2(size.x / 2, size.y), size), false)
 
 
 func _look_btn(tex: Texture2D, chosen: bool, c: Dictionary, what: String, value, tip: String) -> Button:
@@ -974,12 +1059,16 @@ func _upgrade_selected() -> void:
 func _render_info() -> void:
 	var it = world.info_target
 	if it == null:
+		if wardrobe.visible:
+			close_modals()
 		info_panel.visible = false
 		return
 	var lines := []
 	if it.has("cat"):
 		var c: Dictionary = it.cat
 		if not world.cats.has(c):
+			if wardrobe.visible:
+				close_modals()
 			world.info_target = null
 			info_panel.visible = false
 			return
@@ -988,12 +1077,12 @@ func _render_info() -> void:
 		var fs: Dictionary = spr.cat_set(c.color, look)
 		info_img.texture = Spr.scaled(fs.stand[0], 3)
 		info_name.text = I18n.cat(c.name)
-		info_sub.text = tr("%s котик · %s") % [tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
+		info_sub.text = tr("%s · Окрас: %s · %s") % [tr("Кошка") if c.sex == "female" else tr("Кот"), tr(D.CAT_COLORS[c.color].name), world.cats_ai.profession(c)]
 		_set_row("now", tr("Сейчас: ") + world.cats_ai.activity_text(c))
 		var wish: String = world.social.wish_text(c)
 		_set_row("wish", tr("Мечтает: ") + wish if wish != "" else "")
 		_set_row("traits", tr("Характер: ") + world.social.traits_text(c))
-		_set_row("job", tr("Работа: ") + (world.bname(c.job) if c.job >= 0 else "—"))
+		_set_row("job", tr("Работа: ") + world.bname(c.job) if c.job >= 0 else "")
 		_set_row("home", tr("Дом: ") + (world.bname(c.home) if c.home >= 0 else tr("пока нет — ждёт новое жильё")))
 		var car_txt := tr("ходит пешком")
 		if c.car != "":
@@ -1014,9 +1103,11 @@ func _render_info() -> void:
 		_set_row("friends", tr("Друзья: ") + ", ".join(others.slice(0, 4)) + ("…" if others.size() > 4 else "") if others.size() > 0 else "")
 		var hv: float = world.stats.house_happy.get(c.home, 50.0) - (25.0 if world.economy.hungry else 0.0)
 		_set_row("mood", tr("Настроение: ") + _mood(hv))
-		_set_row("food", tr("Хочет кушать! Нужен рыбный причал или пекарня.") if world.economy.hungry else "")
-		cat_rows.visible = true
-		info_pet.visible = true
+		_set_row("food", tr("Проголодался. Еду привозят с причала или из пекарни.") if world.economy.hungry else "")
+		cat_rows.visible = not wardrobe.visible
+		info_pet.visible = not wardrobe.visible
+		info_follow.visible = not wardrobe.visible
+		info_follow.text = tr("Закончить прогулку") if is_same(world.follow_cat, c) else tr("Пойти рядом")
 		info_look.visible = true
 		if wardrobe.visible and not is_same(_ward_cat, c):
 			_fill_wardrobe(c)
@@ -1036,6 +1127,8 @@ func _render_info() -> void:
 			_info_tile = i
 			_info_full = false
 		var tex: Texture2D = spr.scaffold[o.w] if o.build > 0.0 else spr.obj_texture(o)
+		if o.t == "road":
+			tex = spr.tool_texture("road")
 		var k := clampi(56 / maxi(tex.get_width(), tex.get_height()), 1, 3)
 		info_img.texture = Spr.scaled(tex, k)
 		info_name.text = tr(d.name)
@@ -1089,9 +1182,11 @@ func _render_info() -> void:
 		if d.has("store_food"):
 			lines.append(tr("Хранилище еды: +%d") % int(world.stat(o, "store_food")))
 		info_pet.visible = false
+		info_follow.visible = false
 		info_look.visible = false
 		cat_rows.visible = false
-		wardrobe.visible = false
+		if wardrobe.visible:
+			close_modals()
 		info_look.set_pressed_no_signal(false)
 		# коротко по умолчанию, всё остальное — по кнопке «Подробнее»
 		var short := _short_lines(o, d)
@@ -1106,7 +1201,7 @@ func _render_info() -> void:
 			info_up.disabled = world.coins < uc and not world.unlimited
 	info_body.text = "\n".join(lines)
 	info_body.visible = not lines.is_empty()
-	info_panel.custom_minimum_size.x = 380.0 if cat_rows.visible else 300.0
+	info_panel.custom_minimum_size.x = 380.0 if it.has("cat") else 300.0
 	info_panel.visible = true
 
 
@@ -1402,7 +1497,7 @@ func _build_help() -> void:
 		"• Холмы и горы — дома с видом уютнее, а особняки строятся только наверху.",
 		"• Улучшения — нажмите на здание: многие можно улучшить до 3 уровня — здание станет выше и наряднее.",
 		"• Лимиты — монеты и еда копятся до предела хранилищ: банки, склады и супермаркеты поднимают его.",
-		"• Парковки — котики оставляют на них машины. Если парковки рядом нет, машину бросают прямо на дороге, и начинаются пробки!",
+		"• Котики оставляют машины на парковке или у обочины. Парковка рядом оставляет больше места для движения.",
 		"• Еда — рыбные причалы и пекарни. Отдых и природа — пляжи, пальмы, зонтики, фонтаны и знак KOTOWOOD.",
 		"• Достопримечательности Лос-Анджелеса: обсерватория, пирс с колесом обозрения, стадион… Каждая строится один раз и привлекает туристов.",
 		"• Если снести дом, котики не пропадут: погуляют и переедут, как только появится новое жильё.",
@@ -1779,6 +1874,10 @@ func open_modal(m: Control) -> void:
 
 
 func close_modals() -> void:
+	if wardrobe_modal:
+		wardrobe_modal.hide()
+		wardrobe.hide()
+		info_look.set_pressed_no_signal(false)
 	help_modal.visible = false
 	menu_modal.visible = false
 	if goals_modal:
@@ -1794,6 +1893,8 @@ func close_modals() -> void:
 # ---------- обновление ----------
 
 func _process(delta: float) -> void:
+	if is_instance_valid(fitting_preview) and fitting_preview.is_visible_in_tree() and fitting_walk:
+		fitting_preview.queue_redraw()
 	_hud_t += delta
 	if _hud_t > 0.2:
 		_hud_t = 0.0
@@ -1851,11 +1952,11 @@ func _hint_text() -> String:
 		return tr("Котик уже собирает чемодан и скоро приедет…")
 	var homeless: int = world.economy.homeless_count()
 	if homeless > 0:
-		return tr("Котиков без дома: %d. Постройте жильё — они сразу переедут!") % homeless
+		return tr("Ищут уютный дом: %d. В новом домике их уже будут ждать.") % homeless
 	if st.workplaces.is_empty():
-		return tr("Подсказка: котикам нужна работа! Поставьте Рыбный причал у воды (вкладка «Еда»).")
+		return tr("У воды можно устроить рыбный причал. Туда котики будут ходить на работу.")
 	if world.economy.hungry:
-		return tr("Еда закончилась! Нужен ещё один рыбный причал или пекарня.")
+		return tr("Запасы еды закончились. Причал или пекарня помогут их пополнить.")
 	var roads := 0
 	for o in world.objs:
 		if o != null and o.t == "road":
@@ -1863,20 +1964,18 @@ func _hint_text() -> String:
 			if roads >= 3:
 				break
 	if roads < 3:
-		return tr("Подсказка: проложите Дорогу мимо домов и работы — котики поедут на машинах!")
+		return tr("По улице между домом и работой котики могут ездить на машинах.")
 	if world.cats.size() >= st.cap:
-		return tr("Все дома заняты — постройте ещё жильё, чтобы приехали новые котики.")
+		return tr("Все дома обжиты. В новом домике поселятся новые соседи.")
 	var employed: int = world.economy.employed_count()
 	if employed < world.cats.size() and st.jobs <= employed:
-		return tr("Не всем хватает работы — постройте магазин, пекарню или городские службы.")
+		return tr("В магазине или пекарне найдётся работа для соседей.")
 	if world.coins >= st.coin_cap - 0.5 and not world.unlimited:
-		return tr("Хранилище монет заполнено! Потратьте монетки или постройте Банк (вкладка «Бизнес»).")
+		return tr("Копилка полна. В банке поместится больше монеток.")
 	if world.food >= st.food_cap - 0.5 and world.stats.food_prod > world.economy.eat_rate:
-		return tr("Склады еды полны — постройте Склад или Супермаркет, чтобы запасать больше.")
-	if world.street_parked.size() >= 3:
-		return tr("Машины стоят прямо на дорогах — бывают пробки! Постройте Парковку рядом с работой и магазинами.")
+		return tr("Склады полны. У города есть запас еды.")
 	if world.happy < 45.0:
-		return tr("Котикам скучновато: украсьте город клумбами и деревьями рядом с домами.")
+		return tr("Котики любят цветы и деревья под окнами.")
 	return ""
 
 

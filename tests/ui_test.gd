@@ -57,6 +57,13 @@ func _run() -> void:
 		w._process(0.1)
 	w.speed = 1  # 10 — только для теста, в интерфейсе такой скорости нет
 	await _frames(10)
+	if not w.cats.is_empty():
+		w.info_target = {"cat": w.cats[0]}
+		ui._render_info()
+		ui.info_follow.pressed.emit()
+		_check(is_same(w.follow_cat, w.cats[0]), "камера следует за выбранным котиком")
+		ui.info_follow.pressed.emit()
+		_check(w.follow_cat == null, "прогулка заканчивается из карточки")
 	for lang in ["ru", "en"]:
 		I18n.set_lang(lang)
 		for k in w.D.TABS.size():
@@ -82,6 +89,20 @@ func _run() -> void:
 			if not ui.wardrobe.visible:
 				ui._toggle_wardrobe()
 			ui._render_info()
+			if is_same(c, w.cats[0]):
+				for id in w.D.CLOTHES:
+					var previous: String = c.get("cloth", "")
+					ui._pick_look(c, "cloth", id)
+					if not w.D.can_wear(c.sex, id):
+						_check(c.get("cloth", "") == previous, "недоступный фасон пропущен")
+						continue
+					var frames: Dictionary = w.spr.cat_set(c.color, w.cats_ai.own_outfit_key(c))
+					_check(frames.walkA[0].get_image().get_data() != frames.walkB[0].get_image().get_data(), id + " — два кадра шага")
+				ui._toggle_fitting_walk()
+				ui._toggle_fitting_walk()
+				for tab in ["cloth", "acc"]:
+					ui._show_wardrobe_tab(c, tab)
+					_check(ui.wardrobe_tab == tab and ui.wardrobe_modal.visible, "раздел гардероба " + tab)
 			for acc in [""] + w.D.ACCESSORIES.keys():
 				ui._pick_look(c, "acc", acc)
 				ui._pick_look(c, "color", w.D.ACC_COLORS.pick_random())

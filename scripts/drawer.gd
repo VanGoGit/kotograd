@@ -82,7 +82,8 @@ func draw_world() -> void:
 			continue
 		if c.x < v[0] - 1 or c.x > v[2] + 1 or c.y < v[1] - 1 or c.y > v[3] + 1:
 			continue
-		list.append([c.y * T + 14.0, 1, c])
+		var depth: float = world.cats_ai.cat_pos(c).y + 4 if c.has("seat") else c.y * T + 14.0
+		list.append([depth, 1, c])
 	for car in world.cars:
 		list.append([car.py + 4.0, 2, car])
 	for vis in world.events.visitors:
@@ -324,6 +325,8 @@ func _draw_construction(o: Dictionary, x: int, y: int) -> void:
 func _cat_texture(c: Dictionary) -> Texture2D:
 	var fs: Dictionary = world.spr.cat_set(c.color, world.cats_ai.outfit_key(c))
 	var f := 1 if c.dir < 0 else 0
+	if c.has("seat") and fs.has("sit"):
+		return fs.sit[f]
 	match c.state:
 		"sleep":
 			return fs.sleep[f]
@@ -338,7 +341,11 @@ func _draw_cat(c: Dictionary) -> void:
 	var sx := roundi(feet.x) - 5
 	var sy := roundi(feet.y) - 15 - (int(c.anim * 8.0) % 2 if c.pet > 0.0 else 0)
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
-	_draw_small_cat(tx, sx, sy)
+	if c.state == "idle" and c.has("seat"):
+		var size := (tx.get_size() * Vector2(0.75, 0.60)).round()
+		world.draw_texture_rect(tx, Rect2(Vector2(sx + 1, feet.y - size.y), size), false)
+	else:
+		_draw_small_cat(tx, sx, sy)
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:
 		var bob := roundi(sin(world.anim_time * 5.0) * 1.5)
 		world.draw_texture(world.spr.small.heart, Vector2(sx + 3, sy - 4 + bob))
