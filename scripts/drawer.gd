@@ -352,9 +352,9 @@ func _draw_construction(o: Dictionary, x: int, y: int) -> void:
 	var frame: Texture2D = fs.walkA[1] if up else fs.stand[1]
 	var bx := sx + tx.get_width() - 7
 	var by: int = (y + o.w) * T - 15
-	world.draw_texture(frame, Vector2(bx, by))
-	world.draw_rect(Rect2(bx - 1, by + (8 if up else 10), 2, 1), Color("6a6478"))
-	world.draw_rect(Rect2(bx, by + (9 if up else 11), 1, 2), Color("8a5a3b"))
+	_draw_small_cat(frame, bx, by)
+	world.draw_rect(Rect2(bx + 1, by + (10 if up else 12), 2, 1), Color("6a6478"))
+	world.draw_rect(Rect2(bx + 2, by + (11 if up else 13), 1, 2), Color("8a5a3b"))
 
 
 func _cat_texture(c: Dictionary) -> Texture2D:
@@ -388,7 +388,7 @@ func _draw_cat(c: Dictionary) -> void:
 		_draw_wish(c.wish, sx + 8, sy - 11 + roundi(sin(world.anim_time * 2.0 + c.id) * 0.8))
 
 
-## Облачко желания: белый пузырь с хвостиком и значком — куда котик хочет или что ему нужно.
+## Общий масштаб котиков на карте.
 func _draw_small_cat(tx: Texture2D, sx: int, sy: int, tint := Color.WHITE) -> void:
 	var size := (tx.get_size() * 0.75).round()
 	world.draw_texture_rect(tx, Rect2(Vector2(sx + 1, sy + 4), size), false, tint)
@@ -606,9 +606,10 @@ func _scene_cat(k: int, i: int, outfit: String, feet: Vector2, face: int, frame 
 	var keys: Array = D.CAT_COLORS.keys()
 	var fs: Dictionary = world.spr.cat_set(keys[(i * 7 + k * 13) % keys.size()], outfit)
 	var tx: Texture2D = fs[frame][1 if face < 0 else 0]
-	var pos := Vector2(roundi(feet.x - tx.get_width() / 2.0), roundi(feet.y - tx.get_height() + bob))
-	world.draw_rect(Rect2(pos.x + 1, feet.y - 1, tx.get_width() - 2, 1), Color(0.157, 0.118, 0.196, 0.2))
-	world.draw_texture(tx, pos)
+	var sx := roundi(feet.x) - 5
+	var sy := roundi(feet.y) - 16
+	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
+	_draw_small_cat(tx, sx, sy + bob)
 
 
 func _draw_scene(o: Dictionary) -> void:
