@@ -297,7 +297,13 @@ func _door_of(b: int):
 	return null
 
 
-func _enter(c: Dictionary, b: int) -> void:
+func _enter(c: Dictionary, b: int, visit := false) -> void:
+	c.erase("prop")
+	c.erase("prop_left")
+	var item: String = D.VISIT_PROPS.get(world.objs[b].t, "") if visit else ""
+	if item != "":
+		c.prop = item
+		c.prop_left = 16.0
 	c.state = "in"
 	c.at = b
 	c.timer = randf_range(0.5, 1.2)
@@ -569,10 +575,20 @@ func _walk_done(c: Dictionary) -> void:
 		return
 	if d != null and (d.kind == "home" or d.kind == "work" or d.kind == "visit"):
 		if world.is_ready(d.b) and (d.kind != "home" or c.home == d.b):
-			_enter(c, d.b)
+			_enter(c, d.b, d.kind == "visit")
 			return
 	if d != null and d.kind == "stroll":
-		world.social.on_stroll(c, d.get("sb", -1))
+		var spot: int = d.get("sb", -1)
+		world.social.on_stroll(c, spot)
+		if world.is_ready(spot):
+			var place = world.objs[spot]
+			if D.def(place.t).get("wonder", false) or place.t == "statue":
+				c.state = "idle"
+				c.timer = 3.2
+				c.prop = "camera"
+				c.prop_left = c.timer
+				c.dir = 1 if world.center_of(spot).x >= c.x else -1
+				return
 	var o = world.obj_at(roundi(c.x), roundi(c.y))
 	c.state = "idle"
 	var daytime := world.hour() >= 9.0 and world.hour() < 18.0
@@ -606,6 +622,11 @@ func _walk_done(c: Dictionary) -> void:
 
 func _update_cat(c: Dictionary, dt: float) -> void:
 	c.anim += dt
+	if c.has("prop") and c.state != "in":
+		c.prop_left -= dt
+		if c.prop_left <= 0.0:
+			c.erase("prop")
+			c.erase("prop_left")
 	if c.pet > 0.0:
 		c.pet -= dt
 	match c.state:

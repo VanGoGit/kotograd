@@ -16,7 +16,7 @@ const CH := (H + CHUNK - 1) / CHUNK
 const WINDY := ["palm", "wildpalm"]               # котик, на которого показывает обучение
 const LANE := {"r": Vector2(0, 3), "l": Vector2(0, -3), "d": Vector2(-3, 0), "u": Vector2(3, 0)}
 const LIGHT_COLS := [Color("e0483a"), Color("ffd23f"), Color("5fd38f")]
-const SCENES := ["tennis", "volleyball", "skatepark", "playground", "umbrella", "fountain", "icecream", "cafe", "boba", "juicebar", "pier", "surf"]
+const SCENES := ["tennis", "volleyball", "skatepark", "playground", "umbrella", "fountain", "domino", "cafe", "boba", "juicebar", "pier", "surf"]
 const SIT_OUTSIDE := ["cafe", "boba", "juicebar"]
 
 var world: KotoWorld
@@ -381,11 +381,40 @@ func _draw_cat(c: Dictionary) -> void:
 		world.draw_texture_rect(tx, Rect2(Vector2(sx + 1, feet.y - size.y), size), false)
 	else:
 		_draw_small_cat(tx, sx, sy)
+	if c.has("prop") and c.state in ["walk", "idle"]:
+		_draw_hand_prop(c, feet)
 	if world.info_target != null and world.info_target.has("cat") and world.info_target.cat == c:
 		var bob := roundi(sin(world.anim_time * 5.0) * 1.5)
 		world.draw_texture(world.spr.small.heart, Vector2(sx + 3, sy - 4 + bob))
 	if c.get("wish") != null and world.zoom >= 2 and not world.ui.zen:
 		_draw_wish(c.wish, sx + 8, sy - 11 + roundi(sin(world.anim_time * 2.0 + c.id) * 0.8))
+
+
+func _draw_hand_prop(c: Dictionary, feet: Vector2) -> void:
+	var tx: Texture2D = world.spr.hand_props.get(c.prop)
+	if tx == null:
+		return
+	var phase := fposmod(c.anim + c.id * 0.7, 3.2)
+	var lift := 0
+	match c.prop:
+		"mirror", "binoculars", "book", "program", "flower", "cone", "cup", "tea", "juice", "water", "donut", "loaf", "slice", "taco", "burger", "roll", "popcorn", "apple":
+			lift = 2 if phase < 0.8 else 0
+		"camera":
+			lift = 3 if c.prop_left < 2.6 and c.prop_left > 0.8 else 0
+		"balloon":
+			lift = 3 + roundi(sin(c.anim * 2.0))
+		_:
+			lift = int(c.anim * 3.0) % 2 if c.state == "walk" else 0
+	if c.prop == "music":
+		var beat := fposmod(c.anim * 0.6, 1.0)
+		if beat < 0.65:
+			world.draw_texture(tx, feet.round() + Vector2(c.dir * 4, -12 - roundi(beat * 5)), Color(1, 1, 1, 1.0 - beat))
+		return
+	var x := roundi(feet.x) + (2 if c.dir >= 0 else -2 - tx.get_width())
+	var y := roundi(feet.y) - 3 - lift - tx.get_height()
+	world.draw_texture(tx, Vector2(x, y))
+	if c.prop == "balloon":
+		world.draw_line(Vector2(x + 2, y + tx.get_height()), Vector2(x + 2, feet.y - 3), Color("785751"), 1)
 
 
 ## Общий масштаб котиков на карте.
@@ -605,11 +634,15 @@ func _free_tile(x: int, y: int) -> bool:
 func _scene_cat(k: int, i: int, outfit: String, feet: Vector2, face: int, frame := "stand", bob := 0) -> void:
 	var keys: Array = D.CAT_COLORS.keys()
 	var fs: Dictionary = world.spr.cat_set(keys[(i * 7 + k * 13) % keys.size()], outfit)
-	var tx: Texture2D = fs[frame][1 if face < 0 else 0]
+	var tx: Texture2D = fs.get(frame, fs.stand)[1 if face < 0 else 0]
 	var sx := roundi(feet.x) - 5
 	var sy := roundi(feet.y) - 16
 	world.draw_rect(Rect2(sx + 1, sy + 15, 8, 1), Color(0.157, 0.118, 0.196, 0.2))
-	_draw_small_cat(tx, sx, sy + bob)
+	if frame == "sit":
+		var size := (tx.get_size() * Vector2(0.75, 0.60)).round()
+		world.draw_texture_rect(tx, Rect2(Vector2(sx + 1, feet.y - size.y + bob), size), false)
+	else:
+		_draw_small_cat(tx, sx, sy + bob)
 
 
 func _draw_scene(o: Dictionary) -> void:
@@ -673,18 +706,15 @@ func _draw_scene(o: Dictionary) -> void:
 			_scene_cat(0, i, "surfer", Vector2(bx + 8, by + 15), 1, "sleep")
 		"fountain":
 			_scene_cat(0, i, "casual3", Vector2(bx - 3, by + 15), 1)
-		"icecream":
-			# покупатели едят рожки
-			if not _free_tile(o.i % W, o.i / W + 1):
-				return
+		"domino":
+			var turn := fposmod(t, 6.0)
+			var slide := clampf((fposmod(turn, 3.0) - 0.7) * 2, 0, 1)
 			for k in 2:
-				var fx := bx + 4.0 + k * 9.0
-				var fy := by + 30.0 + k
-				_scene_cat(k, i, "casual%d" % ((i + k) % 6), Vector2(fx, fy), 1 if k == 0 else -1)
-				var lick := int(t * 3.0 + k) % 2
-				var cx := fx + (3.0 if k == 0 else -4.0)
-				world.draw_rect(Rect2(cx, fy - 9 - lick, 2, 3), Color("d8a060"))
-				world.draw_rect(Rect2(cx, fy - 11 - lick, 2, 2), Color("ff9fc0") if k == 0 else Color("9ed8c8"))
+				var playing := k == int(turn / 3.0)
+				_scene_cat(k, i, "casual%d" % ((i + k) % 6), Vector2(bx + 1 + k * 14, by + 15), 1 if k == 0 else -1, "sit", -1 if playing and slide > 0 and slide < 1 else 0)
+			var tile_x := bx + roundi(lerpf(2, 6, slide) if turn < 3 else lerpf(12, 8, slide))
+			world.draw_rect(Rect2(tile_x, by + 7, 3, 2), Color("fff3cd"))
+			world.draw_rect(Rect2(tile_x + 1, by + 8, 1, 1), Color("52485a"))
 		"cafe", "boba", "juicebar":
 			# столик на улице: двое болтают, над чашками пар
 			if not _free_tile(o.i % W, o.i / W + 1):

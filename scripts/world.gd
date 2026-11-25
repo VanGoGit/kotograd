@@ -1065,7 +1065,7 @@ func _finish_car(car: Dictionary, broken: bool) -> void:
 		"home":
 			if is_ready(car.target):
 				if paths.home_roads(car.target).has(end.y * W + end.x):
-					cats_ai._enter(c, car.target)
+					cats_ai._enter(c, car.target, d.kind == "visit")
 				else:
 					# машина уехала в гараж, а котик идёт от дороги до двери
 					cats_ai._go_to(c, d, false)

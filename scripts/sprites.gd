@@ -54,6 +54,7 @@ var palms: Array = []
 var flowers: Array = []
 var icons := {}
 var small := {}
+var hand_props := {}
 var scaffold := {}
 var _cat_cache := {}
 var _veh_cache := {}
@@ -644,6 +645,7 @@ func _init() -> void:
 	_make_more()
 	_make_parking()
 	_make_icons()
+	_make_hand_props()
 	_make_generated()
 
 
@@ -1525,6 +1527,42 @@ func _make_generated() -> void:
 		add_shadow(p.img, Rect2i(1, p.h - 1, p.w - 2, 1))
 		obj["pair_" + key] = tex(p.img)
 		windows["pair_" + key] = p.wins
+
+
+## Предметы в лапке рисуются в натуральном разрешении карты.
+func _make_hand_props() -> void:
+	var palette := {
+		"k": "503b50", "w": "fff0d0", "p": "f98fa6", "r": "d95863",
+		"t": "d59b58", "g": "6aa875", "b": "67b5c7", "y": "ffd367",
+	}
+	var patterns := {
+		"cone": [".pp.", "pwwp", "pttp", ".tt.", ".kt."],
+		"cup": ["wwww", "twwk", "twwk", ".tt."],
+		"tea": ["..k.", "wwww", "pttp", "pkpk", ".kk."],
+		"juice": ["..g.", "wwww", "yyyy", ".tt."],
+		"water": [".bb.", ".ww.", "bwwb", "bbbb", ".bb."],
+		"donut": [".pp.", "pwpp", "p.kt", ".tt."],
+		"loaf": ["...t", "..wt", ".wtk", "ttk.", "tk.."],
+		"slice": ["ttttt", "yrry.", "yry..", "ty...", "t...."],
+		"taco": [".grg.", "gyryg", "tyyyt", ".ttt."],
+		"burger": [".ttt.", "tywwt", "gggrg", "kkkkk", ".ttt."],
+		"roll": [".www.", "wwrpw", "kwwwk", ".kkk."],
+		"popcorn": ["ywyy", "wwyw", "rwrw", ".rw."],
+		"book": ["bbkbb", "wwkww", "wwkww", "bbkbb"],
+		"flower": [".p..", "pyp.", ".pg.", "..g.", ".gg."],
+		"apple": ["..g.", ".rrr", "rwrr", ".rr."],
+		"bag": [".kk.", ".k.k", "tttt", "tyyt", "tttt"],
+		"box": ["ttwtt", "tywwt", "ttwtt"],
+		"balloon": [".pp.", "pwpp", "pppp", ".rp.", "..k.", "..k."],
+		"plush": ["t..t", "tyyt", "tktk", ".tt.", "tyyt"],
+		"program": ["wwwp", "wbwp", "wggp", "wwwp"],
+		"mirror": [".ww.", "wbww", ".bb.", "..t.", "..t."],
+		"music": ["..kkk", "..k.k", "ppk.k", "pp.bb"],
+		"binoculars": ["kk.kk", "bbkbb", "bw.wb"],
+		"camera": [".kk..", "bbkkb", "kbwbk", "kkbkk"],
+	}
+	for item in patterns:
+		hand_props[item] = tex(grid(patterns[item], palette))
 
 
 func _make_icons() -> void:

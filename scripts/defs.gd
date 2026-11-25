@@ -184,6 +184,20 @@ const DEFS := {
 	"rock": {"name": "Камень", "natural": true, "desc": "Можно убрать лопаткой за 2 монетки."},
 }
 
+const VISIT_PROPS := {
+	"icecream": "cone", "cafe": "cup", "boba": "tea", "juicebar": "juice",
+	"donut": "donut", "bakery": "loaf", "pizzeria": "slice", "tacotruck": "taco",
+	"burger": "burger", "sushi": "roll", "restaurant": "box", "cinema": "popcorn",
+	"library": "book", "bookstore": "book", "florist": "flower", "market": "apple",
+	"shop": "bag", "supermarket": "bag", "mall": "bag", "boutique": "bag",
+	"techstore": "box", "petshop": "bag", "toystore": "balloon", "arcade": "plush",
+	"theater": "program", "museum": "program", "gallery": "program",
+	"aquarium": "program", "zoo": "program", "gym": "water", "yoga": "water", "bowling": "water",
+	"groomer": "mirror", "barber": "mirror", "tattoo": "mirror", "spa": "flower",
+	"nightclub": "music", "marina": "binoculars", "surf": "water",
+}
+
+
 const TABS := [
 	{"name": "Рельеф", "icon": "t_grass", "tools": ["t_grass", "t_sand", "t_water", "t_hill", "t_mountain", "t_dry", "t_meadow"]},
 	{"name": "Транспорт", "icon": "road", "tools": ["road", "highway", "path", "blvd", "pawtile", "flamingotile", "parking", "garage", "rail", "platform", "station", "airport"]},

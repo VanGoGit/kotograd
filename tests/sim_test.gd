@@ -107,6 +107,8 @@ func _check_neighbors(w) -> void:
 	for i in range(w.W + 1, w.W * (w.H - 1)):
 		if i % w.W >= w.W - 3 or w.objs[i] != null or w.objs[i + 1] != null or w.objs[i + 2] != null:
 			continue
+		if not w.foot_ok(i + w.W):
+			continue
 		var table = w.place_obj(i + 1, "domino", 0, 0)
 		var house = w.place_obj(i + 2, "house", 0, 0)
 		var cafe = w.place_obj(i, "cafe", 0, 1)
@@ -120,6 +122,17 @@ func _check_neighbors(w) -> void:
 		w.recalc()
 		_check(not w.patios.has(i + 1) and comfort == w.stats.house_happy[house.i] + 7, "столик даёт пять единиц уюта и две за соседство")
 		w.remove_obj(cafe)
+		var kiosk = w.place_obj(i, "icecream", 0, 0)
+		var guest := {"id": -103, "dest": {"kind": "visit", "b": i}, "path": [], "anim": 0.0, "pet": 0.0}
+		w.cats_ai._walk_done(guest)
+		_check(guest.state == "in" and guest.get("prop") == "cone", "посетитель киоска получает рожок")
+		w.cats_ai._go_to(guest, {"kind": "wander"}, false)
+		_check(guest.state == "idle" and guest.get("prop") == "cone", "котик выносит мороженое на улицу")
+		guest.timer = 30.0
+		w.cats_ai._update_cat(guest, 17.0)
+		_check(not guest.has("prop"), "после прогулки рожок съеден")
+		_check(w.D.VISIT_PROPS.values().all(func(item): return w.spr.hand_props.has(item)), "у каждой покупки или занятия есть спрайт")
+		w.remove_obj(kiosk)
 		w.remove_obj(house)
 		w.recalc()
 		return
